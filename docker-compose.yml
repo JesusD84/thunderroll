@@ -1,0 +1,65 @@
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: thunderrol_postgres
+    environment:
+      POSTGRES_DB: thunderrol
+      POSTGRES_USER: thunderrol
+      POSTGRES_PASSWORD: thunderrol123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thunderrol -d thunderrol"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: thunderrol_backend
+    environment:
+      DATABASE_URL: postgresql://thunderrol:thunderrol123@postgres:5432/thunderrol
+      SECRET_KEY: your-secret-key-here-thunderrol-2024
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: thunderrol_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: your-nextauth-secret-here-thunderrol-2024
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_uploads:
+
+networks:
+  default:
+    name: thunderrol_network
