@@ -1,5 +1,6 @@
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Enum, Float
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.database import Base
@@ -133,8 +134,7 @@ class Movement(Base):
     __tablename__ = "movements"
 
     id = Column(Integer, primary_key=True, index=True)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=False)
     movement_type = Column(Enum(MovementType), nullable=False)
     from_location_id = Column(Integer, ForeignKey("locations.id"))
     to_location_id = Column(Integer, ForeignKey("locations.id"))
@@ -208,7 +208,7 @@ class TransferUnit(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     transfer_id = Column(Integer, ForeignKey("transfers.id"), nullable=False)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
+    unit_id = Column(UUID(as_uuid=True), ForeignKey("units.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

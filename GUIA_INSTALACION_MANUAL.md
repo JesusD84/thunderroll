@@ -40,7 +40,7 @@ brew services list | grep postgresql  # macOS
 ### 2. Crear Base de Datos y Usuario
 ```bash
 # Conectarse como usuario postgres
-sudo -u postgres psql
+psql -U <username> -d postgres
 
 # Dentro del prompt de PostgreSQL, ejecutar:
 CREATE DATABASE thunderrol;
