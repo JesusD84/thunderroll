@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
 from app.models.models import UserRole, UnitStatus, MovementType
@@ -132,6 +132,8 @@ class Location(LocationBase):
 
 # Unit Schemas
 class UnitBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     engine_number: str
     chassis_number: str
     model_id: int
@@ -146,6 +148,8 @@ class UnitCreate(UnitBase):
     pass
 
 class UnitUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
     model_id: Optional[int] = None
