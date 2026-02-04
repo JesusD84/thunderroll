@@ -1,7 +1,7 @@
 
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -91,7 +91,7 @@ async def upload_inventory_file(
         import_record.successful_imports = result["successful_imports"]
         import_record.failed_imports = result["failed_imports"]
         import_record.status = "completed"
-        import_record.completed_at = datetime.utcnow()
+        import_record.completed_at = datetime.now(UTC)
         
         db.commit()
         

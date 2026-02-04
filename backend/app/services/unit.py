@@ -2,7 +2,7 @@
 """Unit management service."""
 
 import json
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -180,7 +180,7 @@ class UnitService:
             unit.assigned_branch_id = unit_update.assigned_branch_id
         
         unit.last_updated_by_id = user_id
-        unit.updated_at = datetime.utcnow()
+        unit.updated_at = datetime.now(UTC)
         
         # Create audit event
         await UnitService._create_event(
@@ -265,7 +265,7 @@ class UnitService:
         unit.status = UnitStatus.IDENTIFICADA_EN_TALLER
         unit.location_id = taller.id
         unit.last_updated_by_id = user_id
-        unit.updated_at = datetime.utcnow()
+        unit.updated_at = datetime.now(UTC)
         
         # Create audit event
         await UnitService._create_event(

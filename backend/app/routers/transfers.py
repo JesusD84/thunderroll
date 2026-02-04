@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, desc, func
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.database.database import get_db
 from app.models import models, schemas
@@ -142,7 +142,7 @@ def create_transfer(
         user_id=current_user.id,
         total_units=len(transfer.unit_ids),
         notes=transfer.notes,
-        transfer_date=transfer.transfer_date or datetime.utcnow()
+        transfer_date=transfer.transfer_date or datetime.now(UTC)
     )
     db.add(db_transfer)
     db.commit()
@@ -219,7 +219,7 @@ def update_transfer(
                 )
                 db.add(movement)
             
-            update_data["completed_date"] = datetime.utcnow()
+            update_data["completed_date"] = datetime.now(UTC)
         
         # If cancelling the transfer
         elif new_status == "cancelled":

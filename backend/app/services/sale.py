@@ -1,7 +1,7 @@
 
 """Sale service for selling units."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -67,7 +67,7 @@ class SaleService:
         # Update unit status
         unit.status = UnitStatus.VENDIDA
         unit.last_updated_by_id = user_id
-        unit.updated_at = datetime.utcnow()
+        unit.updated_at = datetime.now(UTC)
         
         # Create sale record
         sale = Sale(
@@ -75,7 +75,7 @@ class SaleService:
             receipt=sale_data.receipt,
             sold_by_id=sale_data.sold_by_id,
             branch_id=sale_data.branch_id,
-            sold_at=sale_data.sold_at or datetime.utcnow(),
+            sold_at=sale_data.sold_at or datetime.now(UTC),
             customer_name=sale_data.customer_name
         )
         

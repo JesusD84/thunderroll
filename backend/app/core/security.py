@@ -1,7 +1,7 @@
 
 """Security utilities for JWT tokens and password hashing."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -21,9 +21,9 @@ def create_access_token(
 ) -> str:
     """Create an access token."""
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(UTC) + timedelta(
             minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         )
     
@@ -46,9 +46,9 @@ def create_refresh_token(
 ) -> str:
     """Create a refresh token."""
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(UTC) + timedelta(
             days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
         )
     
