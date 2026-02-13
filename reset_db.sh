@@ -73,7 +73,7 @@ alembic upgrade head
 
 # Ejecutar seeds del backend
 print_status "Poblando con datos iniciales del backend..."
-python -m app.db.seed
+python -m app.database.seed
 
 print_success "Backend reseteado correctamente"
 
