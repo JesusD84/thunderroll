@@ -81,7 +81,7 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # Ejecutar seeds
-python -m app.db.seed
+python -m app.database.seed
 
 # Ejecutar servidor
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
