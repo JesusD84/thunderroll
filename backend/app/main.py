@@ -7,7 +7,7 @@ import os
 
 from app.database.database import engine, SessionLocal, get_db
 from app.models import models
-from app.routers import auth, units, imports, transfers, reports
+from app.routers import auth, units, imports, transfers, reports, settings
 from app.database.seed import create_demo_data
 
 # Create tables
@@ -49,6 +49,7 @@ app.include_router(units.router, prefix="/api/units", tags=["Units"])
 app.include_router(imports.router, prefix="/api/imports", tags=["Imports"])
 app.include_router(transfers.router, prefix="/api/transfers", tags=["Transfers"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 
 @app.get("/")
 def read_root():
