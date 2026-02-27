@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Brand, Model, Color, Location, 
-    Settings, Unit, UnitStatus, Movement, MovementType
+    Setting, Unit, UnitStatus, Movement, MovementType
 )
 from app.services.auth import get_password_hash
 from datetime import datetime, timedelta
