@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Import your models
-from app.db.base import Base
+from app.database.database import Base
 from app.models.location import Location
 from app.models.user import User
 from app.models.shipment import Shipment

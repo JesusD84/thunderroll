@@ -9,11 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.db.base import Base
-from app.core.deps import get_db
+from tests.db.base import Base
+from tests.core.deps import get_db
 from app.models.user import User, UserRole
 from app.models.location import Location, LocationType
-from app.core.security import get_password_hash
+from tests.core.security import get_password_hash
 
 # Test database URL (in-memory SQLite for tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
