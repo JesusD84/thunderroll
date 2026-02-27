@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Brand, Model, Color, Location, 
-    Unit, UnitStatus, Movement, MovementType
+    Setting, Unit, UnitStatus, Movement, MovementType
 )
 from app.services.auth import get_password_hash
 from datetime import datetime, timedelta
@@ -186,6 +186,71 @@ async def create_demo_data():
         db.commit()
         print("✓ Locations created")
         
+        # Create settings
+        settings = [
+            Setting(
+                key="company_name",
+                value="Thunderrol S.A. de C.V.",
+                description="Nombre de la empresa",
+                category="general",
+                data_type="string"
+            ),
+            Setting(
+                key="company_address",
+                value="Guadalajara, Jalisco, México",
+                description="Dirección de la empresa",
+                category="general",
+                data_type="string"
+            ),
+            Setting(
+                key="company_phone",
+                value="33-1234-5678",
+                description="Teléfono de la empresa",
+                category="general",
+                data_type="string"
+            ),
+            Setting(
+                key="company_email",
+                value="info@thunderrol.com",
+                description="Email de la empresa",
+                category="general",
+                data_type="string"
+            ),
+            Setting(
+                key="default_currency",
+                value="MXN",
+                description="Moneda por defecto",
+                category="financial",
+                data_type="string"
+            ),
+            Setting(
+                key="tax_rate",
+                value="16",
+                description="Tasa de IVA (%)",
+                category="financial",
+                data_type="integer"
+            ),
+            Setting(
+                key="timezone",
+                value="America/Mexico_City",
+                description="Zona horaria",
+                category="general",
+                data_type="string"
+            ),
+            Setting(
+                key="auto_backup",
+                value="true",
+                description="Respaldo automático habilitado",
+                category="system",
+                data_type="boolean"
+            )
+        ]
+        
+        for setting in settings:
+            db.add(setting)
+        db.commit()
+        print("✓ Settings created")
+
         # Create demo units
         admin_user = db.query(User).filter(User.username == "admin").first()
         warehouse = db.query(Location).filter(Location.name == "Almacén Principal").first()
