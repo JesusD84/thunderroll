@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
 
-from app.core.config import settings
+from tests.core.config import settings
 
 
 # Password hashing context
