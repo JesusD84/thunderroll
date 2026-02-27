@@ -55,6 +55,6 @@ starlette==0.27.0
 typing_extensions==4.15.0
 tzdata==2025.3
 uvicorn==0.24.0
-uvloop==0.22.1
+uvloop==0.22.1; sys_platform != "win32"
 watchfiles==1.1.1
 websockets==16.0
