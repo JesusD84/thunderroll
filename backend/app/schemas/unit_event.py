@@ -4,14 +4,13 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel
-from app.models.unit_event import EventType
 
 
 class UnitEvent(BaseModel):
     """Unit event response schema."""
     id: int
     unit_id: UUID
-    event_type: EventType
+    event_type: str
     before: dict | None = None
     after: dict | None = None
     user_id: int

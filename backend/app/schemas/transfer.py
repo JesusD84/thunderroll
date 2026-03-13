@@ -4,7 +4,6 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field
-from app.models.transfer import TransferStatus
 
 
 class TransferBase(BaseModel):
@@ -33,7 +32,7 @@ class Transfer(TransferBase):
     created_at: datetime
     received_by_id: int | None = None
     received_at: datetime | None = None
-    status: TransferStatus
+    status: str
     
     # Related objects
     unit: dict | None = None
