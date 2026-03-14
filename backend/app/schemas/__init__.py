@@ -8,7 +8,6 @@ from app.schemas.shipment import Shipment, ShipmentCreate
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilter, UnitIdentification
 from app.schemas.unit_event import UnitEvent
 from app.schemas.transfer import Transfer, TransferCreate, TransferReceive
-from app.schemas.sale import Sale, SaleCreate
 from app.schemas.common import PaginatedResponse
 
 __all__ = [
@@ -19,6 +18,5 @@ __all__ = [
     "Unit", "UnitCreate", "UnitUpdate", "UnitFilter", "UnitIdentification",
     "UnitEvent",
     "Transfer", "TransferCreate", "TransferReceive", 
-    "Sale", "SaleCreate",
     "PaginatedResponse",
 ]
