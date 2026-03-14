@@ -4,7 +4,7 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field
-from app.models.unit import UnitStatus
+from app.models.models import UnitStatus
 
 
 class UnitBase(BaseModel):
