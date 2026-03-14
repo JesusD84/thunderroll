@@ -210,20 +210,15 @@ def delete_unit(
     if not db_unit:
         raise HTTPException(status_code=404, detail="Unit not found")
     
-    # Check if unit has movements (except creation)
-    movement_count = db.query(models.Movement).filter(
-        and_(
-            models.Movement.unit_id == unit_id,
-            models.Movement.movement_type != MovementType.IMPORT
-        )
-    ).count()
-    
-    if movement_count > 0:
+    if db_unit.status == models.UnitStatus.IN_TRANSIT:
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete unit with movement history. Consider marking as inactive instead."
+            detail="Cannot delete unit in transit. The transit should be completed first."
         )
     
+    # Delete associated movements first because Movement.unit_id has a NOT NULL constraint
+    # and the foreign key reference cannot exist after the unit is deleted
+    db.query(models.Movement).filter(models.Movement.unit_id == unit_id).delete()
     db.delete(db_unit)
     db.commit()
     return {"message": "Unit deleted successfully"}
