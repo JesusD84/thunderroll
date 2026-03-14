@@ -2,8 +2,8 @@
 from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
-    User, UserRole, Brand, Model, Color, Location, 
-    Setting, Unit, UnitStatus, Movement, MovementType
+    User, UserRole, Color, Location, Setting,
+    Unit, UnitStatus, Movement, MovementType
 )
 from app.services.auth import get_password_hash
 from datetime import datetime, timedelta
@@ -61,58 +61,6 @@ async def create_demo_data():
             db.add(user)
         db.commit()
         print("✓ Users created")
-        
-        # Create brands
-        brands = [
-            Brand(name="YAMAHA"),
-            Brand(name="HONDA"),
-            Brand(name="SUZUKI"),
-            Brand(name="KAWASAKI"),
-            Brand(name="BAJAJ"),
-            Brand(name="TVS"),
-            Brand(name="HERO"),
-            Brand(name="KTM")
-        ]
-        
-        for brand in brands:
-            db.add(brand)
-        db.commit()
-        print("✓ Brands created")
-        
-        # Create models
-        yamaha_brand = db.query(Brand).filter(Brand.name == "YAMAHA").first()
-        honda_brand = db.query(Brand).filter(Brand.name == "HONDA").first()
-        suzuki_brand = db.query(Brand).filter(Brand.name == "SUZUKI").first()
-        bajaj_brand = db.query(Brand).filter(Brand.name == "BAJAJ").first()
-        
-        models = [
-            # Yamaha models
-            Model(name="YBR 125", brand_id=yamaha_brand.id, year=2024, engine_type="4T", displacement="125cc"),
-            Model(name="XTZ 125", brand_id=yamaha_brand.id, year=2024, engine_type="4T", displacement="125cc"),
-            Model(name="FZ16", brand_id=yamaha_brand.id, year=2024, engine_type="4T", displacement="150cc"),
-            Model(name="MT-03", brand_id=yamaha_brand.id, year=2024, engine_type="4T", displacement="321cc"),
-            
-            # Honda models
-            Model(name="CB 125F", brand_id=honda_brand.id, year=2024, engine_type="4T", displacement="125cc"),
-            Model(name="XR 150L", brand_id=honda_brand.id, year=2024, engine_type="4T", displacement="150cc"),
-            Model(name="CB 190R", brand_id=honda_brand.id, year=2024, engine_type="4T", displacement="184cc"),
-            Model(name="CBR 250R", brand_id=honda_brand.id, year=2024, engine_type="4T", displacement="250cc"),
-            
-            # Suzuki models
-            Model(name="GN 125", brand_id=suzuki_brand.id, year=2024, engine_type="4T", displacement="125cc"),
-            Model(name="GSX 150", brand_id=suzuki_brand.id, year=2024, engine_type="4T", displacement="150cc"),
-            Model(name="GIXXER 250", brand_id=suzuki_brand.id, year=2024, engine_type="4T", displacement="250cc"),
-            
-            # Bajaj models
-            Model(name="BOXER 150", brand_id=bajaj_brand.id, year=2024, engine_type="4T", displacement="150cc"),
-            Model(name="PULSAR 180", brand_id=bajaj_brand.id, year=2024, engine_type="4T", displacement="180cc"),
-            Model(name="DOMINAR 400", brand_id=bajaj_brand.id, year=2024, engine_type="4T", displacement="373cc")
-        ]
-        
-        for model in models:
-            db.add(model)
-        db.commit()
-        print("✓ Models created")
         
         # Create colors
         colors = [
@@ -255,10 +203,14 @@ async def create_demo_data():
         admin_user = db.query(User).filter(User.username == "admin").first()
         warehouse = db.query(Location).filter(Location.name == "Almacén Principal").first()
         
-        # Get some models and colors for demo units
-        ybr125 = db.query(Model).filter(Model.name == "YBR 125").first()
-        cb125f = db.query(Model).filter(Model.name == "CB 125F").first()
-        xtz125 = db.query(Model).filter(Model.name == "XTZ 125").first()
+        # Get some models, brands and colors for demo units
+        ybr125 = "YBR 125"
+        cb125f = "CB 125F"
+        xtz125 = "XTZ 125"
+
+        yamaha = "Yamaha"
+        suzuki = "Suzuki"
+        kawasaki = "Kawasaki"
         
         negro = db.query(Color).filter(Color.name == "Negro").first()
         rojo = db.query(Color).filter(Color.name == "Rojo").first()
@@ -269,7 +221,8 @@ async def create_demo_data():
             Unit(
                 engine_number="YBR125001",
                 chassis_number="YBR125CH001",
-                model_id=ybr125.id,
+                model=ybr125,
+                brand=yamaha,
                 color_id=negro.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
@@ -277,7 +230,8 @@ async def create_demo_data():
             Unit(
                 engine_number="YBR125002",
                 chassis_number="YBR125CH002",
-                model_id=ybr125.id,
+                model=ybr125,
+                brand=kawasaki,
                 color_id=rojo.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
@@ -285,7 +239,8 @@ async def create_demo_data():
             Unit(
                 engine_number="CB125F001",
                 chassis_number="CB125FCH001",
-                model_id=cb125f.id,
+                model=cb125f,
+                brand=kawasaki,
                 color_id=azul.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
@@ -293,7 +248,8 @@ async def create_demo_data():
             Unit(
                 engine_number="CB125F002",
                 chassis_number="CB125FCH002",
-                model_id=cb125f.id,
+                brand=suzuki,
+                model=cb125f,
                 color_id=blanco.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.SOLD,
@@ -302,7 +258,8 @@ async def create_demo_data():
             Unit(
                 engine_number="XTZ125001",
                 chassis_number="XTZ125CH001",
-                model_id=xtz125.id,
+                model=xtz125,
+                brand=suzuki,
                 color_id=negro.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.RESERVED

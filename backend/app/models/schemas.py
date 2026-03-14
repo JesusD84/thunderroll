@@ -44,41 +44,6 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# Brand Schemas
-class BrandBase(BaseModel):
-    name: str
-
-class BrandCreate(BrandBase):
-    pass
-
-class Brand(BrandBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# Model Schemas
-class ModelBase(BaseModel):
-    name: str
-    brand_id: int
-    year: Optional[int] = None
-    engine_type: Optional[str] = None
-    displacement: Optional[str] = None
-
-class ModelCreate(ModelBase):
-    pass
-
-class Model(ModelBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    brand: Optional[Brand] = None
-
-    class Config:
-        from_attributes = True
-
 # Color Schemas
 class ColorBase(BaseModel):
     name: str
@@ -136,7 +101,8 @@ class UnitBase(BaseModel):
 
     engine_number: str
     chassis_number: str
-    model_id: int
+    model: str
+    brand: str
     color_id: int
     current_location_id: Optional[int] = None
     status: UnitStatus = UnitStatus.AVAILABLE
@@ -150,7 +116,8 @@ class UnitUpdate(BaseModel):
 
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
-    model_id: Optional[int] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
     color_id: Optional[int] = None
     current_location_id: Optional[int] = None
     status: Optional[UnitStatus] = None
@@ -162,7 +129,8 @@ class Unit(UnitBase):
     sold_date: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    model: Optional[Model] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
     color: Optional[Color] = None
     current_location: Optional[Location] = None
 
@@ -290,8 +258,6 @@ class InventoryReport(BaseModel):
     total_units: int
     by_status: dict
     by_location: dict
-    by_brand: dict
-    by_model: dict
 
 class MovementReport(BaseModel):
     movements: List[Movement]
