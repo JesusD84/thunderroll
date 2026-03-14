@@ -96,7 +96,6 @@ def get_transfer_units(
     units = db.query(models.Unit).join(models.TransferUnit) \
               .filter(models.TransferUnit.transfer_id == transfer_id) \
               .options(
-                  selectinload(models.Unit.model).selectinload(models.Model.brand),
                   selectinload(models.Unit.color)
               ).all()
     
