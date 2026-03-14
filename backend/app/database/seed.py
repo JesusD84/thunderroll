@@ -272,9 +272,7 @@ async def create_demo_data():
                 model_id=ybr125.id,
                 color_id=negro.id,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE,
-                purchase_price=45000.00,
-                sale_price=52000.00
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="YBR125002",
@@ -282,9 +280,7 @@ async def create_demo_data():
                 model_id=ybr125.id,
                 color_id=rojo.id,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE,
-                purchase_price=45000.00,
-                sale_price=52000.00
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="CB125F001",
@@ -292,9 +288,7 @@ async def create_demo_data():
                 model_id=cb125f.id,
                 color_id=azul.id,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE,
-                purchase_price=48000.00,
-                sale_price=55000.00
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="CB125F002",
@@ -303,8 +297,6 @@ async def create_demo_data():
                 color_id=blanco.id,
                 current_location_id=warehouse.id,
                 status=UnitStatus.SOLD,
-                purchase_price=48000.00,
-                sale_price=55000.00,
                 sold_date=datetime.now() - timedelta(days=5)
             ),
             Unit(
@@ -313,9 +305,7 @@ async def create_demo_data():
                 model_id=xtz125.id,
                 color_id=negro.id,
                 current_location_id=warehouse.id,
-                status=UnitStatus.RESERVED,
-                purchase_price=47000.00,
-                sale_price=54000.00
+                status=UnitStatus.RESERVED
             )
         ]
         
@@ -342,7 +332,6 @@ async def create_demo_data():
                     unit_id=unit.id,
                     user_id=admin_user.id,
                     movement_type=MovementType.SALE,
-                    price=unit.sale_price,
                     movement_date=unit.sold_date,
                     notes="Venta de unidad - datos de demostración"
                 )

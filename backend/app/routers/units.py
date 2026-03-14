@@ -205,7 +205,6 @@ def update_unit(
             unit_id=db_unit.id,
             user_id=current_user.id,
             movement_type=movement_type,
-            price=update_data.get("sale_price") if movement_type == MovementType.SALE else None,
             notes=f"Status changed from {old_status} to {update_data['status']}"
         )
         db.add(movement)
@@ -290,8 +289,6 @@ def move_unit(
     
     if movement.movement_type == MovementType.SALE:
         unit.status = UnitStatus.SOLD
-        if movement.price:
-            unit.sale_price = movement.price
         unit.sold_date = movement.movement_date or db.func.now()
     elif movement.movement_type == MovementType.TRANSFER:
         unit.status = UnitStatus.IN_TRANSIT

@@ -59,8 +59,7 @@ def get_dashboard_stats(
     six_months_ago = datetime.now() - timedelta(days=180)
     sales_by_month = db.query(
         func.date_trunc('month', models.Unit.sold_date).label("month"),
-        func.count(models.Unit.id).label("count"),
-        func.sum(models.Unit.sale_price).label("total_value")
+        func.count(models.Unit.id).label("count")
     ).filter(
         and_(
             models.Unit.status == UnitStatus.SOLD,
@@ -102,7 +101,6 @@ def get_dashboard_stats(
                 "to_location": m.to_location.name if m.to_location else None,
                 "user": f"{m.user.first_name} {m.user.last_name}" if m.user else None,
                 "date": m.movement_date or m.created_at,
-                "price": m.price
             } for m in recent_movements
         ],
         "inventory_by_location": [
@@ -213,8 +211,6 @@ def get_inventory_report(
                 "color": unit.color.name if unit.color else None,
                 "location": unit.current_location.name if unit.current_location else None,
                 "status": unit.status.value if unit.status else None,
-                "purchase_price": unit.purchase_price,
-                "sale_price": unit.sale_price,
                 "created_at": unit.created_at,
                 "sold_date": unit.sold_date
             } for unit in units
@@ -299,7 +295,6 @@ def get_movements_report(
                 "to_location": movement.to_location.name if movement.to_location else None,
                 "user": f"{movement.user.first_name} {movement.user.last_name}" if movement.user else None,
                 "quantity": movement.quantity,
-                "price": movement.price,
                 "notes": movement.notes,
                 "movement_date": movement.movement_date,
                 "created_at": movement.created_at
@@ -353,11 +348,6 @@ def get_sales_report(
     
     # Calculate totals
     total_sales = len(sold_units)
-    total_revenue = sum([unit.sale_price or 0 for unit in sold_units])
-    total_profit = sum([
-        (unit.sale_price or 0) - (unit.purchase_price or 0) 
-        for unit in sold_units
-    ])
     
     # Sales by month
     sales_by_month = {}
@@ -365,24 +355,21 @@ def get_sales_report(
         if unit.sold_date:
             month_key = unit.sold_date.strftime("%Y-%m")
             if month_key not in sales_by_month:
-                sales_by_month[month_key] = {"count": 0, "revenue": 0}
+                sales_by_month[month_key] = {"count": 0}
             sales_by_month[month_key]["count"] += 1
-            sales_by_month[month_key]["revenue"] += unit.sale_price or 0
     
     # Sales by brand
     sales_by_brand = {}
     for unit in sold_units:
         brand = unit.model.brand.name if unit.model and unit.model.brand else "Unknown"
         if brand not in sales_by_brand:
-            sales_by_brand[brand] = {"count": 0, "revenue": 0}
+            sales_by_brand[brand] = {"count": 0}
         sales_by_brand[brand]["count"] += 1
-        sales_by_brand[brand]["revenue"] += unit.sale_price or 0
     
     return {
         "total_sales": total_sales,
         "total_revenue": total_revenue,
         "total_profit": total_profit,
-        "average_sale_price": total_revenue / total_sales if total_sales > 0 else 0,
         "summary": {
             "by_month": [
                 {
@@ -407,9 +394,6 @@ def get_sales_report(
                 "brand": unit.model.brand.name if unit.model and unit.model.brand else None,
                 "model": unit.model.name if unit.model else None,
                 "color": unit.color.name if unit.color else None,
-                "purchase_price": unit.purchase_price,
-                "sale_price": unit.sale_price,
-                "profit": (unit.sale_price or 0) - (unit.purchase_price or 0),
                 "sold_date": unit.sold_date
             } for unit in sold_units
         ]

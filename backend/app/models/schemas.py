@@ -140,8 +140,6 @@ class UnitBase(BaseModel):
     color_id: int
     current_location_id: Optional[int] = None
     status: UnitStatus = UnitStatus.AVAILABLE
-    purchase_price: Optional[float] = None
-    sale_price: Optional[float] = None
     notes: Optional[str] = None
 
 class UnitCreate(UnitBase):
@@ -156,8 +154,6 @@ class UnitUpdate(BaseModel):
     color_id: Optional[int] = None
     current_location_id: Optional[int] = None
     status: Optional[UnitStatus] = None
-    purchase_price: Optional[float] = None
-    sale_price: Optional[float] = None
     sold_date: Optional[datetime] = None
     notes: Optional[str] = None
 
@@ -180,7 +176,6 @@ class MovementBase(BaseModel):
     from_location_id: Optional[int] = None
     to_location_id: Optional[int] = None
     quantity: int = 1
-    price: Optional[float] = None
     notes: Optional[str] = None
     movement_date: Optional[datetime] = None
 
