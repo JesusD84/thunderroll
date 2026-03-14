@@ -26,7 +26,6 @@ def get_dashboard_stats(
     available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
     sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
-    reserved_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.RESERVED).count()
     
     # Location counts
     total_locations = db.query(models.Location).filter(models.Location.is_active == True).count()
@@ -75,7 +74,6 @@ def get_dashboard_stats(
             "available": available_units,
             "sold": sold_units,
             "in_transit": in_transit_units,
-            "reserved": reserved_units
         },
         "locations": {
             "total": total_locations

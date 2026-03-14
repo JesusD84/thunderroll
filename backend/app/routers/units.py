@@ -58,9 +58,6 @@ def get_unit_stats(
     available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
     sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
-    reserved_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.RESERVED).count()
-    damaged_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.DAMAGED).count()
-    maintenance_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.MAINTENANCE).count()
     
     # Get inventory by location
     inventory_by_location = db.query(
@@ -74,9 +71,6 @@ def get_unit_stats(
         "available_units": available_units,
         "sold_units": sold_units,
         "in_transit_units": in_transit_units,
-        "reserved_units": reserved_units,
-        "damaged_units": damaged_units,
-        "maintenance_units": maintenance_units,
         "inventory_by_location": [{"location": loc.name, "count": loc.count} for loc in inventory_by_location]
     }
 

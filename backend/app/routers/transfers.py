@@ -128,7 +128,7 @@ def create_transfer(
     for unit in units:
         if unit.current_location_id != transfer.from_location_id:
             invalid_units.append(f"Unit {unit.engine_number} is not at the source location")
-        if unit.status not in [UnitStatus.AVAILABLE, UnitStatus.RESERVED]:
+        if unit.status not in [UnitStatus.AVAILABLE]:
             invalid_units.append(f"Unit {unit.engine_number} is not available for transfer")
     
     if invalid_units:
@@ -313,7 +313,7 @@ def add_units_to_transfer(
                 detail=f"Unit {unit.engine_number} is not at the source location"
             )
         
-        if unit.status not in [UnitStatus.AVAILABLE, UnitStatus.RESERVED]:
+        if unit.status not in [UnitStatus.AVAILABLE]:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unit {unit.engine_number} is not available for transfer"

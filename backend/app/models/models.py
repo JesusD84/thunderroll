@@ -15,9 +15,6 @@ class UnitStatus(str, enum.Enum):
     AVAILABLE = "available"
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
-    RESERVED = "reserved"
-    DAMAGED = "damaged"
-    MAINTENANCE = "maintenance"
 
 class MovementType(str, enum.Enum):
     IMPORT = "import"

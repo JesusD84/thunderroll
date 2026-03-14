@@ -262,7 +262,7 @@ async def create_demo_data():
                 brand=suzuki,
                 color_id=negro.id,
                 current_location_id=warehouse.id,
-                status=UnitStatus.RESERVED
+                status=UnitStatus.AVAILABLE
             )
         ]
         
