@@ -33,8 +33,6 @@ def upgrade() -> None:
     op.drop_table('imports')
     op.drop_index('ix_transfers_id', table_name='transfers')
     op.drop_table('transfers')
-    op.drop_index('ix_colors_id', table_name='colors')
-    op.drop_table('colors')
     op.drop_index('ix_movements_id', table_name='movements')
     op.drop_table('movements')
     op.drop_index('ix_locations_id', table_name='locations')
@@ -54,14 +52,13 @@ def downgrade() -> None:
     sa.Column('chassis_number', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('model', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('brand', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
-    sa.Column('color_id', sa.INTEGER(), autoincrement=False, nullable=False),
+    sa.Column('color',  sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('current_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
     sa.Column('status', postgresql.ENUM('AVAILABLE', 'SOLD', 'IN_TRANSIT', name='unitstatus'), autoincrement=False, nullable=False),
     sa.Column('sold_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
     sa.Column('notes', sa.TEXT(), autoincrement=False, nullable=True),
     sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
     sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.ForeignKeyConstraint(['color_id'], ['colors.id'], name='units_color_id_fkey'),
     sa.ForeignKeyConstraint(['current_location_id'], ['locations.id'], name='units_current_location_id_fkey'),
     sa.PrimaryKeyConstraint('id', name='units_pkey'),
     postgresql_ignore_search_path=False
@@ -104,17 +101,6 @@ def downgrade() -> None:
     sa.PrimaryKeyConstraint('id', name='movements_pkey')
     )
     op.create_index('ix_movements_id', 'movements', ['id'], unique=False)
-    op.create_table('colors',
-    sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('colors_id_seq'::regclass)"), autoincrement=True, nullable=False),
-    sa.Column('name', sa.VARCHAR(length=50), autoincrement=False, nullable=False),
-    sa.Column('hex_code', sa.VARCHAR(length=7), autoincrement=False, nullable=True),
-    sa.Column('is_active', sa.BOOLEAN(), autoincrement=False, nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.PrimaryKeyConstraint('id', name='colors_pkey'),
-    sa.UniqueConstraint('name', name='colors_name_key'),
-    postgresql_ignore_search_path=False
-    )
-    op.create_index('ix_colors_id', 'colors', ['id'], unique=False)
     op.create_table('transfers',
     sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('transfers_id_seq'::regclass)"), autoincrement=True, nullable=False),
     sa.Column('from_location_id', sa.INTEGER(), autoincrement=False, nullable=False),
