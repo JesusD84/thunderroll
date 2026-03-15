@@ -15,22 +15,19 @@ def get_units(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     status: Optional[UnitStatus] = None,
-    color_id: Optional[int] = None,
+    color: Optional[str] = None,
     location_id: Optional[int] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     )
     
     # Apply filters
     if status:
         query = query.filter(models.Unit.status == status)
-    if color_id:
-        query = query.filter(models.Unit.color_id == color_id)
     if location_id:
         query = query.filter(models.Unit.current_location_id == location_id)
     if search:
@@ -38,6 +35,7 @@ def get_units(
             or_(
                 models.Unit.brand.ilike(f"%{search}%"),
                 models.Unit.model.ilike(f"%{search}%"),
+                models.Unit.color.ilike(f"%{search}%"),
                 models.Unit.engine_number.ilike(f"%{search}%"),
                 models.Unit.chassis_number.ilike(f"%{search}%")
             )
@@ -81,7 +79,6 @@ def get_unit(
     current_user: models.User = Depends(get_current_active_user)
 ):
     unit = db.query(models.Unit).options(
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     ).filter(models.Unit.id == unit_id).first()
     

@@ -124,7 +124,7 @@ def get_dashboard_stats(
 def get_inventory_report(
     brand: Optional[str] = None,
     model: Optional[str] = None,
-    color_id: Optional[int] = None,
+    color: Optional[str] = None,
     location_id: Optional[int] = None,
     status: Optional[UnitStatus] = None,
     date_from: Optional[datetime] = None,
@@ -135,7 +135,6 @@ def get_inventory_report(
     """Generate inventory report with filters"""
     
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     )
     
@@ -144,8 +143,8 @@ def get_inventory_report(
         query = query.filter(models.Unit.brand == brand)
     if model:
         query = query.filter(models.Unit.model == model)
-    if color_id:
-        query = query.filter(models.Unit.color_id == color_id)
+    if color:
+        query = query.filter(models.Unit.color == color)
     if location_id:
         query = query.filter(models.Unit.current_location_id == location_id)
     if status:
@@ -188,7 +187,7 @@ def get_inventory_report(
                 "chassis_number": unit.chassis_number,
                 "brand": unit.brand,
                 "model": unit.model,
-                "color": unit.color.name if unit.color else None,
+                "color": unit.color,
                 "location": unit.current_location.name if unit.current_location else None,
                 "status": unit.status.value if unit.status else None,
                 "created_at": unit.created_at,
@@ -300,7 +299,6 @@ def get_sales_report(
     """Generate sales report"""
     
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     ).filter(models.Unit.status == UnitStatus.SOLD)
     
@@ -354,7 +352,7 @@ def get_sales_report(
                 "chassis_number": unit.chassis_number,
                 "brand": unit.brand,
                 "model": unit.model,
-                "color": unit.color.name if unit.color else None,
+                "color": unit.color,
                 "sold_date": unit.sold_date
             } for unit in sold_units
         ]

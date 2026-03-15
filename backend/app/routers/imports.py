@@ -186,21 +186,13 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
             if existing_unit:
                 raise ValueError(f"Unit with engine number {engine_number} or chassis number {chassis_number} already exists")
             
-            # Get or create color
-            color = db.query(models.Color).filter(models.Color.name == color_name).first()
-            if not color:
-                color = models.Color(name=color_name)
-                db.add(color)
-                db.commit()
-                db.refresh(color)
-            
             # Create unit
             unit = models.Unit(
                 engine_number=engine_number,
                 chassis_number=chassis_number,
                 model=model_name,
                 brand=brand_name,
-                color_id=color.id,
+                color=color_name,
                 current_location_id=default_location.id,
                 status=UnitStatus.AVAILABLE
             )

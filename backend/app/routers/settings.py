@@ -92,35 +92,6 @@ def delete_setting(
     db.commit()
     return {"message": "Setting deleted successfully"}
 
-# Colors endpoints
-@router.get("/colors/", response_model=List[schemas.Color])
-def get_colors(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    colors = db.query(models.Color).filter(models.Color.is_active == True) \
-               .offset(skip).limit(limit).all()
-    return colors
-
-@router.post("/colors/", response_model=schemas.Color)
-def create_color(
-    color: schemas.ColorCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
-):
-    # Check if color already exists
-    existing_color = db.query(models.Color).filter(models.Color.name == color.name).first()
-    if existing_color:
-        raise HTTPException(status_code=400, detail="Color already exists")
-    
-    db_color = models.Color(**color.dict())
-    db.add(db_color)
-    db.commit()
-    db.refresh(db_color)
-    return db_color
-
 # Locations endpoints
 @router.get("/locations/", response_model=List[schemas.Location])
 def get_locations(

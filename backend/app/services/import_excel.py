@@ -195,11 +195,6 @@ class ImportService:
         # Check color
         if pd.isna(row['color']):
             errors.append(f"Row {row_number}: Color is missing")
-        else:
-            color = str(row['color']).strip().lower()
-            valid_colors = ['red', 'black', 'green', 'pink', 'grey', 'blue', 'white', 'yellow', 'orange', 'purple']
-            if color not in valid_colors:
-                errors.append(f"Row {row_number}: Invalid color '{color}'. Valid colors: {valid_colors}")
         
         return errors
     

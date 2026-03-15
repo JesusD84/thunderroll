@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
-    User, UserRole, Color, Location, Setting,
+    User, UserRole, Location, Setting,
     Unit, UnitStatus, Movement, MovementType
 )
 from app.services.auth import get_password_hash
@@ -61,25 +61,6 @@ async def create_demo_data():
             db.add(user)
         db.commit()
         print("✓ Users created")
-        
-        # Create colors
-        colors = [
-            Color(name="Negro", hex_code="#000000"),
-            Color(name="Blanco", hex_code="#FFFFFF"),
-            Color(name="Rojo", hex_code="#FF0000"),
-            Color(name="Azul", hex_code="#0066CC"),
-            Color(name="Verde", hex_code="#00AA00"),
-            Color(name="Amarillo", hex_code="#FFFF00"),
-            Color(name="Naranja", hex_code="#FF6600"),
-            Color(name="Gris", hex_code="#808080"),
-            Color(name="Plateado", hex_code="#C0C0C0"),
-            Color(name="Dorado", hex_code="#FFD700")
-        ]
-        
-        for color in colors:
-            db.add(color)
-        db.commit()
-        print("✓ Colors created")
         
         # Create locations
         locations = [
@@ -212,10 +193,10 @@ async def create_demo_data():
         suzuki = "Suzuki"
         kawasaki = "Kawasaki"
         
-        negro = db.query(Color).filter(Color.name == "Negro").first()
-        rojo = db.query(Color).filter(Color.name == "Rojo").first()
-        azul = db.query(Color).filter(Color.name == "Azul").first()
-        blanco = db.query(Color).filter(Color.name == "Blanco").first()
+        negro = "Negro"
+        rojo = "Rojo"
+        azul = "Azul"
+        blanco = "Blanco"
         
         demo_units = [
             Unit(
@@ -223,7 +204,7 @@ async def create_demo_data():
                 chassis_number="YBR125CH001",
                 model=ybr125,
                 brand=yamaha,
-                color_id=negro.id,
+                color=negro,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
             ),
@@ -232,7 +213,7 @@ async def create_demo_data():
                 chassis_number="YBR125CH002",
                 model=ybr125,
                 brand=kawasaki,
-                color_id=rojo.id,
+                color=rojo,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
             ),
@@ -241,7 +222,7 @@ async def create_demo_data():
                 chassis_number="CB125FCH001",
                 model=cb125f,
                 brand=kawasaki,
-                color_id=azul.id,
+                color=azul,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
             ),
@@ -250,7 +231,7 @@ async def create_demo_data():
                 chassis_number="CB125FCH002",
                 brand=suzuki,
                 model=cb125f,
-                color_id=blanco.id,
+                color=blanco,
                 current_location_id=warehouse.id,
                 status=UnitStatus.SOLD,
                 sold_date=datetime.now() - timedelta(days=5)
@@ -260,7 +241,7 @@ async def create_demo_data():
                 chassis_number="XTZ125CH001",
                 model=xtz125,
                 brand=suzuki,
-                color_id=negro.id,
+                color=negro,
                 current_location_id=warehouse.id,
                 status=UnitStatus.AVAILABLE
             )

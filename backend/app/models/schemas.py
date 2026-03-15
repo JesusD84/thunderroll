@@ -44,22 +44,6 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# Color Schemas
-class ColorBase(BaseModel):
-    name: str
-    hex_code: Optional[str] = None
-
-class ColorCreate(ColorBase):
-    pass
-
-class Color(ColorBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 # Location Schemas
 class LocationBase(BaseModel):
     name: str
@@ -103,7 +87,7 @@ class UnitBase(BaseModel):
     chassis_number: str
     model: str
     brand: str
-    color_id: int
+    color: str
     current_location_id: Optional[int] = None
     status: UnitStatus = UnitStatus.AVAILABLE
     notes: Optional[str] = None
@@ -118,7 +102,7 @@ class UnitUpdate(BaseModel):
     chassis_number: Optional[str] = None
     model: Optional[str] = None
     brand: Optional[str] = None
-    color_id: Optional[int] = None
+    color: Optional[str] = None
     current_location_id: Optional[int] = None
     status: Optional[UnitStatus] = None
     sold_date: Optional[datetime] = None
@@ -131,7 +115,7 @@ class Unit(UnitBase):
     updated_at: Optional[datetime] = None
     model: Optional[str] = None
     brand: Optional[str] = None
-    color: Optional[Color] = None
+    color: Optional[str] = None
     current_location: Optional[Location] = None
 
     class Config:

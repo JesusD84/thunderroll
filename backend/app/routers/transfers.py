@@ -94,10 +94,7 @@ def get_transfer_units(
         raise HTTPException(status_code=404, detail="Transfer not found")
     
     units = db.query(models.Unit).join(models.TransferUnit) \
-              .filter(models.TransferUnit.transfer_id == transfer_id) \
-              .options(
-                  selectinload(models.Unit.color)
-              ).all()
+              .filter(models.TransferUnit.transfer_id == transfer_id).all()
     
     return units
 

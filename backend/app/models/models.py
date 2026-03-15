@@ -43,18 +43,6 @@ class User(Base):
     imports = relationship("Import", back_populates="user")
     transfers = relationship("Transfer", back_populates="user")
 
-class Color(Base):
-    __tablename__ = "colors"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False)
-    hex_code = Column(String(7))  # Color hex code like #FF5733
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    units = relationship("Unit", back_populates="color")
-
 class Location(Base):
     __tablename__ = "locations"
 
@@ -84,7 +72,7 @@ class Unit(Base):
     chassis_number = Column(String(100), unique=True, nullable=False, index=True)
     model = Column(String(100), nullable=False)
     brand = Column(String(100), nullable=False)
-    color_id = Column(Integer, ForeignKey("colors.id"), nullable=False)
+    color = Column(String(100), nullable=False)
     current_location_id = Column(Integer, ForeignKey("locations.id"))
     status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.AVAILABLE)
     sold_date = Column(DateTime(timezone=True))
@@ -93,7 +81,6 @@ class Unit(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    color = relationship("Color", back_populates="units")
     current_location = relationship("Location", back_populates="units")
     movements = relationship("Movement", back_populates="unit")
 
