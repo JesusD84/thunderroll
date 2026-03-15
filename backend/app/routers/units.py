@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_, desc
+from sqlalchemy import func, and_, or_, desc
 from typing import List, Optional
 from app.database.database import get_db
 from app.models import models, schemas
@@ -60,7 +60,7 @@ def get_unit_stats(
     # Get inventory by location
     inventory_by_location = db.query(
         models.Location.name,
-        db.func.count(models.Unit.id).label("count")
+        func.count(models.Unit.id).label("count")
     ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
      .group_by(models.Location.id, models.Location.name).all()
     
@@ -269,7 +269,7 @@ def move_unit(
     
     if movement.movement_type == MovementType.SALE:
         unit.status = UnitStatus.SOLD
-        unit.sold_date = movement.movement_date or db.func.now()
+        unit.sold_date = movement.movement_date or func.now()
     elif movement.movement_type == MovementType.TRANSFER:
         unit.status = UnitStatus.IN_TRANSIT
     
