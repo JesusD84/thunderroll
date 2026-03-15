@@ -67,46 +67,18 @@ async def create_demo_data():
             Location(
                 name="Almacén Principal",
                 address="Av. Revolucion 1234",
-                city="Guadalajara",
-                state="Jalisco",
-                zip_code="44100",
-                country="México",
-                phone="33-1234-5678",
-                email="almacen@thunderrol.com",
-                manager_name="Juan Pérez"
             ),
             Location(
                 name="Sucursal Centro",
                 address="Calle Juárez 567",
-                city="Guadalajara",
-                state="Jalisco",
-                zip_code="44100",
-                country="México",
-                phone="33-2345-6789",
-                email="centro@thunderrol.com",
-                manager_name="María García"
             ),
             Location(
                 name="Sucursal Plaza del Sol",
                 address="Av. López Mateos 890",
-                city="Guadalajara",
-                state="Jalisco",
-                zip_code="44110",
-                country="México",
-                phone="33-3456-7890",
-                email="plaza@thunderrol.com",
-                manager_name="Carlos Rodríguez"
             ),
             Location(
                 name="Taller de Servicio",
                 address="Calle Industria 123",
-                city="Guadalajara",
-                state="Jalisco",
-                zip_code="44120",
-                country="México",
-                phone="33-4567-8901",
-                email="taller@thunderrol.com",
-                manager_name="Luis Martínez"
             )
         ]
         
