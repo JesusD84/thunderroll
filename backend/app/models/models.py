@@ -49,13 +49,6 @@ class Location(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     address = Column(Text)
-    city = Column(String(100))
-    state = Column(String(100))
-    zip_code = Column(String(20))
-    country = Column(String(100))
-    phone = Column(String(20))
-    email = Column(String(255))
-    manager_name = Column(String(100))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

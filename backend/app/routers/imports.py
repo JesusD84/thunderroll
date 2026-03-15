@@ -154,10 +154,7 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
     if not default_location:
         default_location = models.Location(
             name="Almacén Principal",
-            address="Guadalajara, Jalisco",
-            city="Guadalajara",
-            state="Jalisco",
-            country="México"
+            address="Guadalajara, Jalisco Mexico",
         )
         db.add(default_location)
         db.commit()

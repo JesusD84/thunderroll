@@ -48,13 +48,6 @@ class LoginRequest(BaseModel):
 class LocationBase(BaseModel):
     name: str
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
 
 class LocationCreate(LocationBase):
     pass
@@ -62,13 +55,6 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
     is_active: Optional[bool] = None
 
 class Location(LocationBase):
