@@ -25,8 +25,6 @@ def upgrade() -> None:
     op.drop_index('ix_users_id', table_name='users')
     op.drop_index('ix_users_username', table_name='users')
     op.drop_table('users')
-    op.drop_index('ix_settings_id', table_name='settings')
-    op.drop_table('settings')
     op.drop_index('ix_transfer_units_id', table_name='transfer_units')
     op.drop_table('transfer_units')
     op.drop_index('ix_imports_id', table_name='imports')
@@ -140,20 +138,6 @@ def downgrade() -> None:
     sa.PrimaryKeyConstraint('id', name='transfer_units_pkey')
     )
     op.create_index('ix_transfer_units_id', 'transfer_units', ['id'], unique=False)
-    op.create_table('settings',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('key', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
-    sa.Column('value', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('description', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('category', sa.VARCHAR(length=50), autoincrement=False, nullable=True),
-    sa.Column('data_type', sa.VARCHAR(length=20), autoincrement=False, nullable=True),
-    sa.Column('is_active', sa.BOOLEAN(), autoincrement=False, nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.PrimaryKeyConstraint('id', name='settings_pkey'),
-    sa.UniqueConstraint('key', name='settings_key_key')
-    )
-    op.create_index('ix_settings_id', 'settings', ['id'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('users_id_seq'::regclass)"), autoincrement=True, nullable=False),
     sa.Column('email', sa.VARCHAR(length=255), autoincrement=False, nullable=False),
