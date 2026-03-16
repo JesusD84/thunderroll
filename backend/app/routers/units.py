@@ -30,31 +30,6 @@ def create_unit(
 ):
     return UnitService.create_unit(db, unit)
 
-@router.get("/stats")
-def get_unit_stats(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    total_units = db.query(models.Unit).count()
-    available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
-    sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
-    in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
-    
-    # Get inventory by location
-    inventory_by_location = db.query(
-        models.Location.name,
-        func.count(models.Unit.id).label("count")
-    ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
-     .group_by(models.Location.id, models.Location.name).all()
-    
-    return {
-        "total_units": total_units,
-        "available_units": available_units,
-        "sold_units": sold_units,
-        "in_transit_units": in_transit_units,
-        "inventory_by_location": [{"location": loc.name, "count": loc.count} for loc in inventory_by_location]
-    }
-
 @router.get("/{unit_id}", response_model=Unit)
 def get_unit(
     unit_id: int,
@@ -163,6 +138,31 @@ def delete_unit(
     db.delete(db_unit)
     db.commit()
     return {"message": "Unit deleted successfully"}
+
+@router.get("/stats")
+def get_unit_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    total_units = db.query(models.Unit).count()
+    available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
+    sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
+    in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
+    
+    # Get inventory by location
+    inventory_by_location = db.query(
+        models.Location.name,
+        func.count(models.Unit.id).label("count")
+    ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
+     .group_by(models.Location.id, models.Location.name).all()
+    
+    return {
+        "total_units": total_units,
+        "available_units": available_units,
+        "sold_units": sold_units,
+        "in_transit_units": in_transit_units,
+        "inventory_by_location": [{"location": loc.name, "count": loc.count} for loc in inventory_by_location]
+    }
 
 @router.get("/{unit_id}/movements", response_model=List[schemas.Movement])
 def get_unit_movements(
