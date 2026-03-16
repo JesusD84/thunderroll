@@ -1,25 +1,20 @@
 
 """Unit management service."""
 
-import json
-from datetime import datetime, UTC
-from uuid import UUID
-from typing import List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
+from typing import Optional
+from sqlalchemy.orm import Session
 
-from app.models.unit import Unit, UnitStatus
-from app.models.unit_event import UnitEvent, EventType
-from app.models.location import Location, LocationType
-from app.models.user import User
-from app.schemas.unit import UnitCreate, UnitUpdate, UnitFilter, UnitIdentification
+from app.schemas.unit import UnitFilters, Unit, UnitCreate
+from app.repositories.unit_repository import UnitRepository
 
 
 class UnitService:
     """Service for unit operations."""
-    
+
+    @staticmethod
+    def get_units(db: Session, filters: UnitFilters, skip: int, limit: int) -> list[Unit]:
+        return UnitRepository.get_units(db, filters, skip, limit)
+
     @staticmethod
     async def create_unit(
         db: AsyncSession,

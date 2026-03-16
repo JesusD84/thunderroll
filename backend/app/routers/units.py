@@ -1,51 +1,26 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, and_, or_, desc
-from typing import List, Optional
+from typing import List
 from app.database.database import get_db
 from app.models import models, schemas
+from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
 from app.models.models import UserRole, UnitStatus, MovementType
 from app.services.auth import get_current_active_user, require_role
+from app.services.unit import UnitService
 
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.Unit])
+@router.get("/", response_model=List[Unit])
 def get_units(
+    filters: UnitFilters = Depends(),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: Optional[UnitStatus] = None,
-    color: Optional[str] = None,
-    location_id: Optional[int] = None,
-    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    query = db.query(models.Unit).options(
-        selectinload(models.Unit.current_location)
-    )
-    
-    # Apply filters
-    if status:
-        query = query.filter(models.Unit.status == status)
-    if location_id:
-        query = query.filter(models.Unit.current_location_id == location_id)
-    if search:
-        query = query.filter(
-            or_(
-                models.Unit.brand.ilike(f"%{search}%"),
-                models.Unit.model.ilike(f"%{search}%"),
-                models.Unit.color.ilike(f"%{search}%"),
-                models.Unit.engine_number.ilike(f"%{search}%"),
-                models.Unit.chassis_number.ilike(f"%{search}%")
-            )
-        )
-    
-    # Apply pagination and ordering
-    query = query.order_by(desc(models.Unit.created_at))
-    units = query.offset(skip).limit(limit).all()
-    
-    return units
+    return UnitService.get_units(db, filters, skip, limit)
 
 @router.get("/stats")
 def get_unit_stats(
@@ -72,7 +47,7 @@ def get_unit_stats(
         "inventory_by_location": [{"location": loc.name, "count": loc.count} for loc in inventory_by_location]
     }
 
-@router.get("/{unit_id}", response_model=schemas.Unit)
+@router.get("/{unit_id}", response_model=Unit)
 def get_unit(
     unit_id: int,
     db: Session = Depends(get_db),
@@ -86,9 +61,9 @@ def get_unit(
         raise HTTPException(status_code=404, detail="Unit not found")
     return unit
 
-@router.post("/", response_model=schemas.Unit)
+@router.post("/", response_model=Unit)
 def create_unit(
-    unit: schemas.UnitCreate,
+    unit: UnitCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
@@ -125,10 +100,10 @@ def create_unit(
     
     return get_unit(db_unit.id, db, current_user)
 
-@router.put("/{unit_id}", response_model=schemas.Unit)
+@router.put("/{unit_id}", response_model=Unit)
 def update_unit(
     unit_id: int,
-    unit_update: schemas.UnitUpdate,
+    unit_update: UnitUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
