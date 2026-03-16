@@ -22,6 +22,14 @@ def get_units(
 ):
     return UnitService.get_units(db, filters, skip, limit)
 
+@router.post("/", response_model=Unit)
+def create_unit(
+    unit: UnitCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+):
+    return UnitService.create_unit(db, unit)
+
 @router.get("/stats")
 def get_unit_stats(
     db: Session = Depends(get_db),
@@ -60,45 +68,6 @@ def get_unit(
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found")
     return unit
-
-@router.post("/", response_model=Unit)
-def create_unit(
-    unit: UnitCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
-):
-    # Check if engine number or chassis number already exists
-    existing_unit = db.query(models.Unit).filter(
-        or_(
-            models.Unit.engine_number == unit.engine_number,
-            models.Unit.chassis_number == unit.chassis_number
-        )
-    ).first()
-    
-    if existing_unit:
-        raise HTTPException(
-            status_code=400,
-            detail="Unit with this engine number or chassis number already exists"
-        )
-    
-    # Create new unit
-    db_unit = models.Unit(**unit.dict())
-    db.add(db_unit)
-    db.commit()
-    db.refresh(db_unit)
-    
-    # Create import movement record
-    movement = models.Movement(
-        unit_id=db_unit.id,
-        user_id=current_user.id,
-        movement_type=MovementType.IMPORT,
-        to_location_id=unit.current_location_id,
-        notes="Unit created manually"
-    )
-    db.add(movement)
-    db.commit()
-    
-    return get_unit(db_unit.id, db, current_user)
 
 @router.put("/{unit_id}", response_model=Unit)
 def update_unit(

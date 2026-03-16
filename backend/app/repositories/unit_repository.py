@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from app.models.models import Unit
-from app.schemas.unit import UnitFilters
+from app.schemas.unit import UnitCreate, UnitFilters
 
 
 class UnitRepository:
@@ -25,3 +25,31 @@ class UnitRepository:
             )
 
         return query.offset(skip).limit(limit).all()
+
+    @staticmethod
+    def get_unit(db: Session, unit_id: int) -> Unit | None:
+        return (
+            db.query(Unit)
+            .options(selectinload(Unit.current_location))
+            .filter(Unit.id == unit_id)
+            .one_or_none()
+        )
+
+    @staticmethod
+    def get_by_engine_or_chassis(db: Session, engine_number: str, chassis_number: str) -> Unit | None:
+        return (
+            db.query(Unit)
+            .filter(
+                (Unit.engine_number == engine_number) |
+                (Unit.chassis_number == chassis_number)
+            )
+            .first()
+        )
+
+    @staticmethod
+    def create_unit(db: Session, unit_data: UnitCreate) -> Unit:
+        unit = Unit(**unit_data.model_dump())
+        db.add(unit)
+        db.commit()
+        db.refresh(unit)
+        return UnitRepository.get_unit(db, unit.id)
