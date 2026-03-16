@@ -68,7 +68,6 @@ def downgrade() -> None:
     sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('locations_id_seq'::regclass)"), autoincrement=True, nullable=False),
     sa.Column('name', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('address', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('is_active', sa.BOOLEAN(), autoincrement=False, nullable=True),
     sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
     sa.PrimaryKeyConstraint('id', name='locations_pkey'),
     postgresql_ignore_search_path=False

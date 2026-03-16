@@ -28,7 +28,7 @@ def get_dashboard_stats(
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
     
     # Location counts
-    total_locations = db.query(models.Location).filter(models.Location.is_active == True).count()
+    total_locations = db.query(models.Location).count()
     
     # Recent movements (last 10)
     recent_movements = db.query(models.Movement).options(
@@ -42,7 +42,6 @@ def get_dashboard_stats(
         models.Location.name.label("location"),
         func.count(models.Unit.id).label("count")
     ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
-     .filter(models.Location.is_active == True) \
      .group_by(models.Location.id, models.Location.name).all()
     
     # Sales by month (last 6 months)

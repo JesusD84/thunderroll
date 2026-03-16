@@ -55,11 +55,9 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
-    is_active: Optional[bool] = None
 
 class Location(LocationBase):
     id: int
-    is_active: bool
     created_at: datetime
 
     class Config:

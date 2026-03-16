@@ -17,7 +17,7 @@ def get_locations(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    locations = db.query(models.Location).filter(models.Location.is_active == True) \
+    locations = db.query(models.Location) \
                   .offset(skip).limit(limit).all()
     return locations
 
