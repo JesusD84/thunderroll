@@ -27,3 +27,10 @@ class UnitService:
                 detail="A unit with this engine number or chassis number already exists"
             )
         return UnitRepository.create_unit(db, unit_data)
+
+    @staticmethod
+    def get_unit_by_id(db: Session, unit_id: int) -> Unit:
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+        return unit

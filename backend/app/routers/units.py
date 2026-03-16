@@ -36,13 +36,7 @@ def get_unit(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    unit = db.query(models.Unit).options(
-        selectinload(models.Unit.current_location)
-    ).filter(models.Unit.id == unit_id).first()
-    
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    return unit
+    return UnitService.get_unit_by_id(db, unit_id)
 
 @router.put("/{unit_id}", response_model=Unit)
 def update_unit(
