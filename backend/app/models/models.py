@@ -15,9 +15,6 @@ class UnitStatus(str, enum.Enum):
     AVAILABLE = "available"
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
-    RESERVED = "reserved"
-    DAMAGED = "damaged"
-    MAINTENANCE = "maintenance"
 
 class MovementType(str, enum.Enum):
     IMPORT = "import"
@@ -46,58 +43,12 @@ class User(Base):
     imports = relationship("Import", back_populates="user")
     transfers = relationship("Transfer", back_populates="user")
 
-class Brand(Base):
-    __tablename__ = "brands"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    models = relationship("Model", back_populates="brand")
-
-class Model(Base):
-    __tablename__ = "models"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False)
-    year = Column(Integer)
-    engine_type = Column(String(50))
-    displacement = Column(String(20))
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    brand = relationship("Brand", back_populates="models")
-    units = relationship("Unit", back_populates="model")
-
-class Color(Base):
-    __tablename__ = "colors"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False)
-    hex_code = Column(String(7))  # Color hex code like #FF5733
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    units = relationship("Unit", back_populates="color")
-
 class Location(Base):
     __tablename__ = "locations"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     address = Column(Text)
-    city = Column(String(100))
-    state = Column(String(100))
-    zip_code = Column(String(20))
-    country = Column(String(100))
-    phone = Column(String(20))
-    email = Column(String(255))
-    manager_name = Column(String(100))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -112,8 +63,9 @@ class Unit(Base):
     id = Column(Integer, primary_key=True, index=True)
     engine_number = Column(String(100), unique=True, nullable=False, index=True)
     chassis_number = Column(String(100), unique=True, nullable=False, index=True)
-    model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
-    color_id = Column(Integer, ForeignKey("colors.id"), nullable=False)
+    model = Column(String(100), nullable=False)
+    brand = Column(String(100), nullable=False)
+    color = Column(String(100), nullable=False)
     current_location_id = Column(Integer, ForeignKey("locations.id"))
     status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.AVAILABLE)
     sold_date = Column(DateTime(timezone=True))
@@ -122,8 +74,6 @@ class Unit(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    model = relationship("Model", back_populates="units")
-    color = relationship("Color", back_populates="units")
     current_location = relationship("Location", back_populates="units")
     movements = relationship("Movement", back_populates="unit")
 

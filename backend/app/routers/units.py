@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_, desc
+from sqlalchemy import func, and_, or_, desc
 from typing import List, Optional
 from app.database.database import get_db
 from app.models import models, schemas
@@ -15,34 +15,27 @@ def get_units(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     status: Optional[UnitStatus] = None,
-    brand_id: Optional[int] = None,
-    model_id: Optional[int] = None,
-    color_id: Optional[int] = None,
+    color: Optional[str] = None,
     location_id: Optional[int] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.model).selectinload(models.Model.brand),
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     )
     
     # Apply filters
     if status:
         query = query.filter(models.Unit.status == status)
-    if brand_id:
-        query = query.join(models.Model).filter(models.Model.brand_id == brand_id)
-    if model_id:
-        query = query.filter(models.Unit.model_id == model_id)
-    if color_id:
-        query = query.filter(models.Unit.color_id == color_id)
     if location_id:
         query = query.filter(models.Unit.current_location_id == location_id)
     if search:
         query = query.filter(
             or_(
+                models.Unit.brand.ilike(f"%{search}%"),
+                models.Unit.model.ilike(f"%{search}%"),
+                models.Unit.color.ilike(f"%{search}%"),
                 models.Unit.engine_number.ilike(f"%{search}%"),
                 models.Unit.chassis_number.ilike(f"%{search}%")
             )
@@ -63,14 +56,11 @@ def get_unit_stats(
     available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
     sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
-    reserved_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.RESERVED).count()
-    damaged_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.DAMAGED).count()
-    maintenance_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.MAINTENANCE).count()
     
     # Get inventory by location
     inventory_by_location = db.query(
         models.Location.name,
-        db.func.count(models.Unit.id).label("count")
+        func.count(models.Unit.id).label("count")
     ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
      .group_by(models.Location.id, models.Location.name).all()
     
@@ -79,9 +69,6 @@ def get_unit_stats(
         "available_units": available_units,
         "sold_units": sold_units,
         "in_transit_units": in_transit_units,
-        "reserved_units": reserved_units,
-        "damaged_units": damaged_units,
-        "maintenance_units": maintenance_units,
         "inventory_by_location": [{"location": loc.name, "count": loc.count} for loc in inventory_by_location]
     }
 
@@ -92,8 +79,6 @@ def get_unit(
     current_user: models.User = Depends(get_current_active_user)
 ):
     unit = db.query(models.Unit).options(
-        selectinload(models.Unit.model).selectinload(models.Model.brand),
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     ).filter(models.Unit.id == unit_id).first()
     
@@ -222,20 +207,15 @@ def delete_unit(
     if not db_unit:
         raise HTTPException(status_code=404, detail="Unit not found")
     
-    # Check if unit has movements (except creation)
-    movement_count = db.query(models.Movement).filter(
-        and_(
-            models.Movement.unit_id == unit_id,
-            models.Movement.movement_type != MovementType.IMPORT
-        )
-    ).count()
-    
-    if movement_count > 0:
+    if db_unit.status == models.UnitStatus.IN_TRANSIT:
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete unit with movement history. Consider marking as inactive instead."
+            detail="Cannot delete unit in transit. The transit should be completed first."
         )
     
+    # Delete associated movements first because Movement.unit_id has a NOT NULL constraint
+    # and the foreign key reference cannot exist after the unit is deleted
+    db.query(models.Movement).filter(models.Movement.unit_id == unit_id).delete()
     db.delete(db_unit)
     db.commit()
     return {"message": "Unit deleted successfully"}
@@ -289,7 +269,7 @@ def move_unit(
     
     if movement.movement_type == MovementType.SALE:
         unit.status = UnitStatus.SOLD
-        unit.sold_date = movement.movement_date or db.func.now()
+        unit.sold_date = movement.movement_date or func.now()
     elif movement.movement_type == MovementType.TRANSFER:
         unit.status = UnitStatus.IN_TRANSIT
     

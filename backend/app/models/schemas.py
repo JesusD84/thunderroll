@@ -44,68 +44,10 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# Brand Schemas
-class BrandBase(BaseModel):
-    name: str
-
-class BrandCreate(BrandBase):
-    pass
-
-class Brand(BrandBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# Model Schemas
-class ModelBase(BaseModel):
-    name: str
-    brand_id: int
-    year: Optional[int] = None
-    engine_type: Optional[str] = None
-    displacement: Optional[str] = None
-
-class ModelCreate(ModelBase):
-    pass
-
-class Model(ModelBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    brand: Optional[Brand] = None
-
-    class Config:
-        from_attributes = True
-
-# Color Schemas
-class ColorBase(BaseModel):
-    name: str
-    hex_code: Optional[str] = None
-
-class ColorCreate(ColorBase):
-    pass
-
-class Color(ColorBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 # Location Schemas
 class LocationBase(BaseModel):
     name: str
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
 
 class LocationCreate(LocationBase):
     pass
@@ -113,13 +55,6 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
     is_active: Optional[bool] = None
 
 class Location(LocationBase):
@@ -136,8 +71,9 @@ class UnitBase(BaseModel):
 
     engine_number: str
     chassis_number: str
-    model_id: int
-    color_id: int
+    model: str
+    brand: str
+    color: str
     current_location_id: Optional[int] = None
     status: UnitStatus = UnitStatus.AVAILABLE
     notes: Optional[str] = None
@@ -150,8 +86,9 @@ class UnitUpdate(BaseModel):
 
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
-    model_id: Optional[int] = None
-    color_id: Optional[int] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    color: Optional[str] = None
     current_location_id: Optional[int] = None
     status: Optional[UnitStatus] = None
     sold_date: Optional[datetime] = None
@@ -162,8 +99,9 @@ class Unit(UnitBase):
     sold_date: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    model: Optional[Model] = None
-    color: Optional[Color] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    color: Optional[str] = None
     current_location: Optional[Location] = None
 
     class Config:
@@ -290,8 +228,6 @@ class InventoryReport(BaseModel):
     total_units: int
     by_status: dict
     by_location: dict
-    by_brand: dict
-    by_model: dict
 
 class MovementReport(BaseModel):
     movements: List[Movement]
