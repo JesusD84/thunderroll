@@ -185,33 +185,6 @@ class Transfer(TransferBase):
     class Config:
         from_attributes = True
 
-# Setting Schemas
-class SettingBase(BaseModel):
-    key: str
-    value: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    data_type: str = "string"
-
-class SettingCreate(SettingBase):
-    pass
-
-class SettingUpdate(BaseModel):
-    value: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    data_type: Optional[str] = None
-    is_active: Optional[bool] = None
-
-class Setting(SettingBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
 # Dashboard/Reports Schemas
 class DashboardStats(BaseModel):
     total_units: int
