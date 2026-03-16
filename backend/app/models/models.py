@@ -161,16 +161,3 @@ class TransferUnit(Base):
     # Relationships
     transfer = relationship("Transfer", back_populates="transfer_units")
     unit = relationship("Unit")
-
-class Setting(Base):
-    __tablename__ = "settings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    key = Column(String(100), unique=True, nullable=False)
-    value = Column(Text)
-    description = Column(Text)
-    category = Column(String(50))
-    data_type = Column(String(20), default="string")  # string, integer, boolean, json
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
