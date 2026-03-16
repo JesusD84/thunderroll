@@ -79,6 +79,6 @@ def delete_location(
     if unit_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete location with existing units")
     
-    db_location.is_active = False
+    db.delete(db_location)
     db.commit()
     return {"message": "Location deactivated successfully"}
