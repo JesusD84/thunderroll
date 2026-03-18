@@ -45,70 +45,7 @@ def update_unit(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    db_unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not db_unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    
-    # Check for duplicate engine/chassis numbers if they're being updated
-    update_data = unit_update.dict(exclude_unset=True)
-    
-    if "engine_number" in update_data or "chassis_number" in update_data:
-        engine_check = update_data.get("engine_number", db_unit.engine_number)
-        chassis_check = update_data.get("chassis_number", db_unit.chassis_number)
-        
-        existing_unit = db.query(models.Unit).filter(
-            and_(
-                models.Unit.id != unit_id,
-                or_(
-                    models.Unit.engine_number == engine_check,
-                    models.Unit.chassis_number == chassis_check
-                )
-            )
-        ).first()
-        
-        if existing_unit:
-            raise HTTPException(
-                status_code=400,
-                detail="Another unit with this engine number or chassis number already exists"
-            )
-    
-    # Track location changes for movement records
-    old_location_id = db_unit.current_location_id
-    old_status = db_unit.status
-    
-    # Update unit fields
-    for field, value in update_data.items():
-        setattr(db_unit, field, value)
-    
-    db.commit()
-    db.refresh(db_unit)
-    
-    # Create movement record for location changes
-    if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
-        movement = models.Movement(
-            unit_id=db_unit.id,
-            user_id=current_user.id,
-            movement_type=MovementType.TRANSFER,
-            from_location_id=old_location_id,
-            to_location_id=update_data["current_location_id"],
-            notes="Unit location updated"
-        )
-        db.add(movement)
-        db.commit()
-    
-    # Create movement record for status changes
-    if "status" in update_data and update_data["status"] != old_status:
-        movement_type = MovementType.SALE if update_data["status"] == UnitStatus.SOLD else MovementType.TRANSFER
-        movement = models.Movement(
-            unit_id=db_unit.id,
-            user_id=current_user.id,
-            movement_type=movement_type,
-            notes=f"Status changed from {old_status} to {update_data['status']}"
-        )
-        db.add(movement)
-        db.commit()
-    
-    return get_unit(unit_id, db, current_user)
+    return UnitService.update_unit(db, unit_id, unit_update, current_user.id)
 
 @router.delete("/{unit_id}")
 def delete_unit(
