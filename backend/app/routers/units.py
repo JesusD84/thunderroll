@@ -7,7 +7,7 @@ from app.models import models, schemas
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
 from app.models.models import UserRole
 from app.services.auth import get_current_active_user, require_role
-from app.services.unit import UnitService
+from app.services.unit_service import UnitService
 
 router = APIRouter()
 
