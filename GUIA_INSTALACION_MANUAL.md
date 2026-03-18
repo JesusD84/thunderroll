@@ -139,7 +139,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 8. Verificar Backend
 ```bash
 # En otra terminal, probar la API
-curl http://localhost:8000/api/health
+curl http://localhost:8000/health
 # Debería responder: {"status": "ok", "timestamp": "..."}
 
 # Ver documentación de la API
