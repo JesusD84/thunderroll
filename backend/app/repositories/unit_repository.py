@@ -138,3 +138,41 @@ class UnitRepository:
                 for loc in inventory_by_location
             ]
         }
+
+    @staticmethod
+    def get_unit_movements(db: Session, unit_id: int, skip: int, limit: int) -> list[Movement]:
+        return (
+            db.query(Movement)
+            .options(
+                selectinload(Movement.user),
+                selectinload(Movement.from_location),
+                selectinload(Movement.to_location)
+            )
+            .filter(Movement.unit_id == unit_id)
+            .order_by(Movement.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
+    def move_unit(db: Session, unit: Unit, movement_data: dict, user_id: int) -> Movement:
+        db_movement = Movement(
+            **movement_data,
+            unit_id=unit.id,
+            user_id=user_id
+        )
+        db.add(db_movement)
+
+        if db_movement.to_location_id:
+            unit.current_location_id = db_movement.to_location_id
+
+        if db_movement.movement_type == MovementType.SALE:
+            unit.status = UnitStatus.SOLD
+            unit.sold_date = db_movement.movement_date or func.now()
+        elif db_movement.movement_type == MovementType.TRANSFER:
+            unit.status = UnitStatus.IN_TRANSIT
+
+        db.commit()
+        db.refresh(db_movement)
+        return db_movement

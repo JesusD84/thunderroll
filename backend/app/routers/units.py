@@ -1,12 +1,11 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, and_, or_, desc
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 from typing import List
 from app.database.database import get_db
 from app.models import models, schemas
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
-from app.models.models import UserRole, UnitStatus, MovementType
+from app.models.models import UserRole
 from app.services.auth import get_current_active_user, require_role
 from app.services.unit import UnitService
 
@@ -70,20 +69,7 @@ def get_unit_movements(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    # Check if unit exists
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    
-    movements = db.query(models.Movement).options(
-        selectinload(models.Movement.user),
-        selectinload(models.Movement.from_location),
-        selectinload(models.Movement.to_location)
-    ).filter(models.Movement.unit_id == unit_id) \
-     .order_by(desc(models.Movement.created_at)) \
-     .offset(skip).limit(limit).all()
-    
-    return movements
+    return UnitService.get_unit_movements(db, unit_id, skip, limit)
 
 @router.post("/{unit_id}/move")
 def move_unit(
@@ -92,30 +78,4 @@ def move_unit(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    # Check if unit exists
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    
-    # Create movement record
-    db_movement = models.Movement(
-        **movement.dict(),
-        unit_id=unit_id,
-        user_id=current_user.id
-    )
-    db.add(db_movement)
-    
-    # Update unit location and status if applicable
-    if movement.to_location_id:
-        unit.current_location_id = movement.to_location_id
-    
-    if movement.movement_type == MovementType.SALE:
-        unit.status = UnitStatus.SOLD
-        unit.sold_date = movement.movement_date or func.now()
-    elif movement.movement_type == MovementType.TRANSFER:
-        unit.status = UnitStatus.IN_TRANSIT
-    
-    db.commit()
-    db.refresh(db_movement)
-    
-    return {"message": "Unit moved successfully", "movement_id": db_movement.id}
+    return UnitService.move_unit(db, unit_id, movement, current_user.id)
