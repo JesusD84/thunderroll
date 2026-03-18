@@ -70,3 +70,7 @@ class UnitService:
 
         UnitRepository.delete_unit(db, unit_id)
         return {"message": "Unit deleted successfully"}
+
+    @staticmethod
+    def get_stats(db: Session) -> dict:
+        return UnitRepository.get_stats(db)

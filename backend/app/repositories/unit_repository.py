@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_
-from app.models.models import Unit, Movement, MovementType, UnitStatus
+from sqlalchemy import and_, or_, func
+from app.models.models import Unit, Movement, MovementType, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -113,3 +113,28 @@ class UnitRepository:
         db.query(Movement).filter(Movement.unit_id == unit_id).delete()
         db.query(Unit).filter(Unit.id == unit_id).delete()
         db.commit()
+
+    @staticmethod
+    def get_stats(db: Session) -> dict:
+        total_units = db.query(Unit).count()
+        available_units = db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
+        sold_units = db.query(Unit).filter(Unit.status == UnitStatus.SOLD).count()
+        in_transit_units = db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
+
+        inventory_by_location = (
+            db.query(Location.name, func.count(Unit.id).label("count"))
+            .join(Unit, Unit.current_location_id == Location.id, isouter=True)
+            .group_by(Location.id, Location.name)
+            .all()
+        )
+
+        return {
+            "total_units": total_units,
+            "available_units": available_units,
+            "sold_units": sold_units,
+            "in_transit_units": in_transit_units,
+            "inventory_by_location": [
+                {"location": loc.name, "count": loc.count}
+                for loc in inventory_by_location
+            ]
+        }
