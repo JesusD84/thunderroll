@@ -53,22 +53,7 @@ def delete_unit(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN]))
 ):
-    db_unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not db_unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    
-    if db_unit.status == models.UnitStatus.IN_TRANSIT:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot delete unit in transit. The transit should be completed first."
-        )
-    
-    # Delete associated movements first because Movement.unit_id has a NOT NULL constraint
-    # and the foreign key reference cannot exist after the unit is deleted
-    db.query(models.Movement).filter(models.Movement.unit_id == unit_id).delete()
-    db.delete(db_unit)
-    db.commit()
-    return {"message": "Unit deleted successfully"}
+    return UnitService.delete_unit(db, unit_id)
 
 @router.get("/stats")
 def get_unit_stats(

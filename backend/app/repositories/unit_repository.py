@@ -107,3 +107,9 @@ class UnitRepository:
             db.commit()
 
         return UnitRepository.get_unit(db, unit.id)
+
+    @staticmethod
+    def delete_unit(db: Session, unit_id: int) -> None:
+        db.query(Movement).filter(Movement.unit_id == unit_id).delete()
+        db.query(Unit).filter(Unit.id == unit_id).delete()
+        db.commit()

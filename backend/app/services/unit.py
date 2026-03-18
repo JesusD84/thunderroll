@@ -4,7 +4,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models.models import Unit
+from app.models.models import Unit, UnitStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 from app.repositories.unit_repository import UnitRepository
 
@@ -55,3 +55,18 @@ class UnitService:
                 )
 
         return UnitRepository.update_unit(db, unit, unit_update, user_id)
+
+    @staticmethod
+    def delete_unit(db: Session, unit_id: int) -> dict:
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+
+        if unit.status == UnitStatus.IN_TRANSIT:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete unit in transit. The transit should be completed first."
+            )
+
+        UnitRepository.delete_unit(db, unit_id)
+        return {"message": "Unit deleted successfully"}
