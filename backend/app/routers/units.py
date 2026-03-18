@@ -29,6 +29,13 @@ def create_unit(
 ):
     return UnitService.create_unit(db, unit)
 
+@router.get("/stats")
+def get_unit_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    return UnitService.get_stats(db)
+
 @router.get("/{unit_id}", response_model=Unit)
 def get_unit(
     unit_id: int,
@@ -53,13 +60,6 @@ def delete_unit(
     current_user: models.User = Depends(require_role([UserRole.ADMIN]))
 ):
     return UnitService.delete_unit(db, unit_id)
-
-@router.get("/stats")
-def get_unit_stats(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    return UnitService.get_stats(db)
 
 @router.get("/{unit_id}/movements", response_model=List[schemas.Movement])
 def get_unit_movements(
