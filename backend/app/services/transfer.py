@@ -14,7 +14,7 @@ from app.models.location import Location
 from app.models.transfer import Transfer, TransferStatus
 from app.models.unit_event import EventType
 from app.schemas.transfer import TransferCreate, TransferReceive
-from app.services.unit import UnitService
+from app.services.unit_service import UnitService
 
 
 class TransferService:

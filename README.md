@@ -158,9 +158,6 @@ npm run type-check
 - `POST /transfers` - Crear transferencia
 - `POST /transfers/{id}/receive` - Recibir
 
-### Ventas
-- `POST /units/{id}/sell` - Marcar vendida
-
 ### Reportes
 - `GET /reports/movements` - Exportar movimientos
 

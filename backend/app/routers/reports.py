@@ -26,14 +26,12 @@ def get_dashboard_stats(
     available_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
     sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
-    reserved_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.RESERVED).count()
     
     # Location counts
-    total_locations = db.query(models.Location).filter(models.Location.is_active == True).count()
+    total_locations = db.query(models.Location).count()
     
     # Recent movements (last 10)
     recent_movements = db.query(models.Movement).options(
-        selectinload(models.Movement.unit).selectinload(models.Unit.model),
         selectinload(models.Movement.user),
         selectinload(models.Movement.from_location),
         selectinload(models.Movement.to_location)
@@ -44,23 +42,13 @@ def get_dashboard_stats(
         models.Location.name.label("location"),
         func.count(models.Unit.id).label("count")
     ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
-     .filter(models.Location.is_active == True) \
      .group_by(models.Location.id, models.Location.name).all()
-    
-    # Inventory by brand
-    inventory_by_brand = db.query(
-        models.Brand.name.label("brand"),
-        func.count(models.Unit.id).label("count")
-    ).join(models.Model).join(models.Unit) \
-     .filter(models.Brand.is_active == True) \
-     .group_by(models.Brand.id, models.Brand.name).all()
     
     # Sales by month (last 6 months)
     six_months_ago = datetime.now() - timedelta(days=180)
     sales_by_month = db.query(
         func.date_trunc('month', models.Unit.sold_date).label("month"),
-        func.count(models.Unit.id).label("count"),
-        func.sum(models.Unit.sale_price).label("total_value")
+        func.count(models.Unit.id).label("count")
     ).filter(
         and_(
             models.Unit.status == UnitStatus.SOLD,
@@ -85,7 +73,6 @@ def get_dashboard_stats(
             "available": available_units,
             "sold": sold_units,
             "in_transit": in_transit_units,
-            "reserved": reserved_units
         },
         "locations": {
             "total": total_locations
@@ -102,7 +89,6 @@ def get_dashboard_stats(
                 "to_location": m.to_location.name if m.to_location else None,
                 "user": f"{m.user.first_name} {m.user.last_name}" if m.user else None,
                 "date": m.movement_date or m.created_at,
-                "price": m.price
             } for m in recent_movements
         ],
         "inventory_by_location": [
@@ -135,9 +121,9 @@ def get_dashboard_stats(
 
 @router.get("/inventory")
 def get_inventory_report(
-    brand_id: Optional[int] = None,
-    model_id: Optional[int] = None,
-    color_id: Optional[int] = None,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+    color: Optional[str] = None,
     location_id: Optional[int] = None,
     status: Optional[UnitStatus] = None,
     date_from: Optional[datetime] = None,
@@ -148,18 +134,16 @@ def get_inventory_report(
     """Generate inventory report with filters"""
     
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.model).selectinload(models.Model.brand),
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     )
     
     # Apply filters
-    if brand_id:
-        query = query.join(models.Model).filter(models.Model.brand_id == brand_id)
-    if model_id:
-        query = query.filter(models.Unit.model_id == model_id)
-    if color_id:
-        query = query.filter(models.Unit.color_id == color_id)
+    if brand:
+        query = query.filter(models.Unit.brand == brand)
+    if model:
+        query = query.filter(models.Unit.model == model)
+    if color:
+        query = query.filter(models.Unit.color == color)
     if location_id:
         query = query.filter(models.Unit.current_location_id == location_id)
     if status:
@@ -186,14 +170,6 @@ def get_inventory_report(
         # By location
         location_key = unit.current_location.name if unit.current_location else "No Location"
         by_location[location_key] = by_location.get(location_key, 0) + 1
-        
-        # By brand
-        brand_key = unit.model.brand.name if unit.model and unit.model.brand else "Unknown Brand"
-        by_brand[brand_key] = by_brand.get(brand_key, 0) + 1
-        
-        # By model
-        model_key = f"{brand_key} {unit.model.name}" if unit.model else "Unknown Model"
-        by_model[model_key] = by_model.get(model_key, 0) + 1
     
     return {
         "total_units": total_units,
@@ -208,13 +184,11 @@ def get_inventory_report(
                 "id": unit.id,
                 "engine_number": unit.engine_number,
                 "chassis_number": unit.chassis_number,
-                "brand": unit.model.brand.name if unit.model and unit.model.brand else None,
-                "model": unit.model.name if unit.model else None,
-                "color": unit.color.name if unit.color else None,
+                "brand": unit.brand,
+                "model": unit.model,
+                "color": unit.color,
                 "location": unit.current_location.name if unit.current_location else None,
                 "status": unit.status.value if unit.status else None,
-                "purchase_price": unit.purchase_price,
-                "sale_price": unit.sale_price,
                 "created_at": unit.created_at,
                 "sold_date": unit.sold_date
             } for unit in units
@@ -236,7 +210,6 @@ def get_movements_report(
     """Generate movements report with filters"""
     
     query = db.query(models.Movement).options(
-        selectinload(models.Movement.unit).selectinload(models.Unit.model),
         selectinload(models.Movement.user),
         selectinload(models.Movement.from_location),
         selectinload(models.Movement.to_location)
@@ -299,7 +272,6 @@ def get_movements_report(
                 "to_location": movement.to_location.name if movement.to_location else None,
                 "user": f"{movement.user.first_name} {movement.user.last_name}" if movement.user else None,
                 "quantity": movement.quantity,
-                "price": movement.price,
                 "notes": movement.notes,
                 "movement_date": movement.movement_date,
                 "created_at": movement.created_at
@@ -326,8 +298,6 @@ def get_sales_report(
     """Generate sales report"""
     
     query = db.query(models.Unit).options(
-        selectinload(models.Unit.model).selectinload(models.Model.brand),
-        selectinload(models.Unit.color),
         selectinload(models.Unit.current_location)
     ).filter(models.Unit.status == UnitStatus.SOLD)
     
@@ -353,11 +323,6 @@ def get_sales_report(
     
     # Calculate totals
     total_sales = len(sold_units)
-    total_revenue = sum([unit.sale_price or 0 for unit in sold_units])
-    total_profit = sum([
-        (unit.sale_price or 0) - (unit.purchase_price or 0) 
-        for unit in sold_units
-    ])
     
     # Sales by month
     sales_by_month = {}
@@ -365,51 +330,28 @@ def get_sales_report(
         if unit.sold_date:
             month_key = unit.sold_date.strftime("%Y-%m")
             if month_key not in sales_by_month:
-                sales_by_month[month_key] = {"count": 0, "revenue": 0}
+                sales_by_month[month_key] = {"count": 0}
             sales_by_month[month_key]["count"] += 1
-            sales_by_month[month_key]["revenue"] += unit.sale_price or 0
-    
-    # Sales by brand
-    sales_by_brand = {}
-    for unit in sold_units:
-        brand = unit.model.brand.name if unit.model and unit.model.brand else "Unknown"
-        if brand not in sales_by_brand:
-            sales_by_brand[brand] = {"count": 0, "revenue": 0}
-        sales_by_brand[brand]["count"] += 1
-        sales_by_brand[brand]["revenue"] += unit.sale_price or 0
     
     return {
         "total_sales": total_sales,
-        "total_revenue": total_revenue,
-        "total_profit": total_profit,
-        "average_sale_price": total_revenue / total_sales if total_sales > 0 else 0,
+
         "summary": {
             "by_month": [
                 {
                     "month": month,
-                    "count": data["count"],
-                    "revenue": data["revenue"]
+                    "count": data["count"]
                 } for month, data in sorted(sales_by_month.items())
             ],
-            "by_brand": [
-                {
-                    "brand": brand,
-                    "count": data["count"],
-                    "revenue": data["revenue"]
-                } for brand, data in sorted(sales_by_brand.items(), key=lambda x: x[1]["revenue"], reverse=True)
-            ]
         },
         "sales": [
             {
                 "id": unit.id,
                 "engine_number": unit.engine_number,
                 "chassis_number": unit.chassis_number,
-                "brand": unit.model.brand.name if unit.model and unit.model.brand else None,
-                "model": unit.model.name if unit.model else None,
-                "color": unit.color.name if unit.color else None,
-                "purchase_price": unit.purchase_price,
-                "sale_price": unit.sale_price,
-                "profit": (unit.sale_price or 0) - (unit.purchase_price or 0),
+                "brand": unit.brand,
+                "model": unit.model,
+                "color": unit.color,
                 "sold_date": unit.sold_date
             } for unit in sold_units
         ]
@@ -417,8 +359,8 @@ def get_sales_report(
 
 @router.get("/export/inventory")
 def export_inventory_excel(
-    brand_id: Optional[int] = None,
-    model_id: Optional[int] = None,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
     location_id: Optional[int] = None,
     status: Optional[UnitStatus] = None,
     db: Session = Depends(get_db),
@@ -428,8 +370,8 @@ def export_inventory_excel(
     
     # Get inventory data
     report_data = get_inventory_report(
-        brand_id=brand_id,
-        model_id=model_id,
+        brand=brand,
+        model=model,
         location_id=location_id,
         status=status,
         db=db,

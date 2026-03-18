@@ -1,13 +1,13 @@
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
 
-from app.database.database import engine, SessionLocal, get_db
+from app.database.database import engine
 from app.models import models
-from app.routers import auth, units, imports, transfers, reports, settings
+from app.routers import auth, units, locations, imports, transfers, reports
 from app.database.seed import create_demo_data
 
 # Create tables
@@ -46,10 +46,10 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(units.router, prefix="/api/units", tags=["Units"])
+app.include_router(locations.router, prefix="/api/locations", tags=["Locations"])
 app.include_router(imports.router, prefix="/api/imports", tags=["Imports"])
 app.include_router(transfers.router, prefix="/api/transfers", tags=["Transfers"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 
 @app.get("/")
 def read_root():

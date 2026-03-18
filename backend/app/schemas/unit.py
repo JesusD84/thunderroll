@@ -1,75 +1,63 @@
-
-"""Unit schemas."""
-
 from datetime import datetime
-from uuid import UUID
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.models import UnitStatus
-
+from  app.models.schemas import Location
 
 class UnitBase(BaseModel):
-    """Base unit schema."""
-    brand: str = Field(..., min_length=1, max_length=50)
-    model: str = Field(..., min_length=1, max_length=50)
-    color: str = Field(..., min_length=1, max_length=30)
-    supplier_invoice: str = Field(..., min_length=1, max_length=100)
+    model_config = ConfigDict(protected_namespaces=())
 
+    engine_number: str = Field(..., min_length=1, max_length=100)
+    chassis_number: str = Field(..., min_length=1, max_length=100)
+    model: str = Field(..., min_length=1, max_length=100)
+    brand: str = Field(..., min_length=1, max_length=100)
+    color: str = Field(..., min_length=1, max_length=100)
+    current_location_id: Optional[int] = Field(None, gt=0)
+    status: UnitStatus = UnitStatus.AVAILABLE
+    notes: Optional[str] = None
+
+    @field_validator("engine_number", "chassis_number", "model", "brand", "color", mode="before")
+    @classmethod
+    def strip_and_upper(cls, v: str) -> str:
+        return v.strip().upper()
 
 class UnitCreate(UnitBase):
-    """Unit creation schema."""
-    shipment_id: int
-    notes: str | None = None
-
+    pass
 
 class UnitUpdate(BaseModel):
-    """Unit update schema."""
-    brand: str | None = Field(None, min_length=1, max_length=50)
-    model: str | None = Field(None, min_length=1, max_length=50)
-    color: str | None = Field(None, min_length=1, max_length=30)
-    engine_number: int | None = None
-    chassis_number: str | None = Field(None, min_length=1, max_length=20)
-    notes: str | None = None
-    assigned_branch_id: int | None = None
+    model_config = ConfigDict(protected_namespaces=())
 
+    engine_number: Optional[str] = Field(None, min_length=1, max_length=100)
+    chassis_number: Optional[str] = Field(None, min_length=1, max_length=100)
+    model: Optional[str] = Field(None, min_length=1, max_length=100)
+    brand: Optional[str] = Field(None, min_length=1, max_length=100)
+    color: Optional[str] = Field(None, min_length=1, max_length=100)
+    current_location_id: Optional[int] = Field(None, gt=0)
+    status: Optional[UnitStatus] = None
+    sold_date: Optional[datetime] = None
+    notes: Optional[str] = None
 
-class UnitFilter(BaseModel):
-    """Unit filtering schema."""
-    status: UnitStatus | None = None
-    location_id: int | None = None
-    shipment_id: int | None = None
-    brand: str | None = None
-    model: str | None = None
-    engine_number: int | None = None
-    chassis_number: str | None = None
-    query: str | None = None  # General search query
-    
-    
-class UnitIdentification(BaseModel):
-    """Unit identification matching schema."""
-    engine_number: int = Field(..., description="Engine number to match")
-    chassis_number: str = Field(..., min_length=1, max_length=20, description="Chassis number to match")
-    shipment_id: int | None = Field(None, description="Optional shipment to search within")
+    @field_validator("engine_number", "chassis_number", "model", "brand", "color", mode="before")
+    @classmethod
+    def strip_and_upper(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return v.strip().upper()
 
+class UnitFilters(BaseModel):
+    status: Optional[UnitStatus] = None
+    location_id: Optional[int] = None
+    search: Optional[str] = None
 
 class Unit(UnitBase):
-    """Unit response schema."""
-    id: UUID
-    engine_number: int | None = None
-    chassis_number: str | None = None
-    shipment_id: int
-    status: UnitStatus
-    location_id: int
-    assigned_branch_id: int | None = None
-    notes: str | None = None
+    id: int
+    sold_date: Optional[datetime] = None
     created_at: datetime
-    updated_at: datetime
-    last_updated_by_id: int
-    
-    # Related objects
-    location: dict | None = None
-    assigned_branch: dict | None = None
-    shipment: dict | None = None
-    last_updated_by: dict | None = None
-    
+    updated_at: Optional[datetime] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    color: Optional[str] = None
+    current_location: Optional[Location] = None
+
     class Config:
         from_attributes = True
