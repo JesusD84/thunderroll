@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, units, locations, imports, transfers, reports
+from app.api.v1.endpoints import auth, units, locations, imports, transfers, reports, user
 
 router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+router.include_router(user.router, prefix="/user", tags=["User"])
 router.include_router(units.router, prefix="/units", tags=["Units"])
 router.include_router(locations.router, prefix="/locations", tags=["Locations"])
 router.include_router(imports.router, prefix="/imports", tags=["Imports"])
