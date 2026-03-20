@@ -6,7 +6,7 @@ from typing import List
 from app.database.database import get_db
 from app.models.models import UserRole, User
 from app.schemas.location import Location, LocationCreate, LocationFilters, LocationUpdate
-from app.services.auth import get_current_active_user, require_role
+from app.services.auth_service import get_current_active_user, require_role
 from app.services.location_service import LocationService
 
 router = APIRouter()
