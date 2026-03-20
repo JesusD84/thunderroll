@@ -2,7 +2,7 @@
 """Pydantic schemas for request/response validation."""
 
 from app.schemas.auth import Token, TokenData, UserLogin, ForgotPasswordRequest, ResetPasswordRequest
-from app.schemas.user import User, UserCreate, UserUpdate, UserInDB
+from app.schemas.user import User, UserCreate, UserUpdate
 from app.schemas.location import Location, LocationCreate, LocationUpdate
 from app.schemas.shipment import Shipment, ShipmentCreate
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters

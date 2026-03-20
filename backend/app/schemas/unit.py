@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.models import UnitStatus
-from  app.models.schemas import Location
+from  app.schemas.location import Location
 
 class UnitBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())

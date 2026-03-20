@@ -4,38 +4,33 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 from app.models.models import UserRole
-
+from typing import Optional
 
 class UserBase(BaseModel):
-    """Base user schema."""
-    name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    role: UserRole
-
+    username: str
+    first_name: str
+    last_name: str
+    role: UserRole = UserRole.VIEWER
+    
 
 class UserCreate(UserBase):
-    """User creation schema."""
+    email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
 
-
 class UserUpdate(BaseModel):
-    """User update schema."""
-    name: str | None = Field(None, min_length=1, max_length=100)
-    email: EmailStr | None = None
-    role: UserRole | None = None
-    password: str | None = Field(None, min_length=8, max_length=100)
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
 
-
-class UserInDB(UserBase):
-    """User schema for database operations."""
+class User(UserBase):
     id: int
+    is_active: bool
     created_at: datetime
-    last_login_at: datetime | None = None
-    
+    updated_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
-
-
-class User(UserInDB):
-    """User response schema."""
-    pass

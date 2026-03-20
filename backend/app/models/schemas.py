@@ -3,34 +3,7 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
 from app.models.models import UserRole, UnitStatus, MovementType
-
-# User Schemas
-class UserBase(BaseModel):
-    email: EmailStr
-    username: str
-    first_name: str
-    last_name: str
-    role: UserRole = UserRole.VIEWER
-
-class UserCreate(UserBase):
-    password: str
-
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
-
-class User(UserBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+from app.schemas.user import User
 
 # Auth Schemas
 class Token(BaseModel):
