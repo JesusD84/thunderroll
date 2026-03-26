@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.models import User
 from app.models.schemas import TokenData
+from app.core.security import Security
 import os
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-thunderrol-2024")
@@ -23,7 +24,7 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    return Security.get_password_hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
