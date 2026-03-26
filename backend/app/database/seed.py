@@ -5,7 +5,7 @@ from app.models.models import (
     User, UserRole, Location,
     Unit, UnitStatus, Movement, MovementType
 )
-from app.services.auth import get_password_hash
+from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
 import asyncio
 

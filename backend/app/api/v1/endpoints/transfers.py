@@ -8,7 +8,7 @@ from datetime import datetime, UTC
 from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, MovementType
-from app.services.auth import get_current_active_user, require_role
+from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
 
