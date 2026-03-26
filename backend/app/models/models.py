@@ -17,7 +17,6 @@ class UnitStatus(str, enum.Enum):
     IN_TRANSIT = "in_transit"
 
 class TransferType(str, enum.Enum):
-class TransferType(str, enum.Enum):
     IMPORT = "import"
     SALE = "sale"
     TRANSFER = "transfer"
@@ -76,17 +75,13 @@ class Unit(Base):
     # Relationships
     current_location = relationship("Location", back_populates="units")
     transfers = relationship("Transfer", back_populates="unit")
-    transfers = relationship("Transfer", back_populates="unit")
 
-class Transfer(Base):
-    __tablename__ = "transfers"
 class Transfer(Base):
     __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    transfer_type = Column(Enum(TransferType), nullable=False)
     transfer_type = Column(Enum(TransferType), nullable=False)
     from_location_id = Column(Integer, ForeignKey("locations.id"))
     to_location_id = Column(Integer, ForeignKey("locations.id"))
@@ -96,8 +91,6 @@ class Transfer(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    unit = relationship("Unit", back_populates="transfers")
-    user = relationship("User", back_populates="transfers")
     unit = relationship("Unit", back_populates="transfers")
     user = relationship("User", back_populates="transfers")
     from_location = relationship("Location", foreign_keys=[from_location_id])
