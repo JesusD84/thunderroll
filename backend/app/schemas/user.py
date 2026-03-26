@@ -11,11 +11,15 @@ class UserBase(BaseModel):
     username: str
     first_name: str
     last_name: str
-    role: UserRole = UserRole.VIEWER
+    role: UserRole
     
 
 class UserCreate(UserBase):
     email: EmailStr
+    username: str
+    first_name: str
+    last_name: str
+    role: UserRole = UserRole.VIEWER
     password: str = Field(..., min_length=8, max_length=100)
 
 class UserUpdate(BaseModel):
@@ -34,3 +38,9 @@ class User(UserBase):
 
     class Config:
         from_attributes = True
+
+class UserFilters(BaseModel):
+    email: Optional[str] = None
+    username: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
