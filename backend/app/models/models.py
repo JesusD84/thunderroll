@@ -127,36 +127,3 @@ class ImportError(Base):
 
     # Relationships
     import_record = relationship("Import", back_populates="import_errors")
-
-class Transfer(Base):
-    __tablename__ = "transfers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    from_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
-    to_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String(50), default="pending")  # pending, in_transit, completed, cancelled
-    total_units = Column(Integer, default=0)
-    notes = Column(Text)
-    transfer_date = Column(DateTime(timezone=True))
-    completed_date = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relationships
-    from_location = relationship("Location", foreign_keys=[from_location_id], back_populates="transfers_from")
-    to_location = relationship("Location", foreign_keys=[to_location_id], back_populates="transfers_to")
-    user = relationship("User", back_populates="transfers")
-    transfer_units = relationship("TransferUnit", back_populates="transfer")
-
-class TransferUnit(Base):
-    __tablename__ = "transfer_units"
-
-    id = Column(Integer, primary_key=True, index=True)
-    transfer_id = Column(Integer, ForeignKey("transfers.id"), nullable=False)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    transfer = relationship("Transfer", back_populates="transfer_units")
-    unit = relationship("Unit")
