@@ -1,5 +1,3 @@
-
-from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Location,
@@ -9,7 +7,7 @@ from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
 import asyncio
 
-async def create_demo_data():
+def create_demo_data():
     """Create demo data for the application"""
     db = SessionLocal()
     
@@ -178,6 +176,7 @@ async def create_demo_data():
                     user_id=admin_user.id,
                     transfer_type=TransferType.SALE,
                     transfer_date=unit.sold_date,
+                to_location_id=warehouse.id,
                     notes="Venta de unidad - datos de demostración"
                 )
                 db.add(sale_transfer)
@@ -188,8 +187,9 @@ async def create_demo_data():
         print("✅ Demo data creation completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error creating demo data: {str(e)}")
+        print(f"❌ Error creating demo data: {str(e)}", file=sys.stderr, flush=True)
         db.rollback()
+        raise
     finally:
         db.close()
 
