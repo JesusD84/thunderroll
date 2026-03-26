@@ -16,7 +16,7 @@ class UnitStatus(str, enum.Enum):
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
 
-class MovementType(str, enum.Enum):
+class TransferType(str, enum.Enum):
     IMPORT = "import"
     SALE = "sale"
     TRANSFER = "transfer"
@@ -39,9 +39,8 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    movements = relationship("Movement", back_populates="user")
-    imports = relationship("Import", back_populates="user")
     transfers = relationship("Transfer", back_populates="user")
+    imports = relationship("Import", back_populates="user")
 
 class Location(Base):
     __tablename__ = "locations"
@@ -74,25 +73,25 @@ class Unit(Base):
 
     # Relationships
     current_location = relationship("Location", back_populates="units")
-    movements = relationship("Movement", back_populates="unit")
+    transfers = relationship("Transfer", back_populates="unit")
 
-class Movement(Base):
-    __tablename__ = "movements"
+class Transfer(Base):
+    __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    movement_type = Column(Enum(MovementType), nullable=False)
+    transfer_type = Column(Enum(TransferType), nullable=False)
     from_location_id = Column(Integer, ForeignKey("locations.id"))
     to_location_id = Column(Integer, ForeignKey("locations.id"))
     quantity = Column(Integer, default=1)
     notes = Column(Text)
-    movement_date = Column(DateTime(timezone=True), server_default=func.now())
+    Transfer_date = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    unit = relationship("Unit", back_populates="movements")
-    user = relationship("User", back_populates="movements")
+    unit = relationship("Unit", back_populates="transfers")
+    user = relationship("User", back_populates="transfers")
     from_location = relationship("Location", foreign_keys=[from_location_id])
     to_location = relationship("Location", foreign_keys=[to_location_id])
 

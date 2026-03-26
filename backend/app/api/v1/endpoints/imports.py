@@ -9,7 +9,7 @@ import json
 
 from app.database.database import get_db
 from app.models import models, schemas
-from app.models.models import UserRole, UnitStatus, MovementType
+from app.models.models import UserRole, UnitStatus, TransferType
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
@@ -197,15 +197,15 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
             db.commit()
             db.refresh(unit)
             
-            # Create import movement
-            movement = models.Movement(
+            # Create import transfer
+            transfer = models.Transfer(
                 unit_id=unit.id,
                 user_id=1,  # System user for imports
-                movement_type=MovementType.IMPORT,
+                transfer_type=TransferType.IMPORT,
                 to_location_id=default_location.id,
                 notes=f"Imported from file: {import_id}"
             )
-            db.add(movement)
+            db.add(transfer)
             db.commit()
             
             successful_imports += 1

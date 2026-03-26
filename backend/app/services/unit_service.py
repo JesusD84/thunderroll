@@ -4,9 +4,9 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models.models import Unit, Movement, UnitStatus
+from app.models.models import Unit, Transfer, UnitStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
-from app.models.schemas import MovementCreate
+from app.models.schemas import TransferCreate
 from app.repositories.unit_repository import UnitRepository
 
 
@@ -77,18 +77,18 @@ class UnitService:
         return UnitRepository.get_stats(db)
 
     @staticmethod
-    def get_unit_movements(db: Session, unit_id: int, skip: int, limit: int) -> list[Movement]:
+    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
-        return UnitRepository.get_unit_movements(db, unit_id, skip, limit)
+        return UnitRepository.get_unit_transfers(db, unit_id, skip, limit)
 
     @staticmethod
-    def move_unit(db: Session, unit_id: int, movement_data: MovementCreate, user_id: int) -> dict:
+    def move_unit(db: Session, unit_id: int, transfer_data: TransferCreate, user_id: int) -> dict:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
-        data = movement_data.model_dump(exclude={"unit_id"})
-        db_movement = UnitRepository.move_unit(db, unit, data, user_id)
-        return {"message": "Unit moved successfully", "movement_id": db_movement.id}
+        data = transfer_data.model_dump(exclude={"unit_id"})
+        db_transfer = UnitRepository.move_unit(db, unit, data, user_id)
+        return {"message": "Unit moved successfully", "transfer_id": db_transfer.id}

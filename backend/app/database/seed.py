@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Location,
-    Unit, UnitStatus, Movement, MovementType
+    Unit, UnitStatus, Transfer, TransferType
 )
 from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
@@ -159,31 +159,31 @@ async def create_demo_data():
         db.commit()
         print("✓ Demo units created")
         
-        # Create demo movements for the units
+        # Create demo transfers for the units
         for unit in demo_units:
-            # Import movement
-            import_movement = Movement(
+            # Import transfer
+            import_transfer = Transfer(
                 unit_id=unit.id,
                 user_id=admin_user.id,
-                movement_type=MovementType.IMPORT,
+                transfer_type=TransferType.IMPORT,
                 to_location_id=warehouse.id,
                 notes="Unidad importada - datos de demostración"
             )
-            db.add(import_movement)
+            db.add(import_transfer)
             
-            # Sale movement for sold unit
+            # Sale transfer for sold unit
             if unit.status == UnitStatus.SOLD:
-                sale_movement = Movement(
+                sale_transfer = Transfer(
                     unit_id=unit.id,
                     user_id=admin_user.id,
-                    movement_type=MovementType.SALE,
-                    movement_date=unit.sold_date,
+                    transfer_type=TransferType.SALE,
+                    transfer_date=unit.sold_date,
                     notes="Venta de unidad - datos de demostración"
                 )
-                db.add(sale_movement)
+                db.add(sale_transfer)
         
         db.commit()
-        print("✓ Demo movements created")
+        print("✓ Demo transfers created")
         
         print("✅ Demo data creation completed successfully!")
         
