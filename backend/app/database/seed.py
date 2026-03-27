@@ -187,7 +187,7 @@ def create_demo_data():
         print("✅ Demo data creation completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error creating demo data: {str(e)}", file=sys.stderr, flush=True)
+        print(f"❌ Error creating demo data: {str(e)}", flush=True)
         db.rollback()
         raise
     finally:
