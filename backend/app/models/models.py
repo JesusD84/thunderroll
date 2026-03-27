@@ -39,8 +39,8 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    transfers = relationship("Transfer", back_populates="user")
-    imports = relationship("Import", back_populates="user")
+    transfers = relationship("Transfer", foreign_keys="Transfer.dispatched_by_id", back_populates="dispatched_by")
+    transfers = relationship("Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by")
     imports = relationship("Import", back_populates="user")
 
 class Location(Base):
@@ -53,8 +53,8 @@ class Location(Base):
 
     # Relationships
     units = relationship("Unit", back_populates="current_location")
-    transfers_from = relationship("Transfer", foreign_keys="Transfer.from_location_id", back_populates="from_location")
-    transfers_to = relationship("Transfer", foreign_keys="Transfer.to_location_id", back_populates="to_location")
+    transfers_from = relationship("Transfer", foreign_keys="Transfer.origin_location_id", back_populates="origin_location")
+    transfers_to = relationship("Transfer", foreign_keys="Transfer.destination_location_id", back_populates="destination_location")
 
 class Unit(Base):
     __tablename__ = "units"
@@ -81,20 +81,20 @@ class Transfer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    dispatched_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    received_by_id = Column(Integer, ForeignKey("users.id"))
     transfer_type = Column(Enum(TransferType), nullable=False)
-    from_location_id = Column(Integer, ForeignKey("locations.id"))
-    to_location_id = Column(Integer, ForeignKey("locations.id"))
-    quantity = Column(Integer, default=1)
-    notes = Column(Text)
-    transfer_date = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    origin_location_id = Column(Integer, ForeignKey("locations.id"))
+    destination_location_id = Column(Integer, ForeignKey("locations.id"))
+    dispatched_at = Column(DateTime(timezone=True), server_default=func.now())
+    received_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     unit = relationship("Unit", back_populates="transfers")
-    user = relationship("User", back_populates="transfers")
-    from_location = relationship("Location", foreign_keys=[from_location_id])
-    to_location = relationship("Location", foreign_keys=[to_location_id])
+    dispatched_by = relationship("User", back_populates="transfers")
+    received_by = relationship("User", back_populates="transfers")
+    origin_location = relationship("Location", foreign_keys=[origin_location_id])
+    destination_location = relationship("Location", foreign_keys=[destination_location_id])
 
 class Import(Base):
     __tablename__ = "imports"
