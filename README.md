@@ -81,7 +81,7 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # Ejecutar seeds
-python -m app.db.seed
+python -m app.database.seed
 
 # Ejecutar servidor
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -157,9 +157,6 @@ npm run type-check
 ### Transferencias
 - `POST /transfers` - Crear transferencia
 - `POST /transfers/{id}/receive` - Recibir
-
-### Ventas
-- `POST /units/{id}/sell` - Marcar vendida
 
 ### Reportes
 - `GET /reports/movements` - Exportar movimientos

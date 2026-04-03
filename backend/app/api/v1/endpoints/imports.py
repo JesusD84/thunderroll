@@ -1,7 +1,7 @@
 
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -10,7 +10,7 @@ import json
 from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, MovementType
-from app.services.auth import get_current_active_user, require_role
+from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
 
@@ -91,7 +91,7 @@ async def upload_inventory_file(
         import_record.successful_imports = result["successful_imports"]
         import_record.failed_imports = result["failed_imports"]
         import_record.status = "completed"
-        import_record.completed_at = datetime.utcnow()
+        import_record.completed_at = datetime.now(UTC)
         
         db.commit()
         
@@ -154,10 +154,7 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
     if not default_location:
         default_location = models.Location(
             name="Almacén Principal",
-            address="Guadalajara, Jalisco",
-            city="Guadalajara",
-            state="Jalisco",
-            country="México"
+            address="Guadalajara, Jalisco Mexico",
         )
         db.add(default_location)
         db.commit()
@@ -186,39 +183,13 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
             if existing_unit:
                 raise ValueError(f"Unit with engine number {engine_number} or chassis number {chassis_number} already exists")
             
-            # Get or create brand
-            brand = db.query(models.Brand).filter(models.Brand.name == brand_name).first()
-            if not brand:
-                brand = models.Brand(name=brand_name)
-                db.add(brand)
-                db.commit()
-                db.refresh(brand)
-            
-            # Get or create model
-            model = db.query(models.Model).filter(
-                (models.Model.name == model_name) & 
-                (models.Model.brand_id == brand.id)
-            ).first()
-            if not model:
-                model = models.Model(name=model_name, brand_id=brand.id)
-                db.add(model)
-                db.commit()
-                db.refresh(model)
-            
-            # Get or create color
-            color = db.query(models.Color).filter(models.Color.name == color_name).first()
-            if not color:
-                color = models.Color(name=color_name)
-                db.add(color)
-                db.commit()
-                db.refresh(color)
-            
             # Create unit
             unit = models.Unit(
                 engine_number=engine_number,
                 chassis_number=chassis_number,
-                model_id=model.id,
-                color_id=color.id,
+                model=model_name,
+                brand=brand_name,
+                color=color_name,
                 current_location_id=default_location.id,
                 status=UnitStatus.AVAILABLE
             )

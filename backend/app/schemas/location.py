@@ -2,15 +2,14 @@
 """Location schemas."""
 
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, Field
-from app.models.location import LocationType
 
 
 class LocationBase(BaseModel):
     """Base location schema."""
     name: str = Field(..., min_length=1, max_length=100)
-    type: LocationType
-    active: bool = True
+    address: Optional[str] = None
 
 
 class LocationCreate(LocationBase):
@@ -20,9 +19,8 @@ class LocationCreate(LocationBase):
 
 class LocationUpdate(BaseModel):
     """Location update schema."""
-    name: str | None = Field(None, min_length=1, max_length=100)
-    type: LocationType | None = None
-    active: bool | None = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    address: Optional[str] = None
 
 
 class Location(LocationBase):
@@ -32,3 +30,8 @@ class Location(LocationBase):
     
     class Config:
         from_attributes = True
+
+
+class LocationFilters(BaseModel):
+    """Location filter parameters."""
+    name: Optional[str] = None

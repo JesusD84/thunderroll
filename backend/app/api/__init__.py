@@ -1,2 +1,0 @@
-
-"""API routes for Thunderrol."""

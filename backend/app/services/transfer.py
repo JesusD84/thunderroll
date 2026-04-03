@@ -1,7 +1,7 @@
 
 """Transfer service for unit movements between locations."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.models.location import Location
 from app.models.transfer import Transfer, TransferStatus
 from app.models.unit_event import EventType
 from app.schemas.transfer import TransferCreate, TransferReceive
-from app.services.unit import UnitService
+from app.services.unit_service import UnitService
 
 
 class TransferService:
@@ -82,7 +82,7 @@ class TransferService:
         # Update unit status
         unit.status = new_status
         unit.last_updated_by_id = user_id
-        unit.updated_at = datetime.utcnow()
+        unit.updated_at = datetime.now(UTC)
         
         # Create transfer record
         transfer = Transfer(
@@ -152,12 +152,12 @@ class TransferService:
             transfer.to_location.type
         )
         transfer.unit.last_updated_by_id = receive_data.received_by_id
-        transfer.unit.updated_at = datetime.utcnow()
+        transfer.unit.updated_at = datetime.now(UTC)
         
         # Update transfer
         transfer.status = TransferStatus.RECEIVED
         transfer.received_by_id = receive_data.received_by_id
-        transfer.received_at = datetime.utcnow()
+        transfer.received_at = datetime.now(UTC)
         
         # Create audit event
         await UnitService._create_event(

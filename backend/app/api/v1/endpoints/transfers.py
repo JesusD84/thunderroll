@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, desc, func
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, MovementType
-from app.services.auth import get_current_active_user, require_role
+from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
 
@@ -94,11 +94,7 @@ def get_transfer_units(
         raise HTTPException(status_code=404, detail="Transfer not found")
     
     units = db.query(models.Unit).join(models.TransferUnit) \
-              .filter(models.TransferUnit.transfer_id == transfer_id) \
-              .options(
-                  selectinload(models.Unit.model).selectinload(models.Model.brand),
-                  selectinload(models.Unit.color)
-              ).all()
+              .filter(models.TransferUnit.transfer_id == transfer_id).all()
     
     return units
 
@@ -129,7 +125,7 @@ def create_transfer(
     for unit in units:
         if unit.current_location_id != transfer.from_location_id:
             invalid_units.append(f"Unit {unit.engine_number} is not at the source location")
-        if unit.status not in [UnitStatus.AVAILABLE, UnitStatus.RESERVED]:
+        if unit.status not in [UnitStatus.AVAILABLE]:
             invalid_units.append(f"Unit {unit.engine_number} is not available for transfer")
     
     if invalid_units:
@@ -142,7 +138,7 @@ def create_transfer(
         user_id=current_user.id,
         total_units=len(transfer.unit_ids),
         notes=transfer.notes,
-        transfer_date=transfer.transfer_date or datetime.utcnow()
+        transfer_date=transfer.transfer_date or datetime.now(UTC)
     )
     db.add(db_transfer)
     db.commit()
@@ -219,7 +215,7 @@ def update_transfer(
                 )
                 db.add(movement)
             
-            update_data["completed_date"] = datetime.utcnow()
+            update_data["completed_date"] = datetime.now(UTC)
         
         # If cancelling the transfer
         elif new_status == "cancelled":
@@ -314,7 +310,7 @@ def add_units_to_transfer(
                 detail=f"Unit {unit.engine_number} is not at the source location"
             )
         
-        if unit.status not in [UnitStatus.AVAILABLE, UnitStatus.RESERVED]:
+        if unit.status not in [UnitStatus.AVAILABLE]:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unit {unit.engine_number} is not available for transfer"

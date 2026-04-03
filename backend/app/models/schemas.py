@@ -1,36 +1,9 @@
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
 from app.models.models import UserRole, UnitStatus, MovementType
-
-# User Schemas
-class UserBase(BaseModel):
-    email: EmailStr
-    username: str
-    first_name: str
-    last_name: str
-    role: UserRole = UserRole.VIEWER
-
-class UserCreate(UserBase):
-    password: str
-
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
-
-class User(UserBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+from app.schemas.user import User
 
 # Auth Schemas
 class Token(BaseModel):
@@ -44,68 +17,10 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# Brand Schemas
-class BrandBase(BaseModel):
-    name: str
-
-class BrandCreate(BrandBase):
-    pass
-
-class Brand(BrandBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# Model Schemas
-class ModelBase(BaseModel):
-    name: str
-    brand_id: int
-    year: Optional[int] = None
-    engine_type: Optional[str] = None
-    displacement: Optional[str] = None
-
-class ModelCreate(ModelBase):
-    pass
-
-class Model(ModelBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    brand: Optional[Brand] = None
-
-    class Config:
-        from_attributes = True
-
-# Color Schemas
-class ColorBase(BaseModel):
-    name: str
-    hex_code: Optional[str] = None
-
-class ColorCreate(ColorBase):
-    pass
-
-class Color(ColorBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 # Location Schemas
 class LocationBase(BaseModel):
     name: str
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
 
 class LocationCreate(LocationBase):
     pass
@@ -113,18 +28,9 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    manager_name: Optional[str] = None
-    is_active: Optional[bool] = None
 
 class Location(LocationBase):
     id: int
-    is_active: bool
     created_at: datetime
 
     class Config:
@@ -132,28 +38,30 @@ class Location(LocationBase):
 
 # Unit Schemas
 class UnitBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     engine_number: str
     chassis_number: str
-    model_id: int
-    color_id: int
+    model: str
+    brand: str
+    color: str
     current_location_id: Optional[int] = None
     status: UnitStatus = UnitStatus.AVAILABLE
-    purchase_price: Optional[float] = None
-    sale_price: Optional[float] = None
     notes: Optional[str] = None
 
 class UnitCreate(UnitBase):
     pass
 
 class UnitUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
-    model_id: Optional[int] = None
-    color_id: Optional[int] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    color: Optional[str] = None
     current_location_id: Optional[int] = None
     status: Optional[UnitStatus] = None
-    purchase_price: Optional[float] = None
-    sale_price: Optional[float] = None
     sold_date: Optional[datetime] = None
     notes: Optional[str] = None
 
@@ -162,8 +70,9 @@ class Unit(UnitBase):
     sold_date: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    model: Optional[Model] = None
-    color: Optional[Color] = None
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    color: Optional[str] = None
     current_location: Optional[Location] = None
 
     class Config:
@@ -176,7 +85,6 @@ class MovementBase(BaseModel):
     from_location_id: Optional[int] = None
     to_location_id: Optional[int] = None
     quantity: int = 1
-    price: Optional[float] = None
     notes: Optional[str] = None
     movement_date: Optional[datetime] = None
 
@@ -248,33 +156,6 @@ class Transfer(TransferBase):
     class Config:
         from_attributes = True
 
-# Setting Schemas
-class SettingBase(BaseModel):
-    key: str
-    value: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    data_type: str = "string"
-
-class SettingCreate(SettingBase):
-    pass
-
-class SettingUpdate(BaseModel):
-    value: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    data_type: Optional[str] = None
-    is_active: Optional[bool] = None
-
-class Setting(SettingBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
 # Dashboard/Reports Schemas
 class DashboardStats(BaseModel):
     total_units: int
@@ -291,8 +172,6 @@ class InventoryReport(BaseModel):
     total_units: int
     by_status: dict
     by_location: dict
-    by_brand: dict
-    by_model: dict
 
 class MovementReport(BaseModel):
     movements: List[Movement]

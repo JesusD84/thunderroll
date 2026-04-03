@@ -120,7 +120,7 @@ psql -h localhost -U thunderrol -d thunderrol -c "\dt"
 ### 6. Poblar Base de Datos con Datos Iniciales (Seeds)
 ```bash
 # Ejecutar el script de seeders para crear usuarios demo
-python -m app.db.seed
+python -m app.database.seed
 
 # Verificar que se crearon los usuarios
 psql -h localhost -U thunderrol -d thunderrol -c "SELECT email, role FROM users;"
@@ -346,7 +346,7 @@ alembic downgrade base
 # Recrear todas las tablas
 alembic upgrade head
 # Poblar con datos iniciales
-python -m app.db.seed
+python -m app.database.seed
 
 echo "✅ Base de datos reseteada"
 ```

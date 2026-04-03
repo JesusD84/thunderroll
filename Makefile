@@ -107,7 +107,7 @@ create-migration: ## Crear nueva migración (usar: make create-migration DESC="d
 
 seed-db: ## Poblar base de datos con datos iniciales
 	@echo "$(BLUE)🌱 Poblando base de datos...$(NC)"
-	@cd $(BACKEND_DIR) && source venv/bin/activate && python -m app.db.seed
+	@cd $(BACKEND_DIR) && source venv/bin/activate && python -m app.database.seed
 	@cd $(FRONTEND_DIR) && (yarn prisma db seed || npm run prisma db seed)
 
 # Herramientas de desarrollo
