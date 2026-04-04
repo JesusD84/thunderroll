@@ -81,24 +81,19 @@ class Unit(UnitBase):
 # Transfer Schemas
 class TransferBase(BaseModel):
     unit_id: int
+    dispatched_by_id: Optional[int] = None
+    received_by_id: Optional[int] = None
     transfer_type: TransferType
-    from_location_id: Optional[int] = None
-    to_location_id: Optional[int] = None
-    quantity: int = 1
-    notes: Optional[str] = None
-    trasfer_date: Optional[datetime] = None
+    origin_location_id: Optional[int] = None
+    destination_location_id: Optional[int] = None
+    dispatched_at: Optional[datetime] = None
+    received_at: Optional[datetime] = None
 
 class TransferCreate(TransferBase):
     pass
 
 class Transfer(TransferBase):
     id: int
-    user_id: int
-    created_at: datetime
-    unit: Optional[Unit] = None
-    user: Optional[User] = None
-    from_location: Optional[Location] = None
-    to_location: Optional[Location] = None
 
     class Config:
         from_attributes = True
