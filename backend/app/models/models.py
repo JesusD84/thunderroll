@@ -39,8 +39,8 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    transfers = relationship("Transfer", foreign_keys="Transfer.dispatched_by_id", back_populates="dispatched_by")
-    transfers = relationship("Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by")
+    dispatched_transfers = relationship("Transfer", foreign_keys="Transfer.dispatched_by_id", back_populates="dispatched_by")
+    received_transfers = relationship("Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by")
     imports = relationship("Import", back_populates="user")
 
 class Location(Base):
@@ -91,8 +91,8 @@ class Transfer(Base):
 
     # Relationships
     unit = relationship("Unit", back_populates="transfers")
-    dispatched_by = relationship("User", back_populates="transfers")
-    received_by = relationship("User", back_populates="transfers")
+    dispatched_by = relationship("User", foreign_keys=[dispatched_by_id], back_populates="dispatched_transfers")
+    received_by = relationship("User", foreign_keys=[received_by_id], back_populates="received_transfers")
     origin_location = relationship("Location", foreign_keys=[origin_location_id])
     destination_location = relationship("Location", foreign_keys=[destination_location_id])
 

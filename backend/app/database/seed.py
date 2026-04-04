@@ -162,10 +162,8 @@ def create_demo_data():
             # Import transfer
             import_transfer = Transfer(
                 unit_id=unit.id,
-                user_id=admin_user.id,
-                transfer_type=TransferType.IMPORT,
-                to_location_id=warehouse.id,
-                notes="Unidad importada - datos de demostración"
+                dispatched_by_id=admin_user.id,
+                transfer_type=TransferType.IMPORT
             )
             db.add(import_transfer)
             
@@ -173,11 +171,8 @@ def create_demo_data():
             if unit.status == UnitStatus.SOLD:
                 sale_transfer = Transfer(
                     unit_id=unit.id,
-                    user_id=admin_user.id,
-                    transfer_type=TransferType.SALE,
-                    transfer_date=unit.sold_date,
-                to_location_id=warehouse.id,
-                    notes="Venta de unidad - datos de demostración"
+                    dispatched_by_id=admin_user.id,
+                    transfer_type=TransferType.SALE
                 )
                 db.add(sale_transfer)
         
