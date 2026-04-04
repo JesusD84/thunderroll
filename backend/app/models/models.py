@@ -81,13 +81,13 @@ class Transfer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    dispatched_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    dispatched_by_id = Column(Integer, ForeignKey("users.id"))
     received_by_id = Column(Integer, ForeignKey("users.id"))
     transfer_type = Column(Enum(TransferType), nullable=False)
     origin_location_id = Column(Integer, ForeignKey("locations.id"))
     destination_location_id = Column(Integer, ForeignKey("locations.id"))
-    dispatched_at = Column(DateTime(timezone=True), server_default=func.now())
-    received_at = Column(DateTime(timezone=True), server_default=func.now())
+    dispatched_at = Column(DateTime(timezone=True))
+    received_at = Column(DateTime(timezone=True))
 
     # Relationships
     unit = relationship("Unit", back_populates="transfers")
