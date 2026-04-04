@@ -1,8 +1,8 @@
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
-from app.models.models import UserRole, UnitStatus, MovementType
+from app.models.models import UnitStatus, TransferType
 from app.schemas.user import User
 
 # Auth Schemas
@@ -78,20 +78,20 @@ class Unit(UnitBase):
     class Config:
         from_attributes = True
 
-# Movement Schemas
-class MovementBase(BaseModel):
+# Transfer Schemas
+class TransferBase(BaseModel):
     unit_id: int
-    movement_type: MovementType
+    transfer_type: TransferType
     from_location_id: Optional[int] = None
     to_location_id: Optional[int] = None
     quantity: int = 1
     notes: Optional[str] = None
-    movement_date: Optional[datetime] = None
+    trasfer_date: Optional[datetime] = None
 
-class MovementCreate(MovementBase):
+class TransferCreate(TransferBase):
     pass
 
-class Movement(MovementBase):
+class Transfer(TransferBase):
     id: int
     user_id: int
     created_at: datetime
@@ -126,36 +126,6 @@ class Import(ImportBase):
     class Config:
         from_attributes = True
 
-# Transfer Schemas
-class TransferBase(BaseModel):
-    from_location_id: int
-    to_location_id: int
-    notes: Optional[str] = None
-    transfer_date: Optional[datetime] = None
-
-class TransferCreate(TransferBase):
-    unit_ids: List[int]
-
-class TransferUpdate(BaseModel):
-    status: Optional[str] = None
-    notes: Optional[str] = None
-    completed_date: Optional[datetime] = None
-
-class Transfer(TransferBase):
-    id: int
-    user_id: int
-    status: str
-    total_units: int
-    completed_date: Optional[datetime] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    from_location: Optional[Location] = None
-    to_location: Optional[Location] = None
-    user: Optional[User] = None
-
-    class Config:
-        from_attributes = True
-
 # Dashboard/Reports Schemas
 class DashboardStats(BaseModel):
     total_units: int
@@ -163,7 +133,7 @@ class DashboardStats(BaseModel):
     sold_units: int
     in_transit_units: int
     total_locations: int
-    recent_movements: List[Movement]
+    recent_transfers: List[Transfer]
     inventory_by_location: List[dict]
     sales_by_month: List[dict]
 
@@ -173,9 +143,9 @@ class InventoryReport(BaseModel):
     by_status: dict
     by_location: dict
 
-class MovementReport(BaseModel):
-    movements: List[Movement]
-    total_movements: int
+class TransferReport(BaseModel):
+    transfers: List[Transfer]
+    total_transfers: int
     by_type: dict
     by_month: dict
     by_user: dict

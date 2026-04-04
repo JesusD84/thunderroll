@@ -16,7 +16,7 @@ class UnitStatus(str, enum.Enum):
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
 
-class MovementType(str, enum.Enum):
+class TransferType(str, enum.Enum):
     IMPORT = "import"
     SALE = "sale"
     TRANSFER = "transfer"
@@ -39,9 +39,9 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    movements = relationship("Movement", back_populates="user")
+    dispatched_transfers = relationship("Transfer", foreign_keys="Transfer.dispatched_by_id", back_populates="dispatched_by")
+    received_transfers = relationship("Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by")
     imports = relationship("Import", back_populates="user")
-    transfers = relationship("Transfer", back_populates="user")
 
 class Location(Base):
     __tablename__ = "locations"
@@ -53,8 +53,8 @@ class Location(Base):
 
     # Relationships
     units = relationship("Unit", back_populates="current_location")
-    transfers_from = relationship("Transfer", foreign_keys="Transfer.from_location_id", back_populates="from_location")
-    transfers_to = relationship("Transfer", foreign_keys="Transfer.to_location_id", back_populates="to_location")
+    transfers_from = relationship("Transfer", foreign_keys="Transfer.origin_location_id", back_populates="origin_location")
+    transfers_to = relationship("Transfer", foreign_keys="Transfer.destination_location_id", back_populates="destination_location")
 
 class Unit(Base):
     __tablename__ = "units"
@@ -74,27 +74,27 @@ class Unit(Base):
 
     # Relationships
     current_location = relationship("Location", back_populates="units")
-    movements = relationship("Movement", back_populates="unit")
+    transfers = relationship("Transfer", back_populates="unit")
 
-class Movement(Base):
-    __tablename__ = "movements"
+class Transfer(Base):
+    __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    movement_type = Column(Enum(MovementType), nullable=False)
-    from_location_id = Column(Integer, ForeignKey("locations.id"))
-    to_location_id = Column(Integer, ForeignKey("locations.id"))
-    quantity = Column(Integer, default=1)
-    notes = Column(Text)
-    movement_date = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    dispatched_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    received_by_id = Column(Integer, ForeignKey("users.id"))
+    transfer_type = Column(Enum(TransferType), nullable=False)
+    origin_location_id = Column(Integer, ForeignKey("locations.id"))
+    destination_location_id = Column(Integer, ForeignKey("locations.id"))
+    dispatched_at = Column(DateTime(timezone=True), server_default=func.now())
+    received_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    unit = relationship("Unit", back_populates="movements")
-    user = relationship("User", back_populates="movements")
-    from_location = relationship("Location", foreign_keys=[from_location_id])
-    to_location = relationship("Location", foreign_keys=[to_location_id])
+    unit = relationship("Unit", back_populates="transfers")
+    dispatched_by = relationship("User", foreign_keys=[dispatched_by_id], back_populates="dispatched_transfers")
+    received_by = relationship("User", foreign_keys=[received_by_id], back_populates="received_transfers")
+    origin_location = relationship("Location", foreign_keys=[origin_location_id])
+    destination_location = relationship("Location", foreign_keys=[destination_location_id])
 
 class Import(Base):
     __tablename__ = "imports"
@@ -127,36 +127,3 @@ class ImportError(Base):
 
     # Relationships
     import_record = relationship("Import", back_populates="import_errors")
-
-class Transfer(Base):
-    __tablename__ = "transfers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    from_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
-    to_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String(50), default="pending")  # pending, in_transit, completed, cancelled
-    total_units = Column(Integer, default=0)
-    notes = Column(Text)
-    transfer_date = Column(DateTime(timezone=True))
-    completed_date = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relationships
-    from_location = relationship("Location", foreign_keys=[from_location_id], back_populates="transfers_from")
-    to_location = relationship("Location", foreign_keys=[to_location_id], back_populates="transfers_to")
-    user = relationship("User", back_populates="transfers")
-    transfer_units = relationship("TransferUnit", back_populates="transfer")
-
-class TransferUnit(Base):
-    __tablename__ = "transfer_units"
-
-    id = Column(Integer, primary_key=True, index=True)
-    transfer_id = Column(Integer, ForeignKey("transfers.id"), nullable=False)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    transfer = relationship("Transfer", back_populates="transfer_units")
-    unit = relationship("Unit")

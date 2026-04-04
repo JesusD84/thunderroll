@@ -9,7 +9,7 @@ import io
 
 from app.database.database import get_db
 from app.models import models, schemas
-from app.models.models import UserRole, UnitStatus, MovementType
+from app.models.models import UserRole, UnitStatus, TransferType
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
@@ -30,12 +30,12 @@ def get_dashboard_stats(
     # Location counts
     total_locations = db.query(models.Location).count()
     
-    # Recent movements (last 10)
-    recent_movements = db.query(models.Movement).options(
-        selectinload(models.Movement.user),
-        selectinload(models.Movement.from_location),
-        selectinload(models.Movement.to_location)
-    ).order_by(desc(models.Movement.created_at)).limit(10).all()
+    # Recent transfers (last 10)
+    recent_transfers = db.query(models.Transfer).options(
+        selectinload(models.Transfer.user),
+        selectinload(models.Transfer.from_location),
+        selectinload(models.Transfer.to_location)
+    ).order_by(desc(models.Transfer.created_at)).limit(10).all()
     
     # Inventory by location
     inventory_by_location = db.query(
@@ -80,16 +80,16 @@ def get_dashboard_stats(
         "transfers": {
             "active": active_transfers
         },
-        "recent_movements": [
+        "recent_transfers": [
             {
                 "id": m.id,
                 "unit_engine": m.unit.engine_number if m.unit else None,
-                "movement_type": m.movement_type,
+                "transfer_type": m.transfer_type,
                 "from_location": m.from_location.name if m.from_location else None,
                 "to_location": m.to_location.name if m.to_location else None,
                 "user": f"{m.user.first_name} {m.user.last_name}" if m.user else None,
-                "date": m.movement_date or m.created_at,
-            } for m in recent_movements
+                "date": m.transfer_date or m.created_at,
+            } for m in recent_transfers
         ],
         "inventory_by_location": [
             {"location": item.location, "count": item.count}
@@ -195,9 +195,9 @@ def get_inventory_report(
         ]
     }
 
-@router.get("/movements")
-def get_movements_report(
-    movement_type: Optional[MovementType] = None,
+@router.get("/transfers")
+def get_transfers_report(
+    transfer_type: Optional[TransferType] = None,
     user_id: Optional[int] = None,
     location_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
@@ -207,54 +207,54 @@ def get_movements_report(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Generate movements report with filters"""
+    """Generate transfers report with filters"""
     
-    query = db.query(models.Movement).options(
-        selectinload(models.Movement.user),
-        selectinload(models.Movement.from_location),
-        selectinload(models.Movement.to_location)
+    query = db.query(models.Transfer).options(
+        selectinload(models.Transfer.user),
+        selectinload(models.Transfer.from_location),
+        selectinload(models.Transfer.to_location)
     )
     
     # Apply filters
-    if movement_type:
-        query = query.filter(models.Movement.movement_type == movement_type)
+    if transfer_type:
+        query = query.filter(models.Transfer.transfer_type == transfer_type)
     if user_id:
-        query = query.filter(models.Movement.user_id == user_id)
+        query = query.filter(models.Transfer.user_id == user_id)
     if location_id:
         query = query.filter(
             or_(
-                models.Movement.from_location_id == location_id,
-                models.Movement.to_location_id == location_id
+                models.Transfer.from_location_id == location_id,
+                models.Transfer.to_location_id == location_id
             )
         )
     if date_from:
-        query = query.filter(models.Movement.movement_date >= date_from)
+        query = query.filter(models.Transfer.transfer_date >= date_from)
     if date_to:
-        query = query.filter(models.Movement.movement_date <= date_to)
+        query = query.filter(models.Transfer.transfer_date <= date_to)
     
     # Get total count for pagination
-    total_movements = query.count()
+    total_transfers = query.count()
     
     # Apply pagination and ordering
-    movements = query.order_by(desc(models.Movement.movement_date)) \
+    transfers = query.order_by(desc(models.Transfer.transfer_date)) \
                     .offset(skip).limit(limit).all()
     
     # Summary statistics
     by_type = db.query(
-        models.Movement.movement_type,
-        func.count(models.Movement.id).label("count")
-    ).group_by(models.Movement.movement_type).all()
+        models.Transfer.transfer_type,
+        func.count(models.Transfer.id).label("count")
+    ).group_by(models.Transfer.transfer_type).all()
     
     by_month = db.query(
-        func.date_trunc('month', models.Movement.movement_date).label("month"),
-        func.count(models.Movement.id).label("count")
-    ).group_by(func.date_trunc('month', models.Movement.movement_date)) \
-     .order_by(func.date_trunc('month', models.Movement.movement_date)).all()
+        func.date_trunc('month', models.Transfer.transfer_date).label("month"),
+        func.count(models.Transfer.id).label("count")
+    ).group_by(func.date_trunc('month', models.Transfer.transfer_date)) \
+     .order_by(func.date_trunc('month', models.Transfer.transfer_date)).all()
     
     return {
-        "total_movements": total_movements,
+        "total_transfers": total_transfers,
         "summary": {
-            "by_type": {item.movement_type.value: item.count for item in by_type},
+            "by_type": {item.transfer_type.value: item.count for item in by_type},
             "by_month": [
                 {
                     "month": item.month.strftime("%Y-%m") if item.month else None,
@@ -262,26 +262,26 @@ def get_movements_report(
                 } for item in by_month
             ]
         },
-        "movements": [
+        "transfers": [
             {
-                "id": movement.id,
-                "unit_engine": movement.unit.engine_number if movement.unit else None,
-                "unit_chassis": movement.unit.chassis_number if movement.unit else None,
-                "movement_type": movement.movement_type.value if movement.movement_type else None,
-                "from_location": movement.from_location.name if movement.from_location else None,
-                "to_location": movement.to_location.name if movement.to_location else None,
-                "user": f"{movement.user.first_name} {movement.user.last_name}" if movement.user else None,
-                "quantity": movement.quantity,
-                "notes": movement.notes,
-                "movement_date": movement.movement_date,
-                "created_at": movement.created_at
-            } for movement in movements
+                "id": transfer.id,
+                "unit_engine": transfer.unit.engine_number if transfer.unit else None,
+                "unit_chassis": transfer.unit.chassis_number if transfer.unit else None,
+                "transfer_type": transfer.transfer_type.value if transfer.transfer_type else None,
+                "from_location": transfer.from_location.name if transfer.from_location else None,
+                "to_location": transfer.to_location.name if transfer.to_location else None,
+                "user": f"{transfer.user.first_name} {transfer.user.last_name}" if transfer.user else None,
+                "quantity": transfer.quantity,
+                "notes": transfer.notes,
+                "transfer_date": transfer.transfer_date,
+                "created_at": transfer.created_at
+            } for transfer in transfers
         ],
         "pagination": {
             "skip": skip,
             "limit": limit,
-            "total": total_movements,
-            "has_next": skip + limit < total_movements,
+            "total": total_transfers,
+            "has_next": skip + limit < total_transfers,
             "has_previous": skip > 0
         }
     }
@@ -307,13 +307,13 @@ def get_sales_report(
     if date_to:
         query = query.filter(models.Unit.sold_date <= date_to)
     if location_id:
-        # Find sales movements for this location
-        sold_units = db.query(models.Movement.unit_id).filter(
+        # Find sales transfers for this location
+        sold_units = db.query(models.Transfer.unit_id).filter(
             and_(
-                models.Movement.movement_type == MovementType.SALE,
+                models.Transfer.transfer_type == TransferType.SALE,
                 or_(
-                    models.Movement.from_location_id == location_id,
-                    models.Movement.to_location_id == location_id
+                    models.Transfer.from_location_id == location_id,
+                    models.Transfer.to_location_id == location_id
                 )
             )
         ).subquery()
@@ -408,19 +408,19 @@ def export_inventory_excel(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-@router.get("/export/movements")
-def export_movements_excel(
-    movement_type: Optional[MovementType] = None,
+@router.get("/export/transfers")
+def export_transfers_excel(
+    transfer_type: Optional[TransferType] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Export movements report to Excel"""
+    """Export transfers report to Excel"""
     
-    # Get movements data (without pagination for export)
-    report_data = get_movements_report(
-        movement_type=movement_type,
+    # Get transfers data (without pagination for export)
+    report_data = get_transfers_report(
+        transfer_type=transfer_type,
         date_from=date_from,
         date_to=date_to,
         limit=10000,  # Large limit for export
@@ -429,17 +429,17 @@ def export_movements_excel(
     )
     
     # Create DataFrame
-    df = pd.DataFrame(report_data["movements"])
+    df = pd.DataFrame(report_data["transfers"])
     
     # Create Excel file in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Movements', index=False)
+        df.to_excel(writer, sheet_name='Transfers', index=False)
     
     output.seek(0)
     
     # Return Excel file
-    filename = f"movements_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"transfers_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return Response(
         content=output.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

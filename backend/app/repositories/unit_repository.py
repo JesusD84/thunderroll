@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
-from app.models.models import Unit, Movement, MovementType, UnitStatus, Location
+from app.models.models import Unit, Transfer, TransferType, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -86,10 +86,10 @@ class UnitRepository:
         db.refresh(unit)
 
         if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
-            db.add(Movement(
+            db.add(Transfer(
                 unit_id=unit.id,
                 user_id=user_id,
-                movement_type=MovementType.TRANSFER,
+                transfer_type=TransferType.TRANSFER,
                 from_location_id=old_location_id,
                 to_location_id=update_data["current_location_id"],
                 notes="Unit location updated"
@@ -97,11 +97,11 @@ class UnitRepository:
             db.commit()
 
         if "status" in update_data and update_data["status"] != old_status:
-            movement_type = MovementType.SALE if update_data["status"] == UnitStatus.SOLD else MovementType.TRANSFER
-            db.add(Movement(
+            transfer_type = TransferType.SALE if update_data["status"] == UnitStatus.SOLD else TransferType.TRANSFER
+            db.add(Transfer(
                 unit_id=unit.id,
                 user_id=user_id,
-                movement_type=movement_type,
+                transfer_type=transfer_type,
                 notes=f"Status changed from {old_status} to {update_data['status']}"
             ))
             db.commit()
@@ -110,7 +110,7 @@ class UnitRepository:
 
     @staticmethod
     def delete_unit(db: Session, unit_id: int) -> None:
-        db.query(Movement).filter(Movement.unit_id == unit_id).delete()
+        db.query(Transfer).filter(Transfer.unit_id == unit_id).delete()
         db.query(Unit).filter(Unit.id == unit_id).delete()
         db.commit()
 
@@ -140,39 +140,39 @@ class UnitRepository:
         }
 
     @staticmethod
-    def get_unit_movements(db: Session, unit_id: int, skip: int, limit: int) -> list[Movement]:
+    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
         return (
-            db.query(Movement)
+            db.query(Transfer)
             .options(
-                selectinload(Movement.user),
-                selectinload(Movement.from_location),
-                selectinload(Movement.to_location)
+                selectinload(Transfer.user),
+                selectinload(Transfer.from_location),
+                selectinload(Transfer.to_location)
             )
-            .filter(Movement.unit_id == unit_id)
-            .order_by(Movement.created_at.desc())
+            .filter(Transfer.unit_id == unit_id)
+            .order_by(Transfer.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
 
     @staticmethod
-    def move_unit(db: Session, unit: Unit, movement_data: dict, user_id: int) -> Movement:
-        db_movement = Movement(
-            **movement_data,
+    def move_unit(db: Session, unit: Unit, transfer_data: dict, user_id: int) -> Transfer:
+        db_transfer = Transfer(
+            **transfer_data,
             unit_id=unit.id,
             user_id=user_id
         )
-        db.add(db_movement)
+        db.add(db_transfer)
 
-        if db_movement.to_location_id:
-            unit.current_location_id = db_movement.to_location_id
+        if db_transfer.to_location_id:
+            unit.current_location_id = db_transfer.to_location_id
 
-        if db_movement.movement_type == MovementType.SALE:
+        if db_transfer.transfer_type == TransferType.SALE:
             unit.status = UnitStatus.SOLD
-            unit.sold_date = db_movement.movement_date or func.now()
-        elif db_movement.movement_type == MovementType.TRANSFER:
+            unit.sold_date = db_transfer.transfer_date or func.now()
+        elif db_transfer.transfer_type == TransferType.TRANSFER:
             unit.status = UnitStatus.IN_TRANSIT
 
         db.commit()
-        db.refresh(db_movement)
-        return db_movement
+        db.refresh(db_transfer)
+        return db_transfer
