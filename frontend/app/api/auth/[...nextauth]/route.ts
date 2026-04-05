@@ -1,12 +1,10 @@
 
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaClient, UserStatus } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 export const dynamic = "force-dynamic";
 
-const prisma = new PrismaClient();
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 const handler = NextAuth({
   providers: [
@@ -22,36 +20,38 @@ const handler = NextAuth({
         }
 
         try {
-          // Buscar usuario en la base de datos
-          const user = await prisma.user.findUnique({
-            where: { 
-              email: credentials.email,
-              status: UserStatus.ACTIVE 
-            }
+          const params = new URLSearchParams();
+          params.append('username', credentials.email);
+          params.append('password', credentials.password);
+
+          const loginRes = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
           });
 
-          if (!user || !user.hashedPassword) {
+          if (!loginRes.ok) {
             return null;
           }
 
-          // Verificar contraseña
-          const isValid = await bcrypt.compare(credentials.password, user.hashedPassword);
-          
-          if (!isValid) {
+          const { access_token } = await loginRes.json();
+
+          const meRes = await fetch(`${BACKEND_URL}/api/v1/user/me`, {
+            headers: { 'Authorization': `Bearer ${access_token}` },
+          });
+
+          if (!meRes.ok) {
             return null;
           }
 
-          // Actualizar último login
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() }
-          });
+          const user = await meRes.json();
 
           return {
-            id: user.id,
+            id: String(user.id),
             email: user.email,
-            name: user.name || user.email,
-            role: user.role
+            name: `${user.first_name} ${user.last_name}`,
+            role: user.role,
+            accessToken: access_token,
           };
         } catch (error) {
           console.error('Error de autenticación:', error);
@@ -68,6 +68,7 @@ const handler = NextAuth({
       if (user) {
         token.role = (user as any).role;
         token.id = user.id;
+        token.accessToken = (user as any).accessToken;
       }
       return token;
     },
@@ -75,6 +76,7 @@ const handler = NextAuth({
       if (token) {
         (session.user as any).role = token.role;
         (session.user as any).id = token.id;
+        (session as any).accessToken = token.accessToken;
       }
       return session;
     },
