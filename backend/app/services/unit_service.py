@@ -82,13 +82,3 @@ class UnitService:
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
         return UnitRepository.get_unit_transfers(db, unit_id, skip, limit)
-
-    @staticmethod
-    def move_unit(db: Session, unit_id: int, transfer_data: TransferCreate, user_id: int) -> dict:
-        unit = UnitRepository.get_unit(db, unit_id)
-        if not unit:
-            raise HTTPException(status_code=404, detail="Unit not found")
-
-        data = transfer_data.model_dump(exclude={"unit_id"})
-        db_transfer = UnitRepository.move_unit(db, unit, data, user_id)
-        return {"message": "Unit moved successfully", "transfer_id": db_transfer.id}

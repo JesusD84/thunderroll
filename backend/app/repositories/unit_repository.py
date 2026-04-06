@@ -154,25 +154,3 @@ class UnitRepository:
             .limit(limit)
             .all()
         )
-
-    @staticmethod
-    def move_unit(db: Session, unit: Unit, transfer_data: dict, user_id: int) -> Transfer:
-        db_transfer = Transfer(
-            **transfer_data,
-            unit_id=unit.id,
-            user_id=user_id
-        )
-        db.add(db_transfer)
-
-        if db_transfer.to_location_id:
-            unit.current_location_id = db_transfer.to_location_id
-
-        if db_transfer.transfer_type == TransferType.SALE:
-            unit.status = UnitStatus.SOLD
-            unit.sold_date = db_transfer.transfer_date or func.now()
-        elif db_transfer.transfer_type == TransferType.TRANSFER:
-            unit.status = UnitStatus.IN_TRANSIT
-
-        db.commit()
-        db.refresh(db_transfer)
-        return db_transfer

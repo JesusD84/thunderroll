@@ -70,12 +70,3 @@ def get_unit_transfers(
     current_user: models.User = Depends(get_current_active_user)
 ):
     return UnitService.get_unit_transfers(db, unit_id, skip, limit)
-
-@router.post("/{unit_id}/move")
-def move_unit(
-    unit_id: int,
-    transfer: schemas.TransferCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
-):
-    return UnitService.move_unit(db, unit_id, transfer, current_user.id)
