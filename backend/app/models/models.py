@@ -25,6 +25,12 @@ class TransferType(str, enum.Enum):
     DAMAGED = "damaged"
     MAINTENANCE = "maintenance"
 
+class TransferStatus(str, enum.Enum):
+    PENDING = "pending"
+    IN_TRANSIT = "in_transit"
+    RECEIVED = "received"
+    CANCELLED = "cancelled"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -85,6 +91,7 @@ class Transfer(Base):
     dispatched_by_id = Column(Integer, ForeignKey("users.id"))
     received_by_id = Column(Integer, ForeignKey("users.id"))
     transfer_type = Column(Enum(TransferType), nullable=False)
+    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.PENDING)
     origin_location_id = Column(Integer, ForeignKey("locations.id"))
     destination_location_id = Column(Integer, ForeignKey("locations.id"))
     dispatched_at = Column(DateTime(timezone=True))

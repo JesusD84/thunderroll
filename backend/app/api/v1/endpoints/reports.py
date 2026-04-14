@@ -9,7 +9,7 @@ import io
 
 from app.database.database import get_db
 from app.models import models, schemas
-from app.models.models import UserRole, UnitStatus, TransferType
+from app.models.models import UserRole, UnitStatus, TransferType, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
@@ -64,7 +64,7 @@ def get_dashboard_stats(
     
     # Active transfers
     active_transfers = db.query(models.Transfer).filter(
-        models.Transfer.status.in_(["pending", "in_transit"])
+        models.Transfer.status.in_([TransferStatus.PENDING, TransferStatus.IN_TRANSIT])
     ).count()
     
     return {
