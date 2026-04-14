@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, or_
 from datetime import datetime, timedelta
 from typing import List, Optional
 import pandas as pd
@@ -9,7 +9,7 @@ import io
 
 from app.database.database import get_db
 from app.models import models, schemas
-from app.models.models import UserRole, UnitStatus, TransferType, TransferStatus
+from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
@@ -32,10 +32,11 @@ def get_dashboard_stats(
     
     # Recent transfers (last 10)
     recent_transfers = db.query(models.Transfer).options(
-        selectinload(models.Transfer.user),
-        selectinload(models.Transfer.from_location),
-        selectinload(models.Transfer.to_location)
-    ).order_by(desc(models.Transfer.created_at)).limit(10).all()
+        selectinload(models.Transfer.dispatched_by),
+        selectinload(models.Transfer.received_by),
+        selectinload(models.Transfer.origin_location),
+        selectinload(models.Transfer.destination_location)
+    ).order_by(desc(models.Transfer.dispatched_at)).limit(10).all()
     
     # Inventory by location
     inventory_by_location = db.query(
@@ -84,11 +85,13 @@ def get_dashboard_stats(
             {
                 "id": m.id,
                 "unit_engine": m.unit.engine_number if m.unit else None,
-                "transfer_type": m.transfer_type,
-                "from_location": m.from_location.name if m.from_location else None,
-                "to_location": m.to_location.name if m.to_location else None,
-                "user": f"{m.user.first_name} {m.user.last_name}" if m.user else None,
-                "date": m.transfer_date or m.created_at,
+                "origin_location": m.origin_location.name if m.origin_location else None,
+                "destination_location": m.destination_location.name if m.destination_location else None,
+                "dispatched_by": f"{m.dispatched_by.first_name} {m.dispatched_by.last_name}" if m.dispatched_by else None,
+                "received_by": f"{m.received_by.first_name} {m.received_by.last_name}" if m.received_by else None,
+                "status": m.status,
+                "dispatched_at": m.dispatched_at,
+                "received_at": m.received_at,
             } for m in recent_transfers
         ],
         "inventory_by_location": [
@@ -197,7 +200,6 @@ def get_inventory_report(
 
 @router.get("/transfers")
 def get_transfers_report(
-    transfer_type: Optional[TransferType] = None,
     user_id: Optional[int] = None,
     location_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
@@ -208,53 +210,57 @@ def get_transfers_report(
     current_user: models.User = Depends(get_current_active_user)
 ):
     """Generate transfers report with filters"""
-    
+
     query = db.query(models.Transfer).options(
-        selectinload(models.Transfer.user),
-        selectinload(models.Transfer.from_location),
-        selectinload(models.Transfer.to_location)
+        selectinload(models.Transfer.dispatched_by),
+        selectinload(models.Transfer.received_by),
+        selectinload(models.Transfer.origin_location),
+        selectinload(models.Transfer.destination_location)
     )
-    
+
     # Apply filters
-    if transfer_type:
-        query = query.filter(models.Transfer.transfer_type == transfer_type)
     if user_id:
-        query = query.filter(models.Transfer.user_id == user_id)
+        query = query.filter(
+            or_(
+                models.Transfer.dispatched_by_id == user_id,
+                models.Transfer.received_by_id == user_id
+            )
+        )
     if location_id:
         query = query.filter(
             or_(
-                models.Transfer.from_location_id == location_id,
-                models.Transfer.to_location_id == location_id
+                models.Transfer.origin_location_id == location_id,
+                models.Transfer.destination_location_id == location_id
             )
         )
     if date_from:
-        query = query.filter(models.Transfer.transfer_date >= date_from)
+        query = query.filter(models.Transfer.dispatched_at >= date_from)
     if date_to:
-        query = query.filter(models.Transfer.transfer_date <= date_to)
-    
+        query = query.filter(models.Transfer.dispatched_at <= date_to)
+
     # Get total count for pagination
     total_transfers = query.count()
-    
+
     # Apply pagination and ordering
-    transfers = query.order_by(desc(models.Transfer.transfer_date)) \
+    transfers = query.order_by(desc(models.Transfer.dispatched_at)) \
                     .offset(skip).limit(limit).all()
     
     # Summary statistics
     by_type = db.query(
-        models.Transfer.transfer_type,
+        models.Transfer.status,
         func.count(models.Transfer.id).label("count")
-    ).group_by(models.Transfer.transfer_type).all()
-    
+    ).group_by(models.Transfer.status).all()
+
     by_month = db.query(
-        func.date_trunc('month', models.Transfer.transfer_date).label("month"),
+        func.date_trunc('month', models.Transfer.dispatched_at).label("month"),
         func.count(models.Transfer.id).label("count")
-    ).group_by(func.date_trunc('month', models.Transfer.transfer_date)) \
-     .order_by(func.date_trunc('month', models.Transfer.transfer_date)).all()
-    
+    ).group_by(func.date_trunc('month', models.Transfer.dispatched_at)) \
+     .order_by(func.date_trunc('month', models.Transfer.dispatched_at)).all()
+
     return {
         "total_transfers": total_transfers,
         "summary": {
-            "by_type": {item.transfer_type.value: item.count for item in by_type},
+            "by_status": {item.status.value: item.count for item in by_type},
             "by_month": [
                 {
                     "month": item.month.strftime("%Y-%m") if item.month else None,
@@ -265,16 +271,14 @@ def get_transfers_report(
         "transfers": [
             {
                 "id": transfer.id,
-                "unit_engine": transfer.unit.engine_number if transfer.unit else None,
-                "unit_chassis": transfer.unit.chassis_number if transfer.unit else None,
-                "transfer_type": transfer.transfer_type.value if transfer.transfer_type else None,
-                "from_location": transfer.from_location.name if transfer.from_location else None,
-                "to_location": transfer.to_location.name if transfer.to_location else None,
-                "user": f"{transfer.user.first_name} {transfer.user.last_name}" if transfer.user else None,
-                "quantity": transfer.quantity,
-                "notes": transfer.notes,
-                "transfer_date": transfer.transfer_date,
-                "created_at": transfer.created_at
+                "unit_id": transfer.unit_id,
+                "dispatched_by_id": transfer.dispatched_by_id,
+                "received_by_id": transfer.received_by_id,
+                "origin_location_id": transfer.origin_location_id,
+                "destination_location_id": transfer.destination_location_id,
+                "status": transfer.status.value if transfer.status else None,
+                "dispatched_at": transfer.dispatched_at,
+                "received_at": transfer.received_at
             } for transfer in transfers
         ],
         "pagination": {
@@ -307,14 +311,10 @@ def get_sales_report(
     if date_to:
         query = query.filter(models.Unit.sold_date <= date_to)
     if location_id:
-        # Find sales transfers for this location
         sold_units = db.query(models.Transfer.unit_id).filter(
-            and_(
-                models.Transfer.transfer_type == TransferType.SALE,
-                or_(
-                    models.Transfer.from_location_id == location_id,
-                    models.Transfer.to_location_id == location_id
-                )
+            or_(
+                models.Transfer.origin_location_id == location_id,
+                models.Transfer.destination_location_id == location_id
             )
         ).subquery()
         query = query.filter(models.Unit.id.in_(sold_units))
@@ -410,17 +410,15 @@ def export_inventory_excel(
 
 @router.get("/export/transfers")
 def export_transfers_excel(
-    transfer_type: Optional[TransferType] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
     """Export transfers report to Excel"""
-    
+
     # Get transfers data (without pagination for export)
     report_data = get_transfers_report(
-        transfer_type=transfer_type,
         date_from=date_from,
         date_to=date_to,
         limit=10000,  # Large limit for export

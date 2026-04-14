@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
-from app.models.models import Unit, Transfer, TransferType, TransferStatus, UnitStatus, Location
+from datetime import datetime, UTC
+from app.models.models import Unit, Transfer, TransferStatus, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -88,24 +89,21 @@ class UnitRepository:
         if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
             db.add(Transfer(
                 unit_id=unit.id,
-                user_id=user_id,
-                transfer_type=TransferType.TRANSFER,
+                dispatched_by_id=user_id,
+                origin_location_id=old_location_id,
+                destination_location_id=update_data["current_location_id"],
                 status=TransferStatus.IN_TRANSIT,
-                from_location_id=old_location_id,
-                to_location_id=update_data["current_location_id"],
-                notes="Unit location updated"
+                dispatched_at=datetime.now(UTC)
             ))
             db.commit()
 
         if "status" in update_data and update_data["status"] != old_status:
-            transfer_type = TransferType.SALE if update_data["status"] == UnitStatus.SOLD else TransferType.TRANSFER
-            transfer_status = TransferStatus.RECEIVED if transfer_type == TransferType.SALE else TransferStatus.PENDING
+            transfer_status = TransferStatus.RECEIVED if update_data["status"] == UnitStatus.SOLD else TransferStatus.PENDING
             db.add(Transfer(
                 unit_id=unit.id,
-                user_id=user_id,
-                transfer_type=transfer_type,
+                dispatched_by_id=user_id,
                 status=transfer_status,
-                notes=f"Status changed from {old_status} to {update_data['status']}"
+                received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None
             ))
             db.commit()
 
@@ -147,12 +145,13 @@ class UnitRepository:
         return (
             db.query(Transfer)
             .options(
-                selectinload(Transfer.user),
-                selectinload(Transfer.from_location),
-                selectinload(Transfer.to_location)
+                selectinload(Transfer.dispatched_by),
+                selectinload(Transfer.received_by),
+                selectinload(Transfer.origin_location),
+                selectinload(Transfer.destination_location)
             )
             .filter(Transfer.unit_id == unit_id)
-            .order_by(Transfer.created_at.desc())
+            .order_by(Transfer.dispatched_at.desc())
             .offset(skip)
             .limit(limit)
             .all()

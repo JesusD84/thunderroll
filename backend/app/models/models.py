@@ -17,19 +17,11 @@ class UnitStatus(str, enum.Enum):
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
 
-class TransferType(str, enum.Enum):
-    IMPORT = "import"
-    SALE = "sale"
-    TRANSFER = "transfer"
-    RETURN = "return"
-    DAMAGED = "damaged"
-    MAINTENANCE = "maintenance"
-
 class TransferStatus(str, enum.Enum):
-    PENDING = "pending"
-    IN_TRANSIT = "in_transit"
-    RECEIVED = "received"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    IN_TRANSIT = "IN_TRANSIT"
+    RECEIVED = "RECEIVED"
+    CANCELLED = "CANCELLED"
 
 class User(Base):
     __tablename__ = "users"
@@ -90,10 +82,9 @@ class Transfer(Base):
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
     dispatched_by_id = Column(Integer, ForeignKey("users.id"))
     received_by_id = Column(Integer, ForeignKey("users.id"))
-    transfer_type = Column(Enum(TransferType), nullable=False)
-    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.PENDING)
     origin_location_id = Column(Integer, ForeignKey("locations.id"))
     destination_location_id = Column(Integer, ForeignKey("locations.id"))
+    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.PENDING)
     dispatched_at = Column(DateTime(timezone=True))
     received_at = Column(DateTime(timezone=True))
 
@@ -101,8 +92,8 @@ class Transfer(Base):
     unit = relationship("Unit", back_populates="transfers")
     dispatched_by = relationship("User", foreign_keys=[dispatched_by_id], back_populates="dispatched_transfers")
     received_by = relationship("User", foreign_keys=[received_by_id], back_populates="received_transfers")
-    origin_location = relationship("Location", foreign_keys=[origin_location_id])
-    destination_location = relationship("Location", foreign_keys=[destination_location_id])
+    origin_location = relationship("Location", foreign_keys=[origin_location_id], back_populates="transfers_from")
+    destination_location = relationship("Location", foreign_keys=[destination_location_id], back_populates="transfers_to")
 
 class Import(Base):
     __tablename__ = "imports"

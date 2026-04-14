@@ -1,7 +1,7 @@
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Location,
-    Unit, UnitStatus, Transfer, TransferType, TransferStatus
+    Unit, UnitStatus, Transfer, TransferStatus
 )
 from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
@@ -163,8 +163,10 @@ def create_demo_data():
             import_transfer = Transfer(
                 unit_id=unit.id,
                 dispatched_by_id=admin_user.id,
-                transfer_type=TransferType.IMPORT,
-                status=TransferStatus.RECEIVED
+                destination_location_id=warehouse.id,
+                status=TransferStatus.RECEIVED,
+                dispatched_at=datetime.now(),
+                received_at=datetime.now()
             )
             db.add(import_transfer)
             
@@ -173,8 +175,10 @@ def create_demo_data():
                 sale_transfer = Transfer(
                     unit_id=unit.id,
                     dispatched_by_id=admin_user.id,
-                    transfer_type=TransferType.SALE,
-                    status=TransferStatus.RECEIVED
+                    origin_location_id=warehouse.id,
+                    status=TransferStatus.RECEIVED,
+                    dispatched_at=datetime.now() - timedelta(days=5),
+                    received_at=datetime.now() - timedelta(days=5)
                 )
                 db.add(sale_transfer)
         
