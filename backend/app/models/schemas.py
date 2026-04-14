@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional, List
-from app.models.models import UnitStatus, TransferType, TransferStatus
+from app.models.models import UnitStatus, TransferStatus
 from app.schemas.user import User
 
 # Auth Schemas
@@ -83,10 +83,9 @@ class TransferBase(BaseModel):
     unit_id: int
     dispatched_by_id: Optional[int] = None
     received_by_id: Optional[int] = None
-    transfer_type: TransferType
-    status: TransferStatus = TransferStatus.PENDING
     origin_location_id: Optional[int] = None
     destination_location_id: Optional[int] = None
+    status: TransferStatus = TransferStatus.PENDING
     dispatched_at: Optional[datetime] = None
     received_at: Optional[datetime] = None
 
