@@ -74,6 +74,7 @@ def downgrade() -> None:
     sa.Column('unit_id', sa.INTEGER(), autoincrement=False, nullable=False),
     sa.Column('user_id', sa.INTEGER(), autoincrement=False, nullable=False),
     sa.Column('transfer_type', postgresql.ENUM('IMPORT', 'SALE', 'TRANSFER', 'RETURN', 'DAMAGED', 'MAINTENANCE', name='transfertype'), autoincrement=False, nullable=False),
+    sa.Column('status', postgresql.ENUM('PENDING', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED', name='transferstatus'), autoincrement=False, nullable=False, server_default='PENDING'),
     sa.Column('from_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
     sa.Column('to_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
     sa.Column('quantity', sa.INTEGER(), autoincrement=False, nullable=True),

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
-from app.models.models import Unit, Transfer, TransferType, UnitStatus, Location
+from app.models.models import Unit, Transfer, TransferType, TransferStatus, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -90,6 +90,7 @@ class UnitRepository:
                 unit_id=unit.id,
                 user_id=user_id,
                 transfer_type=TransferType.TRANSFER,
+                status=TransferStatus.IN_TRANSIT,
                 from_location_id=old_location_id,
                 to_location_id=update_data["current_location_id"],
                 notes="Unit location updated"
@@ -98,10 +99,12 @@ class UnitRepository:
 
         if "status" in update_data and update_data["status"] != old_status:
             transfer_type = TransferType.SALE if update_data["status"] == UnitStatus.SOLD else TransferType.TRANSFER
+            transfer_status = TransferStatus.RECEIVED if transfer_type == TransferType.SALE else TransferStatus.PENDING
             db.add(Transfer(
                 unit_id=unit.id,
                 user_id=user_id,
                 transfer_type=transfer_type,
+                status=transfer_status,
                 notes=f"Status changed from {old_status} to {update_data['status']}"
             ))
             db.commit()
