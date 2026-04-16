@@ -46,7 +46,7 @@ class UnitBase(BaseModel):
     brand: str
     color: str
     current_location_id: Optional[int] = None
-    status: UnitStatus = UnitStatus.AVAILABLE
+    status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: Optional[str] = None
 
 class UnitCreate(UnitBase):
@@ -124,7 +124,7 @@ class Import(ImportBase):
 # Dashboard/Reports Schemas
 class DashboardStats(BaseModel):
     total_units: int
-    available_units: int
+    in_stock_units: int
     sold_units: int
     in_transit_units: int
     total_locations: int
