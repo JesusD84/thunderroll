@@ -84,8 +84,8 @@ class Transfer(Base):
     received_by_id = Column(Integer, ForeignKey("users.id"))
     origin_location_id = Column(Integer, ForeignKey("locations.id"))
     destination_location_id = Column(Integer, ForeignKey("locations.id"))
-    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.PENDING)
-    dispatched_at = Column(DateTime(timezone=True))
+    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.IN_TRANSIT)
+    dispatched_at = Column(DateTime(timezone=True), server_default=func.now())
     received_at = Column(DateTime(timezone=True))
 
     # Relationships
