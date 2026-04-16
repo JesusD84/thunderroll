@@ -13,7 +13,7 @@ class UserRole(str, enum.Enum):
 
 class UnitStatus(str, enum.Enum):
     WAREHOUSE_UNIDENTIFIED = "warehouse_unidentified"
-    AVAILABLE = "available"
+    IN_STOCK = "IN_STOCK"
     SOLD = "sold"
     IN_TRANSIT = "in_transit"
 
@@ -65,7 +65,7 @@ class Unit(Base):
     brand = Column(String(100), nullable=False)
     color = Column(String(100), nullable=False)
     current_location_id = Column(Integer, ForeignKey("locations.id"))
-    status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.AVAILABLE)
+    status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.WAREHOUSE_UNIDENTIFIED)
     sold_date = Column(DateTime(timezone=True))
     notes = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
