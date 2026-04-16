@@ -10,153 +10,134 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Location {
-  id: string;
+  id: number;
   name: string;
-  type: 'BODEGA' | 'TALLER' | 'SUCURSAL';
-  active: boolean;
+  address: string | null;
   created_at: string;
 }
 
 interface User {
-  id: string;
-  name: string;
+  id: number;
   email: string;
-  role: 'ADMIN' | 'INVENTARIO' | 'TALLER' | 'VENTAS';
+  username: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
   created_at: string;
-  last_login_at?: string;
+  updated_at: string | null;
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'locations' | 'users'>('locations');
   const [showNewLocation, setShowNewLocation] = useState(false);
-  const [newLocation, setNewLocation] = useState<{
-    name: string;
-    type: 'BODEGA' | 'TALLER' | 'SUCURSAL';
-  }>({
-    name: '',
-    type: 'SUCURSAL'
-  });
+  const [newLocation, setNewLocation] = useState({ name: '', address: '' });
 
   useEffect(() => {
-    // Simular carga de datos
-    const mockLocations: Location[] = [
-      {
-        id: '1',
-        name: 'Bodega Principal',
-        type: 'BODEGA',
-        active: true,
-        created_at: '2025-01-01T00:00:00Z'
-      },
-      {
-        id: '2',
-        name: 'Taller Central',
-        type: 'TALLER',
-        active: true,
-        created_at: '2025-01-01T00:00:00Z'
-      },
-      {
-        id: '3',
-        name: 'Sucursal Centro',
-        type: 'SUCURSAL',
-        active: true,
-        created_at: '2025-01-01T00:00:00Z'
-      },
-      {
-        id: '4',
-        name: 'Sucursal Norte',
-        type: 'SUCURSAL',
-        active: true,
-        created_at: '2025-01-01T00:00:00Z'
-      },
-      {
-        id: '5',
-        name: 'Sucursal Sur',
-        type: 'SUCURSAL',
-        active: true,
-        created_at: '2025-01-01T00:00:00Z'
-      }
-    ];
+    const fetchData = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
 
-    const mockUsers: User[] = [
-      {
-        id: '1',
-        name: 'Admin Usuario',
-        email: 'admin@thunderrol.com',
-        role: 'ADMIN',
-        created_at: '2025-01-01T00:00:00Z',
-        last_login_at: '2025-08-20T14:00:00Z'
-      },
-      {
-        id: '2',
-        name: 'Inventario Usuario',
-        email: 'inventario@thunderrol.com',
-        role: 'INVENTARIO',
-        created_at: '2025-01-01T00:00:00Z',
-        last_login_at: '2025-08-20T13:30:00Z'
-      },
-      {
-        id: '3',
-        name: 'Taller Usuario',
-        email: 'taller@thunderrol.com',
-        role: 'TALLER',
-        created_at: '2025-01-01T00:00:00Z',
-        last_login_at: '2025-08-20T12:00:00Z'
-      },
-      {
-        id: '4',
-        name: 'Ventas Usuario',
-        email: 'ventas@thunderrol.com',
-        role: 'VENTAS',
-        created_at: '2025-01-01T00:00:00Z',
-        last_login_at: '2025-08-20T11:00:00Z'
-      }
-    ];
+      try {
+        const [locRes, usersRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/locations/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_URL}/api/v1/user/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ]);
 
-    setTimeout(() => {
-      setLocations(mockLocations);
-      setUsers(mockUsers);
-      setLoading(false);
-    }, 500);
-  }, []);
+        if (locRes.ok) {
+          setLocations(await locRes.json());
+        }
+        if (usersRes.ok) {
+          setUsers(await usersRes.json());
+        }
+      } catch (err) {
+        console.error('Error fetching settings data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [session]);
 
   const handleCreateLocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newLocationRecord: Location = {
-      id: Date.now().toString(),
-      name: newLocation.name,
-      type: newLocation.type,
-      active: true,
-      created_at: new Date().toISOString()
-    };
+    const token = (session as any)?.accessToken;
+    if (!token) return;
 
-    setLocations(prev => [...prev, newLocationRecord]);
-    setShowNewLocation(false);
-    setNewLocation({ name: '', type: 'SUCURSAL' });
+    try {
+      const res = await fetch(`${API_URL}/api/v1/locations/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newLocation.name,
+          address: newLocation.address || null,
+        }),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        setLocations(prev => [...prev, created]);
+        setShowNewLocation(false);
+        setNewLocation({ name: '', address: '' });
+      }
+    } catch (err) {
+      console.error('Error creating location:', err);
+    }
   };
 
-  const handleToggleLocation = (locationId: string) => {
-    setLocations(prev => prev.map(loc => 
-      loc.id === locationId ? { ...loc, active: !loc.active } : loc
-    ));
+  const handleDeleteLocation = async (locationId: number) => {
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/locations/${locationId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        setLocations(prev => prev.filter(loc => loc.id !== locationId));
+      }
+    } catch (err) {
+      console.error('Error deleting location:', err);
+    }
   };
 
-  const roleColors = {
-    'ADMIN': 'bg-red-100 text-red-800',
-    'INVENTARIO': 'bg-blue-100 text-blue-800',
-    'TALLER': 'bg-green-100 text-green-800',
-    'VENTAS': 'bg-purple-100 text-purple-800',
+  const roleColors: Record<string, string> = {
+    'admin': 'bg-red-100 text-red-800',
+    'manager': 'bg-blue-100 text-blue-800',
+    'operator': 'bg-green-100 text-green-800',
+    'viewer': 'bg-purple-100 text-purple-800',
   };
 
-  const locationTypeColors = {
-    'BODEGA': 'bg-yellow-100 text-yellow-800',
-    'TALLER': 'bg-blue-100 text-blue-800',
-    'SUCURSAL': 'bg-green-100 text-green-800',
+  const roleLabels: Record<string, string> = {
+    'admin': 'ADMIN',
+    'manager': 'MANAGER',
+    'operator': 'OPERADOR',
+    'viewer': 'VIEWER',
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
   };
 
   return (
@@ -212,22 +193,13 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <Label>Tipo *</Label>
-                        <Select 
-                          value={newLocation.type} 
-                          onValueChange={(value) => 
-                            setNewLocation(prev => ({ ...prev, type: value as 'BODEGA' | 'TALLER' | 'SUCURSAL' }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="BODEGA">Bodega</SelectItem>
-                            <SelectItem value="TALLER">Taller</SelectItem>
-                            <SelectItem value="SUCURSAL">Sucursal</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="location_address">Dirección</Label>
+                        <Input
+                          id="location_address"
+                          value={newLocation.address}
+                          onChange={(e) => setNewLocation(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="ej. Av. Vallarta 1234"
+                        />
                       </div>
                     </div>
 
@@ -265,9 +237,9 @@ export default function SettingsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>ID</TableHead>
                         <TableHead>Nombre</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Estado</TableHead>
+                        <TableHead>Dirección</TableHead>
                         <TableHead>Creado</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
@@ -275,19 +247,11 @@ export default function SettingsPage() {
                     <TableBody>
                       {locations.map((location) => (
                         <TableRow key={location.id}>
+                          <TableCell className="font-mono text-sm">{location.id}</TableCell>
                           <TableCell className="font-medium">{location.name}</TableCell>
-                          <TableCell>
-                            <Badge className={locationTypeColors[location.type]}>
-                              {location.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={location.active ? 'default' : 'secondary'}>
-                              {location.active ? 'Activa' : 'Inactiva'}
-                            </Badge>
-                          </TableCell>
+                          <TableCell className="text-sm">{location.address || '-'}</TableCell>
                           <TableCell className="text-sm">
-                            01/01/2025
+                            {formatDate(location.created_at)}
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
@@ -297,14 +261,21 @@ export default function SettingsPage() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleToggleLocation(location.id)}
+                                onClick={() => handleDeleteLocation(location.id)}
                               >
-                                {location.active ? 'Desactivar' : 'Activar'}
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
+                      {locations.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-sm text-gray-500">
+                            No hay ubicaciones registradas
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 )}
@@ -330,28 +301,37 @@ export default function SettingsPage() {
                       <TableHead>Nombre</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Rol</TableHead>
-                      <TableHead>Último Acceso</TableHead>
+                      <TableHead>Creado</TableHead>
                       <TableHead>Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {users.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="font-medium">{user.first_name} {user.last_name}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge className={roleColors[user.role]}>
-                            {user.role}
+                          <Badge className={roleColors[user.role] || 'bg-gray-100 text-gray-800'}>
+                            {roleLabels[user.role] || user.role.toUpperCase()}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm">
-                          20/08/2025
+                          {formatDate(user.created_at)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="default">Activo</Badge>
+                          <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                            {user.is_active ? 'Activo' : 'Inactivo'}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
+                    {users.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-sm text-gray-500">
+                          No hay usuarios o no tienes permisos para verlos
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -374,21 +354,21 @@ export default function SettingsPage() {
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium">Inventario</h4>
-                <p className="text-sm text-gray-600">Email: inventario@thunderrol.com</p>
-                <p className="text-sm text-gray-600">Password: inv123</p>
+                <h4 className="font-medium">Manager</h4>
+                <p className="text-sm text-gray-600">Email: manager@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Password: manager123</p>
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium">Taller</h4>
-                <p className="text-sm text-gray-600">Email: taller@thunderrol.com</p>
-                <p className="text-sm text-gray-600">Password: taller123</p>
+                <h4 className="font-medium">Operador</h4>
+                <p className="text-sm text-gray-600">Email: operator@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Password: operator123</p>
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium">Ventas</h4>
-                <p className="text-sm text-gray-600">Email: ventas@thunderrol.com</p>
-                <p className="text-sm text-gray-600">Password: ventas123</p>
+                <h4 className="font-medium">Viewer</h4>
+                <p className="text-sm text-gray-600">Email: viewer@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Password: viewer123</p>
               </div>
             </div>
           </CardContent>
