@@ -18,97 +18,88 @@ import {
   Truck
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 
-interface DashboardStats {
-  total_units: number;
-  by_status: Record<string, number>;
-  by_location: Record<string, number>;
-  recent_sales: number;
-  pending_transfers: number;
-  unidentified_units: number;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface DashboardData {
+  units: {
+    total: number;
+    available: number;
+    sold: number;
+    in_transit: number;
+  };
+  locations: { total: number };
+  transfers: { active: number };
+  recent_movements: {
+    id: number;
+    unit_engine: string | null;
+    movement_type: string;
+    from_location: string | null;
+    to_location: string | null;
+    user: string | null;
+    date: string;
+  }[];
+  inventory_by_location: { location: string; count: number }[];
+  inventory_by_brand: { brand: string; count: number }[];
+  sales_by_month: { month: string | null; count: number }[];
+  recent_imports: {
+    id: number;
+    filename: string;
+    total_records: number;
+    successful: number;
+    failed: number;
+    date: string;
+    user: string | null;
+  }[];
 }
 
-interface RecentActivity {
-  id: string;
-  type: string;
-  description: string;
-  timestamp: string;
-  user: string;
-}
+const movementTypeLabels: Record<string, string> = {
+  'import': 'Importación',
+  'sale': 'Venta',
+  'transfer': 'Transferencia',
+  'return': 'Devolución',
+  'adjustment': 'Ajuste',
+};
 
-const statusLabels = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'En Bodega (No ID)',
-  'IDENTIFICADA_EN_TALLER': 'Identificada en Taller',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'En Tránsito',
-  'EN_SUCURSAL_DISPONIBLE': 'En Sucursal',
-  'VENDIDA': 'Vendida',
+const movementTypeIcons: Record<string, string> = {
+  'import': 'IMPORT',
+  'sale': 'SALE',
+  'transfer': 'TRANSFER',
+  'return': 'TRANSFER',
+  'adjustment': 'IDENTIFICATION',
 };
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const { data: session } = useSession();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simular carga de estadísticas
-    const mockStats: DashboardStats = {
-      total_units: 156,
-      by_status: {
-        'EN_BODEGA_NO_IDENTIFICADA': 25,
-        'IDENTIFICADA_EN_TALLER': 18,
-        'EN_TRANSITO_TALLER_SUCURSAL': 4,
-        'EN_SUCURSAL_DISPONIBLE': 89,
-        'VENDIDA': 20
-      },
-      by_location: {
-        'BODEGA': 25,
-        'TALLER': 18,
-        'SUCURSAL:Centro': 45,
-        'SUCURSAL:Norte': 32,
-        'SUCURSAL:Sur': 12
-      },
-      recent_sales: 5,
-      pending_transfers: 7,
-      unidentified_units: 25
+    const fetchDashboard = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${API_URL}/api/v1/reports/dashboard`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+
+        const data: DashboardData = await res.json();
+        setDashboardData(data);
+      } catch (err: any) {
+        console.error('Error fetching dashboard:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const mockActivity: RecentActivity[] = [
-      {
-        id: '1',
-        type: 'SALE',
-        description: 'Honda PCX Red vendida en Sucursal Centro',
-        timestamp: '2025-08-20T14:30:00Z',
-        user: 'ventas@thunderrol.com'
-      },
-      {
-        id: '2',
-        type: 'TRANSFER',
-        description: 'Yamaha NMAX transferida de Taller a Sucursal Norte',
-        timestamp: '2025-08-20T13:45:00Z',
-        user: 'inventario@thunderrol.com'
-      },
-      {
-        id: '3',
-        type: 'IDENTIFICATION',
-        description: 'Unidad identificada con motor #20250823035830',
-        timestamp: '2025-08-20T12:15:00Z',
-        user: 'taller@thunderrol.com'
-      },
-      {
-        id: '4',
-        type: 'IMPORT',
-        description: 'Importadas 15 unidades del lote BATCH_202508_003',
-        timestamp: '2025-08-20T10:00:00Z',
-        user: 'inventario@thunderrol.com'
-      }
-    ];
-
-    setTimeout(() => {
-      setStats(mockStats);
-      setRecentActivity(mockActivity);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    fetchDashboard();
+  }, [session]);
 
   if (loading) {
     return (
@@ -117,6 +108,47 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-red-600">Error cargando dashboard: {error}</div>
+      </div>
+    );
+  }
+
+  const units = dashboardData?.units;
+  const locationData = dashboardData?.inventory_by_location || [];
+  const brandData = dashboardData?.inventory_by_brand || [];
+  const movements = dashboardData?.recent_movements || [];
+
+  const formatMovementDescription = (m: DashboardData['recent_movements'][0]) => {
+    const engine = m.unit_engine || 'Unidad';
+    const type = movementTypeLabels[m.movement_type] || m.movement_type;
+    if (m.movement_type === 'transfer' && m.from_location && m.to_location) {
+      return `${engine} transferida de ${m.from_location} a ${m.to_location}`;
+    }
+    if (m.movement_type === 'sale') {
+      return `${engine} vendida${m.from_location ? ` en ${m.from_location}` : ''}`;
+    }
+    if (m.movement_type === 'import') {
+      return `${engine} importada${m.to_location ? ` a ${m.to_location}` : ''}`;
+    }
+    return `${type}: ${engine}`;
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays > 0) return `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
+    if (diffHours > 0) return `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
+    if (diffMins > 0) return `Hace ${diffMins} min`;
+    return 'Justo ahora';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,7 +179,7 @@ export default function DashboardPage() {
             <CardContent className="flex items-center p-6">
               <Package className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{stats?.total_units || 0}</div>
+                <div className="text-2xl font-bold text-gray-900">{units?.total || 0}</div>
                 <div className="text-sm text-gray-600">Total de Unidades</div>
               </div>
             </CardContent>
@@ -157,22 +189,18 @@ export default function DashboardPage() {
             <CardContent className="flex items-center p-6">
               <Warehouse className="h-8 w-8 text-yellow-600" />
               <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{stats?.by_location?.['BODEGA'] || 0}</div>
-                <div className="text-sm text-gray-600">En Bodega</div>
+                <div className="text-2xl font-bold text-gray-900">{units?.available || 0}</div>
+                <div className="text-sm text-gray-600">Disponibles</div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="flex items-center p-6">
-              <Building className="h-8 w-8 text-green-600" />
+              <Truck className="h-8 w-8 text-green-600" />
               <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {(stats?.by_location?.['SUCURSAL:Centro'] || 0) + 
-                   (stats?.by_location?.['SUCURSAL:Norte'] || 0) + 
-                   (stats?.by_location?.['SUCURSAL:Sur'] || 0)}
-                </div>
-                <div className="text-sm text-gray-600">En Sucursales</div>
+                <div className="text-2xl font-bold text-gray-900">{units?.in_transit || 0}</div>
+                <div className="text-sm text-gray-600">En Tránsito</div>
               </div>
             </CardContent>
           </Card>
@@ -181,7 +209,7 @@ export default function DashboardPage() {
             <CardContent className="flex items-center p-6">
               <DollarSign className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{stats?.by_status?.['VENDIDA'] || 0}</div>
+                <div className="text-2xl font-bold text-gray-900">{units?.sold || 0}</div>
                 <div className="text-sm text-gray-600">Vendidas</div>
               </div>
             </CardContent>
@@ -189,32 +217,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Estados de Unidades */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Activity className="mr-2 h-5 w-5" />
-                Estados de Unidades
-              </CardTitle>
-              <CardDescription>Distribución actual por estado</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {stats && Object.entries(stats.by_status).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">
-                        {statusLabels[status as keyof typeof statusLabels] || status}
-                      </Badge>
-                    </div>
-                    <div className="text-2xl font-bold">{count}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Ubicaciones */}
+          {/* Inventario por Ubicación */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -225,17 +228,49 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {stats && Object.entries(stats.by_location).map(([location, count]) => (
-                  <div key={location} className="flex items-center justify-between">
+                {locationData.map((item) => (
+                  <div key={item.location} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      {location === 'BODEGA' && <Warehouse className="h-4 w-4 text-yellow-600" />}
-                      {location === 'TALLER' && <Wrench className="h-4 w-4 text-blue-600" />}
-                      {location.startsWith('SUCURSAL') && <Building className="h-4 w-4 text-green-600" />}
-                      <span className="text-sm">{location}</span>
+                      {item.location.toLowerCase().includes('almac') && <Warehouse className="h-4 w-4 text-yellow-600" />}
+                      {item.location.toLowerCase().includes('taller') && <Wrench className="h-4 w-4 text-blue-600" />}
+                      {item.location.toLowerCase().includes('sucursal') && <Building className="h-4 w-4 text-green-600" />}
+                      {!item.location.toLowerCase().includes('almac') && 
+                       !item.location.toLowerCase().includes('taller') && 
+                       !item.location.toLowerCase().includes('sucursal') && <Package className="h-4 w-4 text-gray-600" />}
+                      <span className="text-sm">{item.location}</span>
                     </div>
-                    <div className="text-xl font-bold">{count}</div>
+                    <div className="text-xl font-bold">{item.count}</div>
                   </div>
                 ))}
+                {locationData.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay datos de ubicación</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inventario por Marca */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Activity className="mr-2 h-5 w-5" />
+                Inventario por Marca
+              </CardTitle>
+              <CardDescription>Distribución actual por marca</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {brandData.map((item) => (
+                  <div key={item.brand} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">{item.brand}</Badge>
+                    </div>
+                    <div className="text-2xl font-bold">{item.count}</div>
+                  </div>
+                ))}
+                {brandData.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay datos de marcas</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -251,25 +286,35 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-red-900">Unidades sin Identificar</div>
-                    <div className="text-sm text-red-700">{stats?.unidentified_units || 0} unidades en bodega</div>
+                {(units?.in_transit || 0) > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-blue-900">Unidades en Tránsito</div>
+                      <div className="text-sm text-blue-700">{units?.in_transit} unidades en camino</div>
+                    </div>
+                    <Link href="/transfers">
+                      <Button size="sm" variant="outline">Ver</Button>
+                    </Link>
                   </div>
-                  <Link href="/units?status=EN_BODEGA_NO_IDENTIFICADA">
-                    <Button size="sm" variant="outline">Ver</Button>
-                  </Link>
-                </div>
+                )}
 
-                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-yellow-900">Transferencias Pendientes</div>
-                    <div className="text-sm text-yellow-700">{stats?.pending_transfers || 0} transferencias</div>
+                {(dashboardData?.transfers?.active || 0) > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-yellow-900">Transferencias Activas</div>
+                      <div className="text-sm text-yellow-700">{dashboardData?.transfers?.active} transferencias</div>
+                    </div>
+                    <Link href="/transfers">
+                      <Button size="sm" variant="outline">Ver</Button>
+                    </Link>
                   </div>
-                  <Link href="/transfers">
-                    <Button size="sm" variant="outline">Ver</Button>
-                  </Link>
-                </div>
+                )}
+
+                {(units?.in_transit || 0) === 0 && (dashboardData?.transfers?.active || 0) === 0 && (
+                  <div className="flex items-center p-3 bg-green-50 rounded-lg">
+                    <div className="font-medium text-green-900">Todo en orden — sin alertas pendientes</div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -285,24 +330,30 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0">
-                      {activity.type === 'SALE' && <DollarSign className="h-5 w-5 text-green-600" />}
-                      {activity.type === 'TRANSFER' && <Truck className="h-5 w-5 text-blue-600" />}
-                      {activity.type === 'IDENTIFICATION' && <Wrench className="h-5 w-5 text-purple-600" />}
-                      {activity.type === 'IMPORT' && <Package className="h-5 w-5 text-orange-600" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900">
-                        {activity.description}
+                {movements.map((m) => {
+                  const iconType = movementTypeIcons[m.movement_type] || 'IMPORT';
+                  return (
+                    <div key={m.id} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        {iconType === 'SALE' && <DollarSign className="h-5 w-5 text-green-600" />}
+                        {iconType === 'TRANSFER' && <Truck className="h-5 w-5 text-blue-600" />}
+                        {iconType === 'IDENTIFICATION' && <Wrench className="h-5 w-5 text-purple-600" />}
+                        {iconType === 'IMPORT' && <Package className="h-5 w-5 text-orange-600" />}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Hace 2 horas • {activity.user}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatMovementDescription(m)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {formatTimeAgo(m.date)} • {m.user || 'Sistema'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+                {movements.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay movimientos recientes</div>
+                )}
               </div>
             </CardContent>
           </Card>
