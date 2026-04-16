@@ -9,106 +9,123 @@ import { ArrowLeft, Edit, Truck, DollarSign, History } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Unit {
-  id: string;
-  brand?: string;
-  model?: string;
+  id: number;
+  brand: string;
+  model: string;
   color: string;
-  engine_number?: string;
-  chassis_number?: string;
+  engine_number: string;
+  chassis_number: string;
   status: string;
-  location: string;
-  notes?: string;
+  current_location_id: number;
+  current_location: { name: string; id: number } | null;
+  notes: string | null;
+  sold_date: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
-interface UnitEvent {
-  id: string;
-  event_type: string;
-  before: any;
-  after: any;
-  who: string;
-  reason?: string;
-  timestamp: string;
+interface Movement {
+  id: number;
+  unit_id: number;
+  movement_type: string;
+  from_location_id: number | null;
+  to_location_id: number | null;
+  quantity: number;
+  notes: string | null;
+  movement_date: string;
+  created_at: string;
+  user: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+  from_location: { name: string } | null;
+  to_location: { name: string } | null;
 }
 
-const statusColors = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'bg-red-100 text-red-800',
-  'IDENTIFICADA_EN_TALLER': 'bg-yellow-100 text-yellow-800',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'bg-blue-100 text-blue-800',
-  'EN_SUCURSAL_DISPONIBLE': 'bg-green-100 text-green-800',
-  'VENDIDA': 'bg-gray-100 text-gray-800',
+const statusColors: Record<string, string> = {
+  'available': 'bg-green-100 text-green-800',
+  'sold': 'bg-gray-100 text-gray-800',
+  'in_transit': 'bg-blue-100 text-blue-800',
+  'reserved': 'bg-yellow-100 text-yellow-800',
 };
 
-const statusLabels = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'En Bodega (No Identificada)',
-  'IDENTIFICADA_EN_TALLER': 'Identificada en Taller',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'En Tránsito a Sucursal',
-  'EN_SUCURSAL_DISPONIBLE': 'Disponible en Sucursal',
-  'VENDIDA': 'Vendida',
+const statusLabels: Record<string, string> = {
+  'available': 'Disponible',
+  'sold': 'Vendida',
+  'in_transit': 'En Tránsito',
+  'reserved': 'Reservada',
+};
+
+const movementTypeLabels: Record<string, string> = {
+  'import': 'Importación',
+  'sale': 'Venta',
+  'transfer': 'Transferencia',
+  'return': 'Devolución',
+  'adjustment': 'Ajuste',
+};
+
+const colorMap: Record<string, string> = {
+  'negro': 'bg-black',
+  'rojo': 'bg-red-500',
+  'azul': 'bg-blue-500',
+  'blanco': 'bg-white border border-gray-300',
+  'verde': 'bg-green-500',
+  'gris': 'bg-gray-500',
+  'amarillo': 'bg-yellow-500',
+  'naranja': 'bg-orange-500',
+  'rosa': 'bg-pink-500',
 };
 
 export default function UnitDetailPage() {
   const params = useParams();
   const unitId = params.id as string;
+  const { data: session } = useSession();
   
   const [unit, setUnit] = useState<Unit | null>(null);
-  const [events, setEvents] = useState<UnitEvent[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simular carga de datos
-    const sampleUnit: Unit = {
-      id: unitId,
-      brand: 'Honda',
-      model: 'PCX',
-      color: 'red',
-      engine_number: '20250823035825',
-      chassis_number: 'HXY202507501',
-      status: 'EN_SUCURSAL_DISPONIBLE',
-      location: 'SUCURSAL:Centro',
-      notes: 'Unidad en perfecto estado',
-      created_at: '2025-08-20T10:00:00Z',
-      updated_at: '2025-08-20T14:30:00Z'
+    const fetchData = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+
+      try {
+        const [unitRes, movementsRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/units/${unitId}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ]);
+
+        if (!unitRes.ok) throw new Error(`Unidad no encontrada (${unitRes.status})`);
+
+        const unitData = await unitRes.json();
+        setUnit(unitData);
+
+        if (movementsRes.ok) {
+          const movementsData = await movementsRes.json();
+          setMovements(movementsData);
+        }
+      } catch (err: any) {
+        console.error('Error fetching unit:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const sampleEvents: UnitEvent[] = [
-      {
-        id: '1',
-        event_type: 'CREATED',
-        before: null,
-        after: { status: 'EN_BODEGA_NO_IDENTIFICADA', location: 'BODEGA' },
-        who: 'inventario@thunderrol.com',
-        timestamp: '2025-08-20T10:00:00Z'
-      },
-      {
-        id: '2',
-        event_type: 'IDENTIFICATION',
-        before: { engine_number: null, chassis_number: null },
-        after: { engine_number: '20250823035825', chassis_number: 'HXY202507501' },
-        who: 'taller@thunderrol.com',
-        reason: 'Identificación en taller',
-        timestamp: '2025-08-20T12:00:00Z'
-      },
-      {
-        id: '3',
-        event_type: 'TRANSFER',
-        before: { location: 'TALLER', status: 'IDENTIFICADA_EN_TALLER' },
-        after: { location: 'SUCURSAL:Centro', status: 'EN_SUCURSAL_DISPONIBLE' },
-        who: 'inventario@thunderrol.com',
-        reason: 'Transferencia a sucursal centro',
-        timestamp: '2025-08-20T14:30:00Z'
-      }
-    ];
-
-    setTimeout(() => {
-      setUnit(sampleUnit);
-      setEvents(sampleEvents);
-      setLoading(false);
-    }, 500);
-  }, [unitId]);
+    fetchData();
+  }, [unitId, session]);
 
   if (loading) {
     return (
@@ -118,13 +135,43 @@ export default function UnitDetailPage() {
     );
   }
 
-  if (!unit) {
+  if (error || !unit) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div>Unidad no encontrada</div>
+        <div className="text-red-600">{error || 'Unidad no encontrada'}</div>
       </div>
     );
   }
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const formatMovementDesc = (m: Movement) => {
+    const type = movementTypeLabels[m.movement_type] || m.movement_type;
+    if (m.movement_type === 'import') {
+      return m.to_location ? `Importada a ${m.to_location.name}` : 'Importada al sistema';
+    }
+    if (m.movement_type === 'sale') {
+      return 'Unidad vendida';
+    }
+    if (m.movement_type === 'transfer') {
+      const from = m.from_location?.name || '?';
+      const to = m.to_location?.name || '?';
+      return `${from} → ${to}`;
+    }
+    return type;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -177,15 +224,15 @@ export default function UnitDetailPage() {
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Estado</Label>
                   <div className="mt-1">
-                    <Badge className={statusColors[unit.status as keyof typeof statusColors]}>
-                      {statusLabels[unit.status as keyof typeof statusLabels]}
+                    <Badge className={statusColors[unit.status] || 'bg-gray-100 text-gray-800'}>
+                      {statusLabels[unit.status] || unit.status}
                     </Badge>
                   </div>
                 </div>
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Ubicación</Label>
-                  <div className="mt-1 text-sm">{unit.location}</div>
+                  <div className="mt-1 text-sm">{unit.current_location?.name || '-'}</div>
                 </div>
               </div>
 
@@ -205,13 +252,7 @@ export default function UnitDetailPage() {
                 <Label className="text-sm font-medium text-gray-500">Color</Label>
                 <div className="mt-1 flex items-center">
                   <div className={`w-4 h-4 rounded-full mr-2 ${
-                    unit.color === 'red' ? 'bg-red-500' :
-                    unit.color === 'black' ? 'bg-black' :
-                    unit.color === 'green' ? 'bg-green-500' :
-                    unit.color === 'pink' ? 'bg-pink-500' :
-                    unit.color === 'grey' ? 'bg-gray-500' :
-                    unit.color === 'blue' ? 'bg-blue-500' :
-                    'bg-gray-300'
+                    colorMap[unit.color.toLowerCase()] || 'bg-gray-300'
                   }`}></div>
                   <span className="text-sm capitalize">{unit.color}</span>
                 </div>
@@ -236,66 +277,74 @@ export default function UnitDetailPage() {
                 </div>
               )}
 
+              {unit.sold_date && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Fecha de Venta</Label>
+                  <div className="mt-1 text-sm">{formatDate(unit.sold_date)}</div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Creado</Label>
-                  <div className="mt-1">20/08/2025</div>
+                  <div className="mt-1">{formatDate(unit.created_at)}</div>
                 </div>
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Actualizado</Label>
-                  <div className="mt-1">20/08/2025</div>
+                  <div className="mt-1">{formatDate(unit.updated_at)}</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Historial de Eventos */}
+          {/* Historial de Movimientos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <History className="mr-2 h-5 w-5" />
-                Historial de Eventos
+                Historial de Movimientos
               </CardTitle>
               <CardDescription>Cronología completa de la unidad</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {events.map((event, index) => (
-                  <div key={event.id} className="flex items-start space-x-4">
+                {movements.map((movement: Movement, index: number) => (
+                  <div key={movement.id} className="flex items-start space-x-4">
                     <div className="flex-shrink-0">
                       <div className={`w-3 h-3 rounded-full ${
                         index === 0 ? 'bg-green-500' : 'bg-gray-300'
                       }`}></div>
-                      {index < events.length - 1 && (
+                      {index < movements.length - 1 && (
                         <div className="w-0.5 h-8 bg-gray-200 mx-auto mt-1"></div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">
-                        {event.event_type === 'CREATED' ? 'Unidad Creada' :
-                         event.event_type === 'IDENTIFICATION' ? 'Identificación Completada' :
-                         event.event_type === 'TRANSFER' ? 'Transferencia' :
-                         event.event_type}
+                        {movementTypeLabels[movement.movement_type] || movement.movement_type}
                       </div>
                       
-                      {event.reason && (
-                        <div className="text-sm text-gray-600 mt-1">{event.reason}</div>
-                      )}
+                      <div className="text-sm text-gray-600 mt-1">
+                        {formatMovementDesc(movement)}
+                      </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
-                        20/08/2025 • {event.who}
+                        {formatDateTime(movement.movement_date || movement.created_at)}
+                        {movement.user && ` • ${movement.user.first_name} ${movement.user.last_name}`}
                       </div>
                       
-                      {event.before && event.after && (
+                      {movement.notes && (
                         <div className="text-xs text-gray-400 mt-1">
-                          Cambios: {JSON.stringify(event.after, null, 2)}
+                          {movement.notes}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
+                {movements.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay movimientos registrados</div>
+                )}
               </div>
             </CardContent>
           </Card>
