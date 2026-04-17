@@ -124,48 +124,111 @@ export default function UnitDetailPage() {
   const [sellNotes, setSellNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activeTransferId, setActiveTransferId] = useState<number | null>(null);
 
-  const handleMove = async (movementType: string, toLocationId?: number, notes?: string) => {
+  const parseError = (err: any): string => {
+    const detail = err.detail;
+    return typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error realizando operación';
+  };
+
+  const refreshData = async (token: string) => {
+    const [uRes, mRes] = await Promise.all([
+      fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
+    ]);
+    if (uRes.ok) setUnit(await uRes.json());
+    if (mRes.ok) setMovements(await mRes.json());
+    // Check for active transfer
+    const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+  };
+
+  const handleTransfer = async (toLocationId: number, notes?: string) => {
     const token = (session as any)?.accessToken;
     if (!token || !unit) return;
     setActionLoading(true);
     setActionError(null);
     try {
-      const body: any = {
-        unit_id: unit.id,
-        movement_type: movementType,
-        from_location_id: unit.current_location_id || null,
-        notes: notes || null,
-      };
-      if (toLocationId) body.to_location_id = toLocationId;
+      const res = await fetch(`${API_URL}/api/v1/transfers/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_ids: [unit.id],
+          from_location_id: unit.current_location_id,
+          to_location_id: toLocationId,
+          notes: notes || null,
+        }),
+      });
+      if (res.ok) {
+        await refreshData(token);
+        setShowTransfer(false);
+        setTransferTo('');
+        setTransferNotes('');
+      } else {
+        setActionError(parseError(await res.json()));
+      }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleConfirmArrival = async () => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      let res;
+      if (activeTransferId) {
+        // Complete the Transfer record
+        res = await fetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+      } else {
+        // Legacy: no Transfer record, just update unit status
+        res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'available' }),
+        });
+      }
+      if (res.ok) {
+        await refreshData(token);
+      } else {
+        setActionError(parseError(await res.json()));
+      }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleSell = async (notes?: string) => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
       const res = await fetch(`${API_URL}/api/v1/units/${unitId}/move`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          unit_id: unit.id,
+          movement_type: 'sale',
+          from_location_id: unit.current_location_id || null,
+          notes: notes || null,
+        }),
       });
       if (res.ok) {
-        // Refresh unit and movements
-        const [uRes, mRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        ]);
-        if (uRes.ok) setUnit(await uRes.json());
-        if (mRes.ok) setMovements(await mRes.json());
-        setShowTransfer(false);
+        await refreshData(token);
         setShowSell(false);
-        setTransferTo('');
-        setTransferNotes('');
         setSellNotes('');
       } else {
-        const err = await res.json();
-        const detail = err.detail;
-        setActionError(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error realizando operación');
+        setActionError(parseError(await res.json()));
       }
-    } catch (err) {
-      setActionError('Error de conexión');
-    } finally {
-      setActionLoading(false);
-    }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
   };
 
   useEffect(() => {
@@ -197,6 +260,14 @@ export default function UnitDetailPage() {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (locsRes.ok) setLocations(await locsRes.json());
+
+        // Check for active transfer if unit is in transit
+        if (unitData.status === 'in_transit') {
+          const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (atRes.ok) setActiveTransferId((await atRes.json()).id);
+        }
       } catch (err: any) {
         console.error('Error fetching unit:', err);
         setError(err.message);
@@ -291,16 +362,26 @@ export default function UnitDetailPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
-              <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
-                disabled={unit.status.toUpperCase() === 'SOLD'}>
-                <Truck className="mr-2 h-4 w-4" />
-                Transferir
-              </Button>
-              <Button onClick={() => { setShowSell(true); setActionError(null); }}
-                disabled={unit.status.toUpperCase() === 'SOLD'}>
-                <DollarSign className="mr-2 h-4 w-4" />
-                Vender
-              </Button>
+              {unit.status === 'in_transit' ? (
+                <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmArrival}
+                  disabled={actionLoading}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Confirmando...' : 'Confirmar Llegada'}
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
+                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    <Truck className="mr-2 h-4 w-4" />
+                    Transferir
+                  </Button>
+                  <Button onClick={() => { setShowSell(true); setActionError(null); }}
+                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Vender
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -335,7 +416,7 @@ export default function UnitDetailPage() {
                 <Button variant="outline" onClick={() => setShowTransfer(false)} disabled={actionLoading}>
                   Cancelar
                 </Button>
-                <Button onClick={() => handleMove('transfer', parseInt(transferTo), transferNotes)}
+                <Button onClick={() => handleTransfer(parseInt(transferTo), transferNotes)}
                   disabled={actionLoading || !transferTo}>
                   <Truck className="mr-2 h-4 w-4" />
                   {actionLoading ? 'Transfiriendo...' : 'Transferir'}
@@ -367,7 +448,7 @@ export default function UnitDetailPage() {
                 <Button variant="outline" onClick={() => setShowSell(false)} disabled={actionLoading}>
                   Cancelar
                 </Button>
-                <Button variant="destructive" onClick={() => handleMove('sale', undefined, sellNotes)}
+                <Button variant="destructive" onClick={() => handleSell(sellNotes)}
                   disabled={actionLoading}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   {actionLoading ? 'Procesando...' : 'Confirmar Venta'}
