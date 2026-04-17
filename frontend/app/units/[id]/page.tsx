@@ -5,8 +5,10 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Edit, Truck, DollarSign, History } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, DollarSign, History, Save, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -82,6 +84,22 @@ const colorMap: Record<string, string> = {
   'rosa': 'bg-pink-500',
 };
 
+const colorOptions = [
+  { value: 'ROJO', label: 'Rojo' },
+  { value: 'NEGRO', label: 'Negro' },
+  { value: 'AZUL', label: 'Azul' },
+  { value: 'BLANCO', label: 'Blanco' },
+  { value: 'VERDE', label: 'Verde' },
+  { value: 'GRIS', label: 'Gris' },
+  { value: 'ROSA', label: 'Rosa' },
+  { value: 'AMARILLO', label: 'Amarillo' },
+];
+
+interface Location {
+  id: number;
+  name: string;
+}
+
 export default function UnitDetailPage() {
   const params = useParams();
   const unitId = params.id as string;
@@ -89,8 +107,16 @@ export default function UnitDetailPage() {
   
   const [unit, setUnit] = useState<Unit | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    brand: '', model: '', color: '', engine_number: '', chassis_number: '',
+    current_location_id: '', notes: '',
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -116,6 +142,11 @@ export default function UnitDetailPage() {
           const movementsData = await movementsRes.json();
           setMovements(movementsData);
         }
+
+        const locsRes = await fetch(`${API_URL}/api/v1/locations/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (locsRes.ok) setLocations(await locsRes.json());
       } catch (err: any) {
         console.error('Error fetching unit:', err);
         setError(err.message);
@@ -194,7 +225,19 @@ export default function UnitDetailPage() {
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => {
+                setEditing(true);
+                setEditError(null);
+                setEditForm({
+                  brand: unit.brand || '',
+                  model: unit.model || '',
+                  color: unit.color || '',
+                  engine_number: unit.engine_number || '',
+                  chassis_number: unit.chassis_number || '',
+                  current_location_id: unit.current_location_id ? String(unit.current_location_id) : '',
+                  notes: unit.notes || '',
+                });
+              }}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
@@ -216,10 +259,99 @@ export default function UnitDetailPage() {
           {/* Información de la Unidad */}
           <Card>
             <CardHeader>
-              <CardTitle>Información de la Unidad</CardTitle>
-              <CardDescription>Datos actuales de la unidad</CardDescription>
+              <CardTitle>{editing ? 'Editar Unidad' : 'Información de la Unidad'}</CardTitle>
+              <CardDescription>{editing ? 'Modifica los datos de la unidad' : 'Datos actuales de la unidad'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+            {editing ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setSaving(true);
+                setEditError(null);
+                const token = (session as any)?.accessToken;
+                if (!token) return;
+                try {
+                  const res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      brand: editForm.brand || undefined,
+                      model: editForm.model || undefined,
+                      color: editForm.color || undefined,
+                      engine_number: editForm.engine_number || undefined,
+                      chassis_number: editForm.chassis_number || undefined,
+                      current_location_id: editForm.current_location_id ? parseInt(editForm.current_location_id) : undefined,
+                      notes: editForm.notes || null,
+                    }),
+                  });
+                  if (res.ok) {
+                    const updated = await res.json();
+                    setUnit(updated);
+                    setEditing(false);
+                  } else {
+                    const err = await res.json();
+                    setEditError(err.detail || 'Error actualizando unidad');
+                  }
+                } catch (err) {
+                  setEditError('Error de conexión');
+                } finally {
+                  setSaving(false);
+                }
+              }} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Marca</Label>
+                    <Input value={editForm.brand} onChange={(e) => setEditForm(p => ({...p, brand: e.target.value}))} />
+                  </div>
+                  <div>
+                    <Label>Modelo</Label>
+                    <Input value={editForm.model} onChange={(e) => setEditForm(p => ({...p, model: e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Color</Label>
+                  <Select value={editForm.color} onValueChange={(v) => setEditForm(p => ({...p, color: v}))}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona color" /></SelectTrigger>
+                    <SelectContent>
+                      {colorOptions.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label># Motor</Label>
+                    <Input value={editForm.engine_number} onChange={(e) => setEditForm(p => ({...p, engine_number: e.target.value}))} />
+                  </div>
+                  <div>
+                    <Label># Chasis</Label>
+                    <Input value={editForm.chassis_number} onChange={(e) => setEditForm(p => ({...p, chassis_number: e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Ubicación</Label>
+                  <Select value={editForm.current_location_id} onValueChange={(v) => setEditForm(p => ({...p, current_location_id: v}))}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona ubicación" /></SelectTrigger>
+                    <SelectContent>
+                      {locations.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Notas</Label>
+                  <Input value={editForm.notes} onChange={(e) => setEditForm(p => ({...p, notes: e.target.value}))} placeholder="Observaciones" />
+                </div>
+                {editError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{editError}</div>}
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
+                    <X className="mr-2 h-4 w-4" /> Cancelar
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    <Save className="mr-2 h-4 w-4" /> {saving ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+            <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Estado</Label>
@@ -295,6 +427,8 @@ export default function UnitDetailPage() {
                   <div className="mt-1">{formatDate(unit.updated_at)}</div>
                 </div>
               </div>
+            </>
+            )}
             </CardContent>
           </Card>
 
