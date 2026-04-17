@@ -117,6 +117,56 @@ export default function UnitDetailPage() {
     brand: '', model: '', color: '', engine_number: '', chassis_number: '',
     current_location_id: '', notes: '',
   });
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferTo, setTransferTo] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [showSell, setShowSell] = useState(false);
+  const [sellNotes, setSellNotes] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const handleMove = async (movementType: string, toLocationId?: number, notes?: string) => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const body: any = {
+        unit_id: unit.id,
+        movement_type: movementType,
+        from_location_id: unit.current_location_id || null,
+        notes: notes || null,
+      };
+      if (toLocationId) body.to_location_id = toLocationId;
+      const res = await fetch(`${API_URL}/api/v1/units/${unitId}/move`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        // Refresh unit and movements
+        const [uRes, mRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        ]);
+        if (uRes.ok) setUnit(await uRes.json());
+        if (mRes.ok) setMovements(await mRes.json());
+        setShowTransfer(false);
+        setShowSell(false);
+        setTransferTo('');
+        setTransferNotes('');
+        setSellNotes('');
+      } else {
+        const err = await res.json();
+        const detail = err.detail;
+        setActionError(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error realizando operación');
+      }
+    } catch (err) {
+      setActionError('Error de conexión');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -241,11 +291,13 @@ export default function UnitDetailPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
+                disabled={unit.status.toUpperCase() === 'SOLD'}>
                 <Truck className="mr-2 h-4 w-4" />
                 Transferir
               </Button>
-              <Button>
+              <Button onClick={() => { setShowSell(true); setActionError(null); }}
+                disabled={unit.status.toUpperCase() === 'SOLD'}>
                 <DollarSign className="mr-2 h-4 w-4" />
                 Vender
               </Button>
@@ -253,6 +305,78 @@ export default function UnitDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Transfer Modal */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Transferir Unidad</CardTitle>
+              <CardDescription>Mover unidad {unit.engine_number} a otra ubicación</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Ubicación Destino *</Label>
+                <Select value={transferTo} onValueChange={setTransferTo}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona destino" /></SelectTrigger>
+                  <SelectContent>
+                    {locations.filter(l => l.id !== unit.current_location_id).map(l =>
+                      <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Notas</Label>
+                <Input value={transferNotes} onChange={(e) => setTransferNotes(e.target.value)} placeholder="Notas opcionales" />
+              </div>
+              {actionError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{actionError}</div>}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowTransfer(false)} disabled={actionLoading}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => handleMove('transfer', parseInt(transferTo), transferNotes)}
+                  disabled={actionLoading || !transferTo}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Transfiriendo...' : 'Transferir'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Sell Modal */}
+      {showSell && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Vender Unidad</CardTitle>
+              <CardDescription>Registrar venta de {unit.engine_number}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
+                Esta acción marcará la unidad como vendida. Esta operación no se puede deshacer fácilmente.
+              </div>
+              <div>
+                <Label>Notas de venta</Label>
+                <Input value={sellNotes} onChange={(e) => setSellNotes(e.target.value)} placeholder="Detalles de la venta" />
+              </div>
+              {actionError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{actionError}</div>}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowSell(false)} disabled={actionLoading}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={() => handleMove('sale', undefined, sellNotes)}
+                  disabled={actionLoading}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Procesando...' : 'Confirmar Venta'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -280,7 +404,6 @@ export default function UnitDetailPage() {
                       color: editForm.color || undefined,
                       engine_number: editForm.engine_number || undefined,
                       chassis_number: editForm.chassis_number || undefined,
-                      current_location_id: editForm.current_location_id ? parseInt(editForm.current_location_id) : undefined,
                       notes: editForm.notes || null,
                     }),
                   });
@@ -326,15 +449,6 @@ export default function UnitDetailPage() {
                     <Label># Chasis</Label>
                     <Input value={editForm.chassis_number} onChange={(e) => setEditForm(p => ({...p, chassis_number: e.target.value}))} />
                   </div>
-                </div>
-                <div>
-                  <Label>Ubicación</Label>
-                  <Select value={editForm.current_location_id} onValueChange={(v) => setEditForm(p => ({...p, current_location_id: v}))}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona ubicación" /></SelectTrigger>
-                    <SelectContent>
-                      {locations.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div>
                   <Label>Notas</Label>
