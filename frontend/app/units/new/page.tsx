@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,37 +10,83 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface Location {
+  id: number;
+  name: string;
+}
 
 export default function NewUnitPage() {
+  const { data: session } = useSession();
   const router = useRouter();
+  const [locations, setLocations] = useState<Location[]>([]);
   const [formData, setFormData] = useState({
     brand: '',
     model: '',
     color: '',
     engine_number: '',
     chassis_number: '',
-    supplier_invoice: '',
-    shipment_batch: '',
+    current_location_id: '',
     notes: ''
   });
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_URL}/api/v1/locations/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) setLocations(await res.json());
+      } catch (err) {
+        console.error('Error fetching locations:', err);
+      }
+    };
+    fetchLocations();
+  }, [session]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+
+    const token = (session as any)?.accessToken;
+    if (!token) return;
 
     try {
-      // Aquí iría la llamada al API del backend
-      console.log('Creando unidad:', formData);
-      
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redirigir a la lista de unidades
-      router.push('/units');
-    } catch (error) {
-      console.error('Error creando unidad:', error);
+      const res = await fetch(`${API_URL}/api/v1/units/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          engine_number: formData.engine_number,
+          chassis_number: formData.chassis_number,
+          model: formData.model,
+          brand: formData.brand,
+          color: formData.color,
+          current_location_id: formData.current_location_id ? parseInt(formData.current_location_id) : null,
+          notes: formData.notes || null,
+        }),
+      });
+
+      if (res.ok) {
+        router.push('/units');
+      } else {
+        const err = await res.json();
+        setError(err.detail || 'Error creando unidad');
+      }
+    } catch (err) {
+      console.error('Error creando unidad:', err);
+      setError('Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -113,12 +159,13 @@ export default function NewUnitPage() {
                     <SelectValue placeholder="Selecciona el color" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="red">Rojo</SelectItem>
-                    <SelectItem value="black">Negro</SelectItem>
-                    <SelectItem value="green">Verde</SelectItem>
-                    <SelectItem value="pink">Rosa</SelectItem>
-                    <SelectItem value="grey">Gris</SelectItem>
-                    <SelectItem value="blue">Azul</SelectItem>
+                    <SelectItem value="ROJO">Rojo</SelectItem>
+                    <SelectItem value="NEGRO">Negro</SelectItem>
+                    <SelectItem value="VERDE">Verde</SelectItem>
+                    <SelectItem value="ROSA">Rosa</SelectItem>
+                    <SelectItem value="GRIS">Gris</SelectItem>
+                    <SelectItem value="AZUL">Azul</SelectItem>
+                    <SelectItem value="BLANCO">Blanco</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -146,27 +193,19 @@ export default function NewUnitPage() {
                 </div>
               </div>
 
-              {/* Información de Lote */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="supplier_invoice">Factura Proveedor</Label>
-                  <Input
-                    id="supplier_invoice"
-                    value={formData.supplier_invoice}
-                    onChange={(e) => handleInputChange('supplier_invoice', e.target.value)}
-                    placeholder="Número de factura"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="shipment_batch">Lote de Envío</Label>
-                  <Input
-                    id="shipment_batch"
-                    value={formData.shipment_batch}
-                    onChange={(e) => handleInputChange('shipment_batch', e.target.value)}
-                    placeholder="Código del lote"
-                  />
-                </div>
+              {/* Ubicación */}
+              <div>
+                <Label>Ubicación Inicial</Label>
+                <Select value={formData.current_location_id} onValueChange={(value) => handleInputChange('current_location_id', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona ubicación" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -179,6 +218,10 @@ export default function NewUnitPage() {
                 />
               </div>
 
+              {error && (
+                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+              )}
+
               {/* Botones */}
               <div className="flex justify-end space-x-4">
                 <Link href="/units">
@@ -186,7 +229,7 @@ export default function NewUnitPage() {
                     Cancelar
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading || !formData.color}>
+                <Button type="submit" disabled={loading || !formData.engine_number || !formData.chassis_number || !formData.model || !formData.brand || !formData.color}>
                   {loading ? (
                     <>Guardando...</>
                   ) : (

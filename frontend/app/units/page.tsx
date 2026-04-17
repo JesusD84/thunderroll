@@ -57,6 +57,20 @@ const colorMap: Record<string, string> = {
   'amarillo': 'bg-yellow-500',
   'naranja': 'bg-orange-500',
   'rosa': 'bg-pink-500',
+  'black': 'bg-black',
+  'red': 'bg-red-500',
+  'blue': 'bg-blue-500',
+  'white': 'bg-white border border-gray-300',
+  'green': 'bg-green-500',
+  'grey': 'bg-gray-500',
+  'pink': 'bg-pink-500',
+};
+
+const colorLabels: Record<string, string> = {
+  'negro': 'Negro', 'rojo': 'Rojo', 'azul': 'Azul', 'blanco': 'Blanco',
+  'verde': 'Verde', 'gris': 'Gris', 'amarillo': 'Amarillo', 'naranja': 'Naranja',
+  'rosa': 'Rosa', 'black': 'Negro', 'red': 'Rojo', 'blue': 'Azul',
+  'white': 'Blanco', 'green': 'Verde', 'grey': 'Gris', 'pink': 'Rosa',
 };
 
 export default function UnitsPage() {
@@ -223,7 +237,7 @@ export default function UnitsPage() {
                           <div className={`w-4 h-4 rounded-full mr-2 ${
                             colorMap[unit.color.toLowerCase()] || 'bg-gray-300'
                           }`}></div>
-                          {unit.color}
+                          {colorLabels[unit.color.toLowerCase()] || unit.color}
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
