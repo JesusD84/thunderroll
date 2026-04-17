@@ -396,6 +396,10 @@ export default function UnitDetailPage() {
               <CardDescription>Mover unidad {unit.engine_number} a otra ubicación</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                <span className="text-gray-500">Ubicación actual:</span>{' '}
+                <span className="font-medium">{locations.find(l => l.id === unit.current_location_id)?.name || unit.current_location?.name || 'Sin ubicación'}</span>
+              </div>
               <div>
                 <Label>Ubicación Destino *</Label>
                 <Select value={transferTo} onValueChange={setTransferTo}>

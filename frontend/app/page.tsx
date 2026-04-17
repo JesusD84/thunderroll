@@ -292,7 +292,7 @@ export default function DashboardPage() {
                       <div className="font-medium text-blue-900">Unidades en Tránsito</div>
                       <div className="text-sm text-blue-700">{units?.in_transit} unidades en camino</div>
                     </div>
-                    <Link href="/transfers">
+                    <Link href="/units?status=in_transit">
                       <Button size="sm" variant="outline">Ver</Button>
                     </Link>
                   </div>

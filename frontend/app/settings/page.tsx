@@ -41,6 +41,10 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'locations' | 'users'>('locations');
   const [showNewLocation, setShowNewLocation] = useState(false);
   const [newLocation, setNewLocation] = useState({ name: '', address: '' });
+  const [editingLocation, setEditingLocation] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', address: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,9 +106,37 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteLocation = async (locationId: number) => {
+  const handleEditLocation = async (locationId: number) => {
     const token = (session as any)?.accessToken;
     if (!token) return;
+    setEditSaving(true);
+    setLocationError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/locations/${locationId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name || undefined,
+          address: editForm.address || null,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLocations(prev => prev.map(l => l.id === locationId ? updated : l));
+        setEditingLocation(null);
+      } else {
+        const err = await res.json();
+        setLocationError(typeof err.detail === 'string' ? err.detail : 'Error actualizando ubicación');
+      }
+    } catch { setLocationError('Error de conexión'); }
+    finally { setEditSaving(false); }
+  };
+
+  const handleDeleteLocation = async (locationId: number) => {
+    if (!confirm('¿Seguro que deseas eliminar esta ubicación? Solo se puede eliminar si no tiene unidades asignadas.')) return;
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    setLocationError(null);
 
     try {
       const res = await fetch(`${API_URL}/api/v1/locations/${locationId}`, {
@@ -114,9 +146,12 @@ export default function SettingsPage() {
 
       if (res.ok) {
         setLocations(prev => prev.filter(loc => loc.id !== locationId));
+      } else {
+        const err = await res.json();
+        setLocationError(typeof err.detail === 'string' ? err.detail : 'Error eliminando ubicación');
       }
-    } catch (err) {
-      console.error('Error deleting location:', err);
+    } catch {
+      setLocationError('Error de conexión');
     }
   };
 
@@ -231,6 +266,9 @@ export default function SettingsPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {locationError && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{locationError}</div>
+                )}
                 {loading ? (
                   <div className="text-center py-8">Cargando ubicaciones...</div>
                 ) : (
@@ -248,24 +286,51 @@ export default function SettingsPage() {
                       {locations.map((location) => (
                         <TableRow key={location.id}>
                           <TableCell className="font-mono text-sm">{location.id}</TableCell>
-                          <TableCell className="font-medium">{location.name}</TableCell>
-                          <TableCell className="text-sm">{location.address || '-'}</TableCell>
+                          <TableCell>
+                            {editingLocation === location.id ? (
+                              <Input value={editForm.name} onChange={(e) => setEditForm(p => ({...p, name: e.target.value}))} className="h-8" />
+                            ) : (
+                              <span className="font-medium">{location.name}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingLocation === location.id ? (
+                              <Input value={editForm.address} onChange={(e) => setEditForm(p => ({...p, address: e.target.value}))} className="h-8" placeholder="Dirección" />
+                            ) : (
+                              <span className="text-sm">{location.address || '-'}</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm">
                             {formatDate(location.created_at)}
                           </TableCell>
                           <TableCell>
-                            <div className="flex space-x-2">
-                              <Button variant="outline" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleDeleteLocation(location.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {editingLocation === location.id ? (
+                              <div className="flex space-x-2">
+                                <Button size="sm" onClick={() => handleEditLocation(location.id)} disabled={editSaving || !editForm.name}>
+                                  {editSaving ? 'Guardando...' : 'Guardar'}
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => setEditingLocation(null)} disabled={editSaving}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex space-x-2">
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  setEditingLocation(location.id);
+                                  setEditForm({ name: location.name, address: location.address || '' });
+                                  setLocationError(null);
+                                }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleDeleteLocation(location.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
