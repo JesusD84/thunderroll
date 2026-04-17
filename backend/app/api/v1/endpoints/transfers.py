@@ -25,7 +25,8 @@ def get_transfers(
     query = db.query(models.Transfer).options(
         selectinload(models.Transfer.from_location),
         selectinload(models.Transfer.to_location),
-        selectinload(models.Transfer.user)
+        selectinload(models.Transfer.user),
+        selectinload(models.Transfer.transfer_units).selectinload(models.TransferUnit.unit)
     )
     
     # Apply filters
