@@ -44,3 +44,12 @@ class Transfer(TransferBase):
 
     class Config:
         from_attributes = True
+
+
+class TransferStats(BaseModel):
+    total_transfers: int
+    pending_transfers: int
+    in_transit_transfers: int
+    received_transfers: int
+    cancelled: int
+    recent_transfers: list[Transfer]
