@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer
+from app.models.models import Transfer, TransferStatus
 from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
 
 
@@ -50,3 +50,15 @@ class TransferRepository:
     def delete_transfer(db: Session, db_transfer: Transfer) -> None:
         db.delete(db_transfer)
         db.commit()
+
+    @staticmethod
+    def count_transfers(db: Session) -> int:
+        return db.query(Transfer).count()
+
+    @staticmethod
+    def count_transfers_by_status(db: Session, status: TransferStatus) -> int:
+        return db.query(Transfer).filter(Transfer.status == status).count()
+
+    @staticmethod
+    def get_recent_transfers(db: Session, limit: int = 10) -> list[Transfer]:
+        return db.query(Transfer).order_by(Transfer.dispatched_at.desc()).limit(limit).all()

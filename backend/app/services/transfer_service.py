@@ -7,7 +7,7 @@ from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
+from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate, TransferStats
 
 
 class TransferService:
@@ -62,6 +62,24 @@ class TransferService:
             raise HTTPException(status_code=404, detail="Transfer not found")
         TransferRepository.delete_transfer(db, db_transfer)
         return {"message": "Transfer deleted successfully"}
+
+    @staticmethod
+    def get_transfer_stats(db: Session) -> TransferStats:
+        total_transfers = TransferRepository.count_transfers(db)
+        pending_transfers = TransferRepository.count_transfers_by_status(db, TransferStatus.PENDING)
+        in_transit_transfers = TransferRepository.count_transfers_by_status(db, TransferStatus.IN_TRANSIT)
+        received_transfers = TransferRepository.count_transfers_by_status(db, TransferStatus.RECEIVED)
+        cancelled_transfers = TransferRepository.count_transfers_by_status(db, TransferStatus.CANCELLED)
+        recent_transfers = TransferRepository.get_recent_transfers(db)
+
+        return TransferStats(
+            total_transfers=total_transfers,
+            pending_transfers=pending_transfers,
+            in_transit_transfers=in_transit_transfers,
+            received_transfers=received_transfers,
+            cancelled=cancelled_transfers,
+            recent_transfers=recent_transfers,
+        )
 
     @staticmethod
     def _validate_relations(db: Session, transfer_data: TransferCreate) -> None:

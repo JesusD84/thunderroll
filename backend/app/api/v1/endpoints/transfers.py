@@ -4,11 +4,19 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.models import UserRole, User
-from app.schemas.transfer import Transfer, TransferCreate, TransferFilters, TransferUpdate
+from app.schemas.transfer import Transfer, TransferCreate, TransferFilters, TransferUpdate, TransferStats
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.transfer_service import TransferService
 
 router = APIRouter()
+
+
+@router.get("/stats", response_model=TransferStats)
+def get_transfer_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    return TransferService.get_transfer_stats(db)
 
 
 @router.get("/", response_model=List[Transfer])
