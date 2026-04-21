@@ -61,15 +61,15 @@ def delete_unit(
 ):
     return UnitService.delete_unit(db, unit_id)
 
-@router.get("/{unit_id}/movements", response_model=List[schemas.Movement])
-def get_unit_movements(
+@router.get("/{unit_id}/transfers", response_model=List[schemas.Transfer])
+def get_unit_transfers(
     unit_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    return UnitService.get_unit_movements(db, unit_id, skip, limit)
+    return UnitService.get_unit_transfers(db, unit_id, skip, limit)
 
 @router.post("/{unit_id}/move")
 def move_unit(

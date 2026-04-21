@@ -20,13 +20,13 @@ class ReportService:
     """Service for generating reports."""
     
     @staticmethod
-    async def generate_movements_report(
+    async def generate_transfers_report(
         db: AsyncSession,
         from_date: date,
         to_date: date,
         format_type: str = "xlsx"
     ) -> Response:
-        """Generate movements report for date range."""
+        """Generate transfers report for date range."""
         
         # Convert dates to datetime
         from_datetime = datetime.combine(from_date, datetime.min.time())

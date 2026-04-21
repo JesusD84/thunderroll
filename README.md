@@ -159,7 +159,7 @@ npm run type-check
 - `POST /transfers/{id}/receive` - Recibir
 
 ### Reportes
-- `GET /reports/movements` - Exportar movimientos
+- `GET /reports/transfers` - Exportar movimientos
 
 ### Catálogos
 - `GET /locations` - Ubicaciones

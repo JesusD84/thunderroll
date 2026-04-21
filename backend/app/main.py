@@ -16,7 +16,7 @@ models.Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await create_demo_data()
+    create_demo_data()
     yield
     # Shutdown
     pass

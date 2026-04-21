@@ -7,7 +7,6 @@ from app.schemas.location import Location, LocationCreate, LocationUpdate
 from app.schemas.shipment import Shipment, ShipmentCreate
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
 from app.schemas.unit_event import UnitEvent
-from app.schemas.transfer import Transfer, TransferCreate, TransferReceive
 from app.schemas.common import PaginatedResponse
 
 __all__ = [
@@ -15,6 +14,5 @@ __all__ = [
     "ResetPasswordRequest", "User", "UserCreate", "UserUpdate",
     "UserFilters", "Location", "LocationCreate", "LocationUpdate",
     "Shipment", "ShipmentCreate", "Unit", "UnitCreate",
-    "UnitUpdate", "UnitFilters", "UnitEvent", "Transfer",
-    "TransferCreate", "TransferReceive", "PaginatedResponse",
+    "UnitUpdate", "UnitFilters", "UnitEvent", "PaginatedResponse"
 ]

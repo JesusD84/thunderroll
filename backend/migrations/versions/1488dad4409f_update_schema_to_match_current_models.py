@@ -25,14 +25,10 @@ def upgrade() -> None:
     op.drop_index('ix_users_id', table_name='users')
     op.drop_index('ix_users_username', table_name='users')
     op.drop_table('users')
-    op.drop_index('ix_transfer_units_id', table_name='transfer_units')
-    op.drop_table('transfer_units')
     op.drop_index('ix_imports_id', table_name='imports')
     op.drop_table('imports')
     op.drop_index('ix_transfers_id', table_name='transfers')
     op.drop_table('transfers')
-    op.drop_index('ix_movements_id', table_name='movements')
-    op.drop_table('movements')
     op.drop_index('ix_locations_id', table_name='locations')
     op.drop_table('locations')
     op.drop_index('ix_units_chassis_number', table_name='units')
@@ -52,7 +48,7 @@ def downgrade() -> None:
     sa.Column('brand', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('color',  sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('current_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('status', postgresql.ENUM('AVAILABLE', 'SOLD', 'IN_TRANSIT', name='unitstatus'), autoincrement=False, nullable=False),
+    sa.Column('status', postgresql.ENUM('WAREHOUSE_UNIDENTIFIED', 'IN_STOCK', 'SOLD', 'IN_TRANSIT', name='unitstatus'), autoincrement=False, nullable=False),
     sa.Column('sold_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
     sa.Column('notes', sa.TEXT(), autoincrement=False, nullable=True),
     sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
@@ -73,41 +69,22 @@ def downgrade() -> None:
     postgresql_ignore_search_path=False
     )
     op.create_index('ix_locations_id', 'locations', ['id'], unique=False)
-    op.create_table('movements',
+    op.create_table('transfers',
     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
     sa.Column('unit_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('user_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('movement_type', postgresql.ENUM('IMPORT', 'SALE', 'TRANSFER', 'RETURN', 'DAMAGED', 'MAINTENANCE', name='movementtype'), autoincrement=False, nullable=False),
-    sa.Column('from_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('to_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('quantity', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('notes', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('movement_date', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.ForeignKeyConstraint(['from_location_id'], ['locations.id'], name='movements_from_location_id_fkey'),
-    sa.ForeignKeyConstraint(['to_location_id'], ['locations.id'], name='movements_to_location_id_fkey'),
-    sa.ForeignKeyConstraint(['unit_id'], ['units.id'], name='movements_unit_id_fkey'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='movements_user_id_fkey'),
-    sa.PrimaryKeyConstraint('id', name='movements_pkey')
-    )
-    op.create_index('ix_movements_id', 'movements', ['id'], unique=False)
-    op.create_table('transfers',
-    sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('transfers_id_seq'::regclass)"), autoincrement=True, nullable=False),
-    sa.Column('from_location_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('to_location_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('user_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('status', sa.VARCHAR(length=50), autoincrement=False, nullable=True),
-    sa.Column('total_units', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('notes', sa.TEXT(), autoincrement=False, nullable=True),
-    sa.Column('transfer_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.Column('completed_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
-    sa.ForeignKeyConstraint(['from_location_id'], ['locations.id'], name='transfers_from_location_id_fkey'),
-    sa.ForeignKeyConstraint(['to_location_id'], ['locations.id'], name='transfers_to_location_id_fkey'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='transfers_user_id_fkey'),
-    sa.PrimaryKeyConstraint('id', name='transfers_pkey'),
-    postgresql_ignore_search_path=False
+    sa.Column('dispatched_by_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('received_by_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('origin_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('destination_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('status', postgresql.ENUM('PENDING', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED', name='transferstatus'), autoincrement=False, nullable=False, server_default='PENDING'),
+    sa.Column('dispatched_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
+    sa.Column('received_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
+    sa.ForeignKeyConstraint(['destination_location_id'], ['locations.id'], name='transfers_destination_location_id_fkey'),
+    sa.ForeignKeyConstraint(['origin_location_id'], ['locations.id'], name='transfers_origin_location_id_fkey'),
+    sa.ForeignKeyConstraint(['dispatched_by_id'], ['users.id'], name='transfers_dispatched_by_id_fkey'),
+    sa.ForeignKeyConstraint(['received_by_id'], ['users.id'], name='transfers_received_by_id_fkey'),
+    sa.ForeignKeyConstraint(['unit_id'], ['units.id'], name='transfers_unit_id_fkey'),
+    sa.PrimaryKeyConstraint('id', name='transfers_pkey')
     )
     op.create_index('ix_transfers_id', 'transfers', ['id'], unique=False)
     op.create_table('imports',
@@ -127,16 +104,6 @@ def downgrade() -> None:
     postgresql_ignore_search_path=False
     )
     op.create_index('ix_imports_id', 'imports', ['id'], unique=False)
-    op.create_table('transfer_units',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('transfer_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('unit_id', sa.INTEGER(), autoincrement=False, nullable=False),
-    sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=True),
-    sa.ForeignKeyConstraint(['transfer_id'], ['transfers.id'], name='transfer_units_transfer_id_fkey'),
-    sa.ForeignKeyConstraint(['unit_id'], ['units.id'], name='transfer_units_unit_id_fkey'),
-    sa.PrimaryKeyConstraint('id', name='transfer_units_pkey')
-    )
-    op.create_index('ix_transfer_units_id', 'transfer_units', ['id'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.INTEGER(), server_default=sa.text("nextval('users_id_seq'::regclass)"), autoincrement=True, nullable=False),
     sa.Column('email', sa.VARCHAR(length=255), autoincrement=False, nullable=False),

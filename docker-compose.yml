@@ -35,7 +35,6 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
     ports:
       - "8000:8000"
-      - "587:587"
     volumes:
       - ./backend:/app
       - backend_uploads:/app/uploads

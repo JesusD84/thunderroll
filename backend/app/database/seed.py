@@ -1,15 +1,13 @@
-
-from sqlalchemy.orm import Session
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Location,
-    Unit, UnitStatus, Movement, MovementType
+    Unit, UnitStatus, Transfer, TransferStatus
 )
 from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
 import asyncio
 
-async def create_demo_data():
+def create_demo_data():
     """Create demo data for the application"""
     db = SessionLocal()
     
@@ -113,7 +111,7 @@ async def create_demo_data():
                 brand=yamaha,
                 color=negro,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE
+                status=UnitStatus.IN_STOCK
             ),
             Unit(
                 engine_number="YBR125002",
@@ -122,7 +120,7 @@ async def create_demo_data():
                 brand=kawasaki,
                 color=rojo,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE
+                status=UnitStatus.IN_STOCK
             ),
             Unit(
                 engine_number="CB125F001",
@@ -131,7 +129,7 @@ async def create_demo_data():
                 brand=kawasaki,
                 color=azul,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE
+                status=UnitStatus.IN_STOCK
             ),
             Unit(
                 engine_number="CB125F002",
@@ -150,7 +148,7 @@ async def create_demo_data():
                 brand=suzuki,
                 color=negro,
                 current_location_id=warehouse.id,
-                status=UnitStatus.AVAILABLE
+                status=UnitStatus.IN_STOCK
             )
         ]
         
@@ -159,37 +157,40 @@ async def create_demo_data():
         db.commit()
         print("✓ Demo units created")
         
-        # Create demo movements for the units
+        # Create demo transfers for the units
         for unit in demo_units:
-            # Import movement
-            import_movement = Movement(
+            # Import transfer
+            import_transfer = Transfer(
                 unit_id=unit.id,
-                user_id=admin_user.id,
-                movement_type=MovementType.IMPORT,
-                to_location_id=warehouse.id,
-                notes="Unidad importada - datos de demostración"
+                dispatched_by_id=admin_user.id,
+                destination_location_id=warehouse.id,
+                status=TransferStatus.RECEIVED,
+                dispatched_at=datetime.now(),
+                received_at=datetime.now()
             )
-            db.add(import_movement)
+            db.add(import_transfer)
             
-            # Sale movement for sold unit
+            # Sale transfer for sold unit
             if unit.status == UnitStatus.SOLD:
-                sale_movement = Movement(
+                sale_transfer = Transfer(
                     unit_id=unit.id,
-                    user_id=admin_user.id,
-                    movement_type=MovementType.SALE,
-                    movement_date=unit.sold_date,
-                    notes="Venta de unidad - datos de demostración"
+                    dispatched_by_id=admin_user.id,
+                    origin_location_id=warehouse.id,
+                    status=TransferStatus.RECEIVED,
+                    dispatched_at=datetime.now() - timedelta(days=5),
+                    received_at=datetime.now() - timedelta(days=5)
                 )
-                db.add(sale_movement)
+                db.add(sale_transfer)
         
         db.commit()
-        print("✓ Demo movements created")
+        print("✓ Demo transfers created")
         
         print("✅ Demo data creation completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error creating demo data: {str(e)}")
+        print(f"❌ Error creating demo data: {str(e)}", flush=True)
         db.rollback()
+        raise
     finally:
         db.close()
 
