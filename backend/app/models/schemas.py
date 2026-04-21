@@ -141,6 +141,15 @@ class TransferUpdate(BaseModel):
     notes: Optional[str] = None
     completed_date: Optional[datetime] = None
 
+class TransferUnit(BaseModel):
+    id: int
+    transfer_id: int
+    unit_id: int
+    unit: Optional[Unit] = None
+
+    class Config:
+        from_attributes = True
+
 class Transfer(TransferBase):
     id: int
     user_id: int
@@ -152,6 +161,7 @@ class Transfer(TransferBase):
     from_location: Optional[Location] = None
     to_location: Optional[Location] = None
     user: Optional[User] = None
+    transfer_units: Optional[List[TransferUnit]] = None
 
     class Config:
         from_attributes = True

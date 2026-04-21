@@ -5,110 +5,279 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Edit, Truck, DollarSign, History } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, DollarSign, History, Save, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Unit {
-  id: string;
-  brand?: string;
-  model?: string;
+  id: number;
+  brand: string;
+  model: string;
   color: string;
-  engine_number?: string;
-  chassis_number?: string;
+  engine_number: string;
+  chassis_number: string;
   status: string;
-  location: string;
-  notes?: string;
+  current_location_id: number;
+  current_location: { name: string; id: number } | null;
+  notes: string | null;
+  sold_date: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
-interface UnitEvent {
-  id: string;
-  event_type: string;
-  before: any;
-  after: any;
-  who: string;
-  reason?: string;
-  timestamp: string;
+interface Movement {
+  id: number;
+  unit_id: number;
+  movement_type: string;
+  from_location_id: number | null;
+  to_location_id: number | null;
+  quantity: number;
+  notes: string | null;
+  movement_date: string;
+  created_at: string;
+  user: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+  from_location: { name: string } | null;
+  to_location: { name: string } | null;
 }
 
-const statusColors = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'bg-red-100 text-red-800',
-  'IDENTIFICADA_EN_TALLER': 'bg-yellow-100 text-yellow-800',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'bg-blue-100 text-blue-800',
-  'EN_SUCURSAL_DISPONIBLE': 'bg-green-100 text-green-800',
-  'VENDIDA': 'bg-gray-100 text-gray-800',
+const statusColors: Record<string, string> = {
+  'available': 'bg-green-100 text-green-800',
+  'sold': 'bg-gray-100 text-gray-800',
+  'in_transit': 'bg-blue-100 text-blue-800',
+  'reserved': 'bg-yellow-100 text-yellow-800',
 };
 
-const statusLabels = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'En Bodega (No Identificada)',
-  'IDENTIFICADA_EN_TALLER': 'Identificada en Taller',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'En Tránsito a Sucursal',
-  'EN_SUCURSAL_DISPONIBLE': 'Disponible en Sucursal',
-  'VENDIDA': 'Vendida',
+const statusLabels: Record<string, string> = {
+  'available': 'Disponible',
+  'sold': 'Vendida',
+  'in_transit': 'En Tránsito',
+  'reserved': 'Reservada',
 };
+
+const movementTypeLabels: Record<string, string> = {
+  'import': 'Importación',
+  'sale': 'Venta',
+  'transfer': 'Transferencia',
+  'return': 'Devolución',
+  'adjustment': 'Ajuste',
+};
+
+const colorMap: Record<string, string> = {
+  'negro': 'bg-black',
+  'rojo': 'bg-red-500',
+  'azul': 'bg-blue-500',
+  'blanco': 'bg-white border border-gray-300',
+  'verde': 'bg-green-500',
+  'gris': 'bg-gray-500',
+  'amarillo': 'bg-yellow-500',
+  'naranja': 'bg-orange-500',
+  'rosa': 'bg-pink-500',
+};
+
+const colorOptions = [
+  { value: 'ROJO', label: 'Rojo' },
+  { value: 'NEGRO', label: 'Negro' },
+  { value: 'AZUL', label: 'Azul' },
+  { value: 'BLANCO', label: 'Blanco' },
+  { value: 'VERDE', label: 'Verde' },
+  { value: 'GRIS', label: 'Gris' },
+  { value: 'ROSA', label: 'Rosa' },
+  { value: 'AMARILLO', label: 'Amarillo' },
+];
+
+interface Location {
+  id: number;
+  name: string;
+}
 
 export default function UnitDetailPage() {
   const params = useParams();
   const unitId = params.id as string;
+  const { data: session } = useSession();
   
   const [unit, setUnit] = useState<Unit | null>(null);
-  const [events, setEvents] = useState<UnitEvent[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    brand: '', model: '', color: '', engine_number: '', chassis_number: '',
+    current_location_id: '', notes: '',
+  });
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferTo, setTransferTo] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [showSell, setShowSell] = useState(false);
+  const [sellNotes, setSellNotes] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeTransferId, setActiveTransferId] = useState<number | null>(null);
+
+  const parseError = (err: any): string => {
+    const detail = err.detail;
+    return typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error realizando operación';
+  };
+
+  const refreshData = async (token: string) => {
+    const [uRes, mRes] = await Promise.all([
+      fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
+    ]);
+    if (uRes.ok) setUnit(await uRes.json());
+    if (mRes.ok) setMovements(await mRes.json());
+    // Check for active transfer
+    const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+  };
+
+  const handleTransfer = async (toLocationId: number, notes?: string) => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/transfers/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_ids: [unit.id],
+          from_location_id: unit.current_location_id,
+          to_location_id: toLocationId,
+          notes: notes || null,
+        }),
+      });
+      if (res.ok) {
+        await refreshData(token);
+        setShowTransfer(false);
+        setTransferTo('');
+        setTransferNotes('');
+      } else {
+        setActionError(parseError(await res.json()));
+      }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleConfirmArrival = async () => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      let res;
+      if (activeTransferId) {
+        // Complete the Transfer record
+        res = await fetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+      } else {
+        // Legacy: no Transfer record, just update unit status
+        res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'available' }),
+        });
+      }
+      if (res.ok) {
+        await refreshData(token);
+      } else {
+        setActionError(parseError(await res.json()));
+      }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleSell = async (notes?: string) => {
+    const token = (session as any)?.accessToken;
+    if (!token || !unit) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/units/${unitId}/move`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_id: unit.id,
+          movement_type: 'sale',
+          from_location_id: unit.current_location_id || null,
+          notes: notes || null,
+        }),
+      });
+      if (res.ok) {
+        await refreshData(token);
+        setShowSell(false);
+        setSellNotes('');
+      } else {
+        setActionError(parseError(await res.json()));
+      }
+    } catch { setActionError('Error de conexión'); }
+    finally { setActionLoading(false); }
+  };
 
   useEffect(() => {
-    // Simular carga de datos
-    const sampleUnit: Unit = {
-      id: unitId,
-      brand: 'Honda',
-      model: 'PCX',
-      color: 'red',
-      engine_number: '20250823035825',
-      chassis_number: 'HXY202507501',
-      status: 'EN_SUCURSAL_DISPONIBLE',
-      location: 'SUCURSAL:Centro',
-      notes: 'Unidad en perfecto estado',
-      created_at: '2025-08-20T10:00:00Z',
-      updated_at: '2025-08-20T14:30:00Z'
+    const fetchData = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+
+      try {
+        const [unitRes, movementsRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/units/${unitId}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ]);
+
+        if (!unitRes.ok) throw new Error(`Unidad no encontrada (${unitRes.status})`);
+
+        const unitData = await unitRes.json();
+        setUnit(unitData);
+
+        if (movementsRes.ok) {
+          const movementsData = await movementsRes.json();
+          setMovements(movementsData);
+        }
+
+        const locsRes = await fetch(`${API_URL}/api/v1/locations/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (locsRes.ok) setLocations(await locsRes.json());
+
+        // Check for active transfer if unit is in transit
+        if (unitData.status === 'in_transit') {
+          const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (atRes.ok) setActiveTransferId((await atRes.json()).id);
+        }
+      } catch (err: any) {
+        console.error('Error fetching unit:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const sampleEvents: UnitEvent[] = [
-      {
-        id: '1',
-        event_type: 'CREATED',
-        before: null,
-        after: { status: 'EN_BODEGA_NO_IDENTIFICADA', location: 'BODEGA' },
-        who: 'inventario@thunderrol.com',
-        timestamp: '2025-08-20T10:00:00Z'
-      },
-      {
-        id: '2',
-        event_type: 'IDENTIFICATION',
-        before: { engine_number: null, chassis_number: null },
-        after: { engine_number: '20250823035825', chassis_number: 'HXY202507501' },
-        who: 'taller@thunderrol.com',
-        reason: 'Identificación en taller',
-        timestamp: '2025-08-20T12:00:00Z'
-      },
-      {
-        id: '3',
-        event_type: 'TRANSFER',
-        before: { location: 'TALLER', status: 'IDENTIFICADA_EN_TALLER' },
-        after: { location: 'SUCURSAL:Centro', status: 'EN_SUCURSAL_DISPONIBLE' },
-        who: 'inventario@thunderrol.com',
-        reason: 'Transferencia a sucursal centro',
-        timestamp: '2025-08-20T14:30:00Z'
-      }
-    ];
-
-    setTimeout(() => {
-      setUnit(sampleUnit);
-      setEvents(sampleEvents);
-      setLoading(false);
-    }, 500);
-  }, [unitId]);
+    fetchData();
+  }, [unitId, session]);
 
   if (loading) {
     return (
@@ -118,13 +287,43 @@ export default function UnitDetailPage() {
     );
   }
 
-  if (!unit) {
+  if (error || !unit) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div>Unidad no encontrada</div>
+        <div className="text-red-600">{error || 'Unidad no encontrada'}</div>
       </div>
     );
   }
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const formatMovementDesc = (m: Movement) => {
+    const type = movementTypeLabels[m.movement_type] || m.movement_type;
+    if (m.movement_type === 'import') {
+      return m.to_location ? `Importada a ${m.to_location.name}` : 'Importada al sistema';
+    }
+    if (m.movement_type === 'sale') {
+      return 'Unidad vendida';
+    }
+    if (m.movement_type === 'transfer') {
+      const from = m.from_location?.name || '?';
+      const to = m.to_location?.name || '?';
+      return `${from} → ${to}`;
+    }
+    return type;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,45 +346,224 @@ export default function UnitDetailPage() {
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => {
+                setEditing(true);
+                setEditError(null);
+                setEditForm({
+                  brand: unit.brand || '',
+                  model: unit.model || '',
+                  color: unit.color || '',
+                  engine_number: unit.engine_number || '',
+                  chassis_number: unit.chassis_number || '',
+                  current_location_id: unit.current_location_id ? String(unit.current_location_id) : '',
+                  notes: unit.notes || '',
+                });
+              }}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
-              <Button variant="outline">
-                <Truck className="mr-2 h-4 w-4" />
-                Transferir
-              </Button>
-              <Button>
-                <DollarSign className="mr-2 h-4 w-4" />
-                Vender
-              </Button>
+              {unit.status === 'in_transit' ? (
+                <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmArrival}
+                  disabled={actionLoading}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Confirmando...' : 'Confirmar Llegada'}
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
+                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    <Truck className="mr-2 h-4 w-4" />
+                    Transferir
+                  </Button>
+                  <Button onClick={() => { setShowSell(true); setActionError(null); }}
+                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Vender
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Transfer Modal */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Transferir Unidad</CardTitle>
+              <CardDescription>Mover unidad {unit.engine_number} a otra ubicación</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                <span className="text-gray-500">Ubicación actual:</span>{' '}
+                <span className="font-medium">{locations.find(l => l.id === unit.current_location_id)?.name || unit.current_location?.name || 'Sin ubicación'}</span>
+              </div>
+              <div>
+                <Label>Ubicación Destino *</Label>
+                <Select value={transferTo} onValueChange={setTransferTo}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona destino" /></SelectTrigger>
+                  <SelectContent>
+                    {locations.filter(l => l.id !== unit.current_location_id).map(l =>
+                      <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Notas</Label>
+                <Input value={transferNotes} onChange={(e) => setTransferNotes(e.target.value)} placeholder="Notas opcionales" />
+              </div>
+              {actionError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{actionError}</div>}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowTransfer(false)} disabled={actionLoading}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => handleTransfer(parseInt(transferTo), transferNotes)}
+                  disabled={actionLoading || !transferTo}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Transfiriendo...' : 'Transferir'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Sell Modal */}
+      {showSell && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Vender Unidad</CardTitle>
+              <CardDescription>Registrar venta de {unit.engine_number}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
+                Esta acción marcará la unidad como vendida. Esta operación no se puede deshacer fácilmente.
+              </div>
+              <div>
+                <Label>Notas de venta</Label>
+                <Input value={sellNotes} onChange={(e) => setSellNotes(e.target.value)} placeholder="Detalles de la venta" />
+              </div>
+              {actionError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{actionError}</div>}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowSell(false)} disabled={actionLoading}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={() => handleSell(sellNotes)}
+                  disabled={actionLoading}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {actionLoading ? 'Procesando...' : 'Confirmar Venta'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Información de la Unidad */}
           <Card>
             <CardHeader>
-              <CardTitle>Información de la Unidad</CardTitle>
-              <CardDescription>Datos actuales de la unidad</CardDescription>
+              <CardTitle>{editing ? 'Editar Unidad' : 'Información de la Unidad'}</CardTitle>
+              <CardDescription>{editing ? 'Modifica los datos de la unidad' : 'Datos actuales de la unidad'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+            {editing ? (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setSaving(true);
+                setEditError(null);
+                const token = (session as any)?.accessToken;
+                if (!token) return;
+                try {
+                  const res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      brand: editForm.brand || undefined,
+                      model: editForm.model || undefined,
+                      color: editForm.color || undefined,
+                      engine_number: editForm.engine_number || undefined,
+                      chassis_number: editForm.chassis_number || undefined,
+                      notes: editForm.notes || null,
+                    }),
+                  });
+                  if (res.ok) {
+                    const updated = await res.json();
+                    setUnit(updated);
+                    setEditing(false);
+                  } else {
+                    const err = await res.json();
+                    setEditError(err.detail || 'Error actualizando unidad');
+                  }
+                } catch (err) {
+                  setEditError('Error de conexión');
+                } finally {
+                  setSaving(false);
+                }
+              }} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Marca</Label>
+                    <Input value={editForm.brand} onChange={(e) => setEditForm(p => ({...p, brand: e.target.value}))} />
+                  </div>
+                  <div>
+                    <Label>Modelo</Label>
+                    <Input value={editForm.model} onChange={(e) => setEditForm(p => ({...p, model: e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Color</Label>
+                  <Select value={editForm.color} onValueChange={(v) => setEditForm(p => ({...p, color: v}))}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona color" /></SelectTrigger>
+                    <SelectContent>
+                      {colorOptions.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label># Motor</Label>
+                    <Input value={editForm.engine_number} onChange={(e) => setEditForm(p => ({...p, engine_number: e.target.value}))} />
+                  </div>
+                  <div>
+                    <Label># Chasis</Label>
+                    <Input value={editForm.chassis_number} onChange={(e) => setEditForm(p => ({...p, chassis_number: e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Notas</Label>
+                  <Input value={editForm.notes} onChange={(e) => setEditForm(p => ({...p, notes: e.target.value}))} placeholder="Observaciones" />
+                </div>
+                {editError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{editError}</div>}
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
+                    <X className="mr-2 h-4 w-4" /> Cancelar
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    <Save className="mr-2 h-4 w-4" /> {saving ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+            <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Estado</Label>
                   <div className="mt-1">
-                    <Badge className={statusColors[unit.status as keyof typeof statusColors]}>
-                      {statusLabels[unit.status as keyof typeof statusLabels]}
+                    <Badge className={statusColors[unit.status] || 'bg-gray-100 text-gray-800'}>
+                      {statusLabels[unit.status] || unit.status}
                     </Badge>
                   </div>
                 </div>
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Ubicación</Label>
-                  <div className="mt-1 text-sm">{unit.location}</div>
+                  <div className="mt-1 text-sm">{unit.current_location?.name || '-'}</div>
                 </div>
               </div>
 
@@ -205,13 +583,7 @@ export default function UnitDetailPage() {
                 <Label className="text-sm font-medium text-gray-500">Color</Label>
                 <div className="mt-1 flex items-center">
                   <div className={`w-4 h-4 rounded-full mr-2 ${
-                    unit.color === 'red' ? 'bg-red-500' :
-                    unit.color === 'black' ? 'bg-black' :
-                    unit.color === 'green' ? 'bg-green-500' :
-                    unit.color === 'pink' ? 'bg-pink-500' :
-                    unit.color === 'grey' ? 'bg-gray-500' :
-                    unit.color === 'blue' ? 'bg-blue-500' :
-                    'bg-gray-300'
+                    colorMap[unit.color.toLowerCase()] || 'bg-gray-300'
                   }`}></div>
                   <span className="text-sm capitalize">{unit.color}</span>
                 </div>
@@ -236,66 +608,76 @@ export default function UnitDetailPage() {
                 </div>
               )}
 
+              {unit.sold_date && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Fecha de Venta</Label>
+                  <div className="mt-1 text-sm">{formatDate(unit.sold_date)}</div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Creado</Label>
-                  <div className="mt-1">20/08/2025</div>
+                  <div className="mt-1">{formatDate(unit.created_at)}</div>
                 </div>
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Actualizado</Label>
-                  <div className="mt-1">20/08/2025</div>
+                  <div className="mt-1">{formatDate(unit.updated_at)}</div>
                 </div>
               </div>
+            </>
+            )}
             </CardContent>
           </Card>
 
-          {/* Historial de Eventos */}
+          {/* Historial de Movimientos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <History className="mr-2 h-5 w-5" />
-                Historial de Eventos
+                Historial de Movimientos
               </CardTitle>
               <CardDescription>Cronología completa de la unidad</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {events.map((event, index) => (
-                  <div key={event.id} className="flex items-start space-x-4">
+                {movements.map((movement: Movement, index: number) => (
+                  <div key={movement.id} className="flex items-start space-x-4">
                     <div className="flex-shrink-0">
                       <div className={`w-3 h-3 rounded-full ${
                         index === 0 ? 'bg-green-500' : 'bg-gray-300'
                       }`}></div>
-                      {index < events.length - 1 && (
+                      {index < movements.length - 1 && (
                         <div className="w-0.5 h-8 bg-gray-200 mx-auto mt-1"></div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">
-                        {event.event_type === 'CREATED' ? 'Unidad Creada' :
-                         event.event_type === 'IDENTIFICATION' ? 'Identificación Completada' :
-                         event.event_type === 'TRANSFER' ? 'Transferencia' :
-                         event.event_type}
+                        {movementTypeLabels[movement.movement_type] || movement.movement_type}
                       </div>
                       
-                      {event.reason && (
-                        <div className="text-sm text-gray-600 mt-1">{event.reason}</div>
-                      )}
+                      <div className="text-sm text-gray-600 mt-1">
+                        {formatMovementDesc(movement)}
+                      </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
-                        20/08/2025 • {event.who}
+                        {formatDateTime(movement.movement_date || movement.created_at)}
+                        {movement.user && ` • ${movement.user.first_name} ${movement.user.last_name}`}
                       </div>
                       
-                      {event.before && event.after && (
+                      {movement.notes && (
                         <div className="text-xs text-gray-400 mt-1">
-                          Cambios: {JSON.stringify(event.after, null, 2)}
+                          {movement.notes}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
+                {movements.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay movimientos registrados</div>
+                )}
               </div>
             </CardContent>
           </Card>

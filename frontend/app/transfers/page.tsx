@@ -9,134 +9,217 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Truck, CheckCircle, Clock, ArrowRight } from 'lucide-react';
+import { Truck, CheckCircle, ArrowRight, Eye, Package, Plus } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 
-interface Transfer {
-  id: string;
-  unit_id: string;
-  unit_info: string;
-  from_location: string;
-  to_location: string;
-  status: 'PENDING' | 'IN_TRANSIT' | 'RECEIVED';
-  created_by: string;
-  created_at: string;
-  eta?: string;
-  received_by?: string;
-  received_at?: string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface Location {
+  id: number;
+  name: string;
 }
 
-const transferStatusColors = {
-  'PENDING': 'bg-yellow-100 text-yellow-800',
-  'IN_TRANSIT': 'bg-blue-100 text-blue-800', 
-  'RECEIVED': 'bg-green-100 text-green-800',
+interface AvailableUnit {
+  id: number;
+  brand: string;
+  model: string;
+  engine_number: string;
+  color: string;
+}
+
+interface TransferUnit {
+  id: number;
+  unit_id: number;
+  unit: {
+    id: number;
+    brand: string;
+    model: string;
+    engine_number: string;
+    color: string;
+  } | null;
+}
+
+interface Transfer {
+  id: number;
+  from_location_id: number;
+  to_location_id: number;
+  user_id: number;
+  status: string;
+  total_units: number;
+  notes: string | null;
+  transfer_date: string | null;
+  completed_date: string | null;
+  created_at: string;
+  from_location: { name: string } | null;
+  to_location: { name: string } | null;
+  user: { email: string; first_name: string; last_name: string } | null;
+  transfer_units: TransferUnit[] | null;
+}
+
+const statusColors: Record<string, string> = {
+  'pending': 'bg-yellow-100 text-yellow-800',
+  'in_transit': 'bg-blue-100 text-blue-800',
+  'completed': 'bg-green-100 text-green-800',
+  'cancelled': 'bg-red-100 text-red-800',
 };
 
-const transferStatusLabels = {
-  'PENDING': 'Pendiente',
-  'IN_TRANSIT': 'En Tránsito',
-  'RECEIVED': 'Recibida',
+const statusLabels: Record<string, string> = {
+  'pending': 'Pendiente',
+  'in_transit': 'En Tránsito',
+  'completed': 'Completada',
+  'cancelled': 'Cancelada',
 };
 
 export default function TransfersPage() {
+  const { data: session } = useSession();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+
+  // New transfer form state
   const [showNewTransfer, setShowNewTransfer] = useState(false);
-  const [newTransfer, setNewTransfer] = useState({
-    unit_id: '',
-    from_location: '',
-    to_location: '',
-    eta: '',
-    reason: ''
-  });
+  const [fromLocationId, setFromLocationId] = useState('');
+  const [toLocationId, setToLocationId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [availableUnits, setAvailableUnits] = useState<AvailableUnit[]>([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simular datos de transferencias
-    const sampleTransfers: Transfer[] = [
-      {
-        id: '1',
-        unit_id: 'UNIT_001',
-        unit_info: 'Honda PCX - Red - HXY202507501',
-        from_location: 'TALLER',
-        to_location: 'SUCURSAL:Centro',
-        status: 'IN_TRANSIT',
-        created_by: 'inventario@thunderrol.com',
-        created_at: '2025-08-20T09:00:00Z',
-        eta: '2025-08-20T16:00:00Z'
-      },
-      {
-        id: '2',
-        unit_id: 'UNIT_002',
-        unit_info: 'Yamaha NMAX - Black - HXY202507502',
-        from_location: 'SUCURSAL:Centro',
-        to_location: 'SUCURSAL:Norte',
-        status: 'PENDING',
-        created_by: 'ventas@thunderrol.com',
-        created_at: '2025-08-20T11:00:00Z',
-        eta: '2025-08-21T10:00:00Z'
-      },
-      {
-        id: '3',
-        unit_id: 'UNIT_003',
-        unit_info: 'Honda PCX - Blue - HXY202507503',
-        from_location: 'BODEGA',
-        to_location: 'TALLER',
-        status: 'RECEIVED',
-        created_by: 'inventario@thunderrol.com',
-        created_at: '2025-08-19T14:00:00Z',
-        received_by: 'taller@thunderrol.com',
-        received_at: '2025-08-19T15:30:00Z'
+    const fetchData = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+
+      try {
+        const [tRes, lRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/transfers/`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/v1/locations/`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        ]);
+        if (tRes.ok) setTransfers(await tRes.json());
+        if (lRes.ok) setLocations(await lRes.json());
+      } catch (err) {
+        console.error('Error fetching transfers:', err);
+      } finally {
+        setLoading(false);
       }
-    ];
-
-    setTimeout(() => {
-      setTransfers(sampleTransfers);
-      setLoading(false);
-    }, 500);
-  }, []);
-
-  const handleCreateTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Aquí iría la llamada al API
-    console.log('Creando transferencia:', newTransfer);
-    
-    // Simular creación
-    const newTransferRecord: Transfer = {
-      id: Date.now().toString(),
-      unit_id: newTransfer.unit_id,
-      unit_info: `Unidad ${newTransfer.unit_id}`,
-      from_location: newTransfer.from_location,
-      to_location: newTransfer.to_location,
-      status: 'PENDING',
-      created_by: 'current_user@thunderrol.com',
-      created_at: new Date().toISOString(),
-      eta: newTransfer.eta || undefined
     };
 
-    setTransfers(prev => [newTransferRecord, ...prev]);
-    setShowNewTransfer(false);
-    setNewTransfer({
-      unit_id: '',
-      from_location: '',
-      to_location: '',
-      eta: '',
-      reason: ''
+    fetchData();
+  }, [session]);
+
+  // Fetch available units when origin location changes
+  useEffect(() => {
+    const fetchUnits = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token || !fromLocationId) { setAvailableUnits([]); return; }
+      setUnitsLoading(true);
+      setSelectedUnitId('');
+      try {
+        const res = await fetch(
+          `${API_URL}/api/v1/units/?status=available&location_id=${fromLocationId}`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        if (res.ok) setAvailableUnits(await res.json());
+      } catch (err) {
+        console.error('Error fetching units:', err);
+      } finally {
+        setUnitsLoading(false);
+      }
+    };
+    fetchUnits();
+  }, [fromLocationId, session]);
+
+  const handleCreateTransfer = async () => {
+    const token = (session as any)?.accessToken;
+    if (!token || !selectedUnitId || !fromLocationId || !toLocationId) return;
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/transfers/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_ids: [parseInt(selectedUnitId)],
+          from_location_id: parseInt(fromLocationId),
+          to_location_id: parseInt(toLocationId),
+          notes: transferNotes || null,
+        }),
+      });
+      if (res.ok) {
+        // Refresh list and reset form
+        const listRes = await fetch(`${API_URL}/api/v1/transfers/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (listRes.ok) setTransfers(await listRes.json());
+        setShowNewTransfer(false);
+        setFromLocationId(''); setToLocationId(''); setSelectedUnitId(''); setTransferNotes('');
+        setAvailableUnits([]);
+      } else {
+        const err = await res.json();
+        const detail = err.detail;
+        setCreateError(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error creando transferencia');
+      }
+    } catch { setCreateError('Error de conexión'); }
+    finally { setCreateLoading(false); }
+  };
+
+  const handleConfirmArrival = async (transferId: number) => {
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    setActionLoading(transferId);
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/transfers/${transferId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+
+      if (res.ok) {
+        // Refresh transfers list
+        const listRes = await fetch(`${API_URL}/api/v1/transfers/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (listRes.ok) setTransfers(await listRes.json());
+      }
+    } catch (err) {
+      console.error('Error completing transfer:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('es-MX', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
     });
   };
 
-  const handleReceiveTransfer = async (transferId: string) => {
-    // Simular recepción
-    setTransfers(prev => prev.map(transfer => 
-      transfer.id === transferId 
-        ? { 
-            ...transfer, 
-            status: 'RECEIVED' as const,
-            received_by: 'current_user@thunderrol.com',
-            received_at: new Date().toISOString()
-          }
-        : transfer
-    ));
+  const getUnitLabel = (transfer: Transfer) => {
+    const units = transfer.transfer_units;
+    if (!units || units.length === 0) return '-';
+    const u = units[0].unit;
+    if (!u) return `ID: ${units[0].unit_id}`;
+    return `${u.brand} ${u.model}`;
   };
+
+  const getUnitId = (transfer: Transfer): number | null => {
+    const units = transfer.transfer_units;
+    if (!units || units.length === 0) return null;
+    return units[0].unit_id;
+  };
+
+  const filteredTransfers = statusFilter === 'all'
+    ? transfers
+    : transfers.filter(t => t.status === statusFilter);
+
+  const pendingCount = transfers.filter(t => t.status === 'pending' || t.status === 'in_transit').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,105 +229,88 @@ export default function TransfersPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Transferencias</h1>
-              <p className="text-gray-600">Gestiona movimientos entre ubicaciones</p>
+              <p className="text-gray-600">Control de movimientos entre ubicaciones</p>
             </div>
-            <Button onClick={() => setShowNewTransfer(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Transferencia
-            </Button>
+            <div className="flex items-center space-x-3">
+              {pendingCount > 0 && (
+                <Badge className="bg-blue-100 text-blue-800 text-sm px-3 py-1">
+                  <Truck className="mr-1 h-4 w-4" />
+                  {pendingCount} en tránsito
+                </Badge>
+              )}
+              <Button onClick={() => { setShowNewTransfer(true); setCreateError(null); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Transferencia
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Formulario Nueva Transferencia */}
+        {/* New Transfer Form */}
         {showNewTransfer && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Nueva Transferencia</CardTitle>
-              <CardDescription>Crear una nueva transferencia de unidad</CardDescription>
+              <CardDescription>Selecciona origen, unidad y destino</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateTransfer} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="unit_id">ID de Unidad *</Label>
-                    <Input
-                      id="unit_id"
-                      value={newTransfer.unit_id}
-                      onChange={(e) => setNewTransfer(prev => ({ ...prev, unit_id: e.target.value }))}
-                      placeholder="UNIT_001"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="eta">Fecha/Hora Estimada</Label>
-                    <Input
-                      id="eta"
-                      type="datetime-local"
-                      value={newTransfer.eta}
-                      onChange={(e) => setNewTransfer(prev => ({ ...prev, eta: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Ubicación Origen *</Label>
-                    <Select value={newTransfer.from_location} onValueChange={(value) => setNewTransfer(prev => ({ ...prev, from_location: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona origen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BODEGA">Bodega</SelectItem>
-                        <SelectItem value="TALLER">Taller</SelectItem>
-                        <SelectItem value="SUCURSAL:Centro">Sucursal Centro</SelectItem>
-                        <SelectItem value="SUCURSAL:Norte">Sucursal Norte</SelectItem>
-                        <SelectItem value="SUCURSAL:Sur">Sucursal Sur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Ubicación Destino *</Label>
-                    <Select value={newTransfer.to_location} onValueChange={(value) => setNewTransfer(prev => ({ ...prev, to_location: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona destino" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BODEGA">Bodega</SelectItem>
-                        <SelectItem value="TALLER">Taller</SelectItem>
-                        <SelectItem value="SUCURSAL:Centro">Sucursal Centro</SelectItem>
-                        <SelectItem value="SUCURSAL:Norte">Sucursal Norte</SelectItem>
-                        <SelectItem value="SUCURSAL:Sur">Sucursal Sur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="reason">Motivo</Label>
-                  <Input
-                    id="reason"
-                    value={newTransfer.reason}
-                    onChange={(e) => setNewTransfer(prev => ({ ...prev, reason: e.target.value }))}
-                    placeholder="Motivo de la transferencia"
-                  />
+                  <Label>1. Ubicación Origen *</Label>
+                  <Select value={fromLocationId} onValueChange={setFromLocationId}>
+                    <SelectTrigger><SelectValue placeholder="¿De dónde sale?" /></SelectTrigger>
+                    <SelectContent>
+                      {locations.map(l => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setShowNewTransfer(false)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={!newTransfer.unit_id || !newTransfer.from_location || !newTransfer.to_location}
-                  >
-                    Crear Transferencia
-                  </Button>
+                <div>
+                  <Label>2. Unidad a Transferir *</Label>
+                  <Select value={selectedUnitId} onValueChange={setSelectedUnitId} disabled={!fromLocationId || unitsLoading}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={unitsLoading ? 'Cargando unidades...' : !fromLocationId ? 'Selecciona origen primero' : availableUnits.length === 0 ? 'Sin unidades disponibles' : 'Selecciona unidad'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUnits.map(u => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.brand} {u.model} — {u.engine_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </form>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>3. Ubicación Destino *</Label>
+                  <Select value={toLocationId} onValueChange={setToLocationId}>
+                    <SelectTrigger><SelectValue placeholder="¿A dónde va?" /></SelectTrigger>
+                    <SelectContent>
+                      {locations.filter(l => String(l.id) !== fromLocationId).map(l =>
+                        <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Notas (opcional)</Label>
+                  <Input value={transferNotes} onChange={(e) => setTransferNotes(e.target.value)} placeholder="Motivo de la transferencia" />
+                </div>
+              </div>
+              {createError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{createError}</div>}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => {
+                  setShowNewTransfer(false); setFromLocationId(''); setToLocationId('');
+                  setSelectedUnitId(''); setTransferNotes(''); setAvailableUnits([]);
+                }}>Cancelar</Button>
+                <Button onClick={handleCreateTransfer}
+                  disabled={createLoading || !selectedUnitId || !fromLocationId || !toLocationId}>
+                  <Truck className="mr-2 h-4 w-4" />
+                  {createLoading ? 'Creando...' : 'Crear Transferencia'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -252,8 +318,24 @@ export default function TransfersPage() {
         {/* Lista de Transferencias */}
         <Card>
           <CardHeader>
-            <CardTitle>Transferencias Activas</CardTitle>
-            <CardDescription>Movimientos pendientes y en tránsito</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Historial de Transferencias</CardTitle>
+                <CardDescription>Movimientos entre ubicaciones</CardDescription>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtrar por estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                  <SelectItem value="in_transit">En Tránsito</SelectItem>
+                  <SelectItem value="completed">Completada</SelectItem>
+                  <SelectItem value="cancelled">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -266,62 +348,86 @@ export default function TransfersPage() {
                     <TableHead>Unidad</TableHead>
                     <TableHead>Ruta</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>ETA</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Completada</TableHead>
                     <TableHead>Creado Por</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transfers.map((transfer) => (
-                    <TableRow key={transfer.id}>
-                      <TableCell className="font-mono text-sm">{transfer.id}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{transfer.unit_id}</div>
-                          <div className="text-sm text-gray-500">{transfer.unit_info}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm">{transfer.from_location}</span>
-                          <ArrowRight className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">{transfer.to_location}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={transferStatusColors[transfer.status]}>
-                          {transferStatusLabels[transfer.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {transfer.eta ? '21/08/2025' : '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{transfer.created_by}</TableCell>
-                      <TableCell>
-                        {transfer.status === 'IN_TRANSIT' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleReceiveTransfer(transfer.id)}
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Recibir
-                          </Button>
-                        )}
-                        {transfer.status === 'PENDING' && (
-                          <Badge variant="outline">
-                            <Clock className="mr-1 h-3 w-3" />
-                            Pendiente
+                  {filteredTransfers.map((transfer) => {
+                    const unitId = getUnitId(transfer);
+                    return (
+                      <TableRow key={transfer.id}>
+                        <TableCell className="font-mono text-sm">{transfer.id}</TableCell>
+                        <TableCell>
+                          {unitId ? (
+                            <Link href={`/units/${unitId}`} className="text-blue-600 hover:underline text-sm font-medium">
+                              {getUnitLabel(transfer)}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-gray-500">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm">{transfer.from_location?.name || '-'}</span>
+                            <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm">{transfer.to_location?.name || '-'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={statusColors[transfer.status] || 'bg-gray-100 text-gray-800'}>
+                            {statusLabels[transfer.status] || transfer.status}
                           </Badge>
-                        )}
-                        {transfer.status === 'RECEIVED' && (
-                          <Badge variant="default">
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            Completada
-                          </Badge>
-                        )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {formatDate(transfer.transfer_date || transfer.created_at)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {formatDate(transfer.completed_date)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {transfer.user ? `${transfer.user.first_name} ${transfer.user.last_name}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {(transfer.status === 'pending' || transfer.status === 'in_transit') && (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => handleConfirmArrival(transfer.id)}
+                                disabled={actionLoading === transfer.id}
+                              >
+                                <CheckCircle className="mr-1 h-4 w-4" />
+                                {actionLoading === transfer.id ? 'Confirmando...' : 'Confirmar Llegada'}
+                              </Button>
+                            )}
+                            {transfer.status === 'completed' && (
+                              <Badge variant="outline" className="text-green-700 border-green-300">
+                                <CheckCircle className="mr-1 h-3 w-3" />
+                                Completada
+                              </Badge>
+                            )}
+                            {unitId && (
+                              <Link href={`/units/${unitId}`}>
+                                <Button size="sm" variant="ghost">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filteredTransfers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-8">
+                        No hay transferencias {statusFilter !== 'all' ? `con estado "${statusLabels[statusFilter]}"` : 'registradas'}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             )}

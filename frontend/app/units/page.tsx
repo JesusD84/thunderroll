@@ -10,81 +10,112 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, Filter } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Unit {
-  id: string;
-  brand?: string;
-  model?: string;
+  id: number;
+  brand: string;
+  model: string;
   color: string;
-  engine_number?: string;
-  chassis_number?: string;
+  engine_number: string;
+  chassis_number: string;
   status: string;
-  location: string;
+  current_location_id: number;
+  current_location: { name: string; id: number } | null;
+  sold_date: string | null;
   created_at: string;
 }
 
-const statusColors = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'bg-red-100 text-red-800',
-  'IDENTIFICADA_EN_TALLER': 'bg-yellow-100 text-yellow-800',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'bg-blue-100 text-blue-800',
-  'EN_SUCURSAL_DISPONIBLE': 'bg-green-100 text-green-800',
-  'VENDIDA': 'bg-gray-100 text-gray-800',
+interface Location {
+  id: number;
+  name: string;
+}
+
+const statusColors: Record<string, string> = {
+  'available': 'bg-green-100 text-green-800',
+  'sold': 'bg-gray-100 text-gray-800',
+  'in_transit': 'bg-blue-100 text-blue-800',
+  'reserved': 'bg-yellow-100 text-yellow-800',
 };
 
-const statusLabels = {
-  'EN_BODEGA_NO_IDENTIFICADA': 'En Bodega (No ID)',
-  'IDENTIFICADA_EN_TALLER': 'Identificada en Taller',
-  'EN_TRANSITO_TALLER_SUCURSAL': 'En Tránsito',
-  'EN_SUCURSAL_DISPONIBLE': 'En Sucursal',
-  'VENDIDA': 'Vendida',
+const statusLabels: Record<string, string> = {
+  'available': 'Disponible',
+  'sold': 'Vendida',
+  'in_transit': 'En Tránsito',
+  'reserved': 'Reservada',
+};
+
+const colorMap: Record<string, string> = {
+  'negro': 'bg-black',
+  'rojo': 'bg-red-500',
+  'azul': 'bg-blue-500',
+  'blanco': 'bg-white border border-gray-300',
+  'verde': 'bg-green-500',
+  'gris': 'bg-gray-500',
+  'amarillo': 'bg-yellow-500',
+  'naranja': 'bg-orange-500',
+  'rosa': 'bg-pink-500',
+  'black': 'bg-black',
+  'red': 'bg-red-500',
+  'blue': 'bg-blue-500',
+  'white': 'bg-white border border-gray-300',
+  'green': 'bg-green-500',
+  'grey': 'bg-gray-500',
+  'pink': 'bg-pink-500',
+};
+
+const colorLabels: Record<string, string> = {
+  'negro': 'Negro', 'rojo': 'Rojo', 'azul': 'Azul', 'blanco': 'Blanco',
+  'verde': 'Verde', 'gris': 'Gris', 'amarillo': 'Amarillo', 'naranja': 'Naranja',
+  'rosa': 'Rosa', 'black': 'Negro', 'red': 'Rojo', 'blue': 'Azul',
+  'white': 'Blanco', 'green': 'Verde', 'grey': 'Gris', 'pink': 'Rosa',
 };
 
 export default function UnitsPage() {
+  const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [units, setUnits] = useState<Unit[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [locationFilter, setLocationFilter] = useState('all');
 
   useEffect(() => {
-    // Simular datos mientras conectamos con el backend
-    const sampleUnits: Unit[] = [
-      {
-        id: '1',
-        brand: 'Honda',
-        model: 'PCX',
-        color: 'red',
-        engine_number: '20250823035825',
-        chassis_number: 'HXY202507501',
-        status: 'EN_SUCURSAL_DISPONIBLE',
-        location: 'SUCURSAL:Centro',
-        created_at: '2025-08-20T10:00:00Z'
-      },
-      {
-        id: '2',
-        brand: 'Yamaha',
-        model: 'NMAX',
-        color: 'black',
-        engine_number: '20250823035826',
-        chassis_number: 'HXY202507502',
-        status: 'IDENTIFICADA_EN_TALLER',
-        location: 'TALLER',
-        created_at: '2025-08-20T09:00:00Z'
-      },
-      {
-        id: '3',
-        color: 'green',
-        status: 'EN_BODEGA_NO_IDENTIFICADA',
-        location: 'BODEGA',
-        created_at: '2025-08-20T08:00:00Z'
+    const fetchData = async () => {
+      const token = (session as any)?.accessToken;
+      if (!token) return;
+
+      try {
+        const [unitsRes, locationsRes] = await Promise.all([
+          fetch(`${API_URL}/api/v1/units/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_URL}/api/v1/locations/`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ]);
+
+        if (unitsRes.ok) {
+          const unitsData = await unitsRes.json();
+          setUnits(unitsData);
+        }
+        if (locationsRes.ok) {
+          const locationsData = await locationsRes.json();
+          setLocations(locationsData);
+        }
+      } catch (err) {
+        console.error('Error fetching units:', err);
+      } finally {
+        setLoading(false);
       }
-    ];
-    
-    setTimeout(() => {
-      setUnits(sampleUnits);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    };
+
+    fetchData();
+  }, [session]);
 
   const filteredUnits = units.filter(unit => {
     const matchesSearch = !searchTerm || 
@@ -94,7 +125,7 @@ export default function UnitsPage() {
       unit.model?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || unit.status === statusFilter;
-    const matchesLocation = locationFilter === 'all' || unit.location === locationFilter;
+    const matchesLocation = locationFilter === 'all' || String(unit.current_location_id) === locationFilter;
     
     return matchesSearch && matchesStatus && matchesLocation;
   });
@@ -143,11 +174,9 @@ export default function UnitsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los Estados</SelectItem>
-                  <SelectItem value="EN_BODEGA_NO_IDENTIFICADA">En Bodega (No ID)</SelectItem>
-                  <SelectItem value="IDENTIFICADA_EN_TALLER">Identificada en Taller</SelectItem>
-                  <SelectItem value="EN_TRANSITO_TALLER_SUCURSAL">En Tránsito</SelectItem>
-                  <SelectItem value="EN_SUCURSAL_DISPONIBLE">En Sucursal</SelectItem>
-                  <SelectItem value="VENDIDA">Vendida</SelectItem>
+                  {Object.entries(statusLabels).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -157,11 +186,9 @@ export default function UnitsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las Ubicaciones</SelectItem>
-                  <SelectItem value="BODEGA">Bodega</SelectItem>
-                  <SelectItem value="TALLER">Taller</SelectItem>
-                  <SelectItem value="SUCURSAL:Centro">Sucursal Centro</SelectItem>
-                  <SelectItem value="SUCURSAL:Norte">Sucursal Norte</SelectItem>
-                  <SelectItem value="SUCURSAL:Sur">Sucursal Sur</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -210,15 +237,9 @@ export default function UnitsPage() {
                       <TableCell>
                         <div className="flex items-center">
                           <div className={`w-4 h-4 rounded-full mr-2 ${
-                            unit.color === 'red' ? 'bg-red-500' :
-                            unit.color === 'black' ? 'bg-black' :
-                            unit.color === 'green' ? 'bg-green-500' :
-                            unit.color === 'pink' ? 'bg-pink-500' :
-                            unit.color === 'grey' ? 'bg-gray-500' :
-                            unit.color === 'blue' ? 'bg-blue-500' :
-                            'bg-gray-300'
+                            colorMap[unit.color.toLowerCase()] || 'bg-gray-300'
                           }`}></div>
-                          {unit.color}
+                          {colorLabels[unit.color.toLowerCase()] || unit.color}
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
@@ -228,11 +249,11 @@ export default function UnitsPage() {
                         {unit.chassis_number || '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[unit.status as keyof typeof statusColors]}>
-                          {statusLabels[unit.status as keyof typeof statusLabels]}
+                        <Badge className={statusColors[unit.status] || 'bg-gray-100 text-gray-800'}>
+                          {statusLabels[unit.status] || unit.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{unit.location}</TableCell>
+                      <TableCell>{unit.current_location?.name || '-'}</TableCell>
                       <TableCell>
                         <Link href={`/units/${unit.id}`}>
                           <Button variant="outline" size="sm">Ver Detalle</Button>
