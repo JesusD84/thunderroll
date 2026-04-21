@@ -332,7 +332,6 @@ tramp
 
 # Docker
 .dockerignore
-docker-compose.override.yml
 
 # ================================
 # SECURITY & SECRETS

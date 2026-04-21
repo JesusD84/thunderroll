@@ -45,6 +45,12 @@ def get_dashboard_stats(
     ).join(models.Unit, models.Unit.current_location_id == models.Location.id, isouter=True) \
      .group_by(models.Location.id, models.Location.name).all()
     
+    # Inventory by brand
+    inventory_by_brand = db.query(
+        models.Unit.brand.label("brand"),
+        func.count(models.Unit.id).label("count")
+    ).group_by(models.Unit.brand).all()
+    
     # Sales by month (last 6 months)
     six_months_ago = datetime.now() - timedelta(days=180)
     sales_by_month = db.query(
@@ -106,7 +112,6 @@ def get_dashboard_stats(
             {
                 "month": item.month.strftime("%Y-%m") if item.month else None,
                 "count": item.count,
-                "total_value": float(item.total_value) if item.total_value else 0
             } for item in sales_by_month
         ],
         "recent_imports": [

@@ -1,6 +1,6 @@
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session, selectinload
 from typing import List
 from app.database.database import get_db
 from app.models import models, schemas
@@ -70,3 +70,31 @@ def get_unit_transfers(
     current_user: models.User = Depends(get_current_active_user)
 ):
     return UnitService.get_unit_transfers(db, unit_id, skip, limit)
+
+@router.post("/{unit_id}/move")
+def move_unit(
+    unit_id: int,
+    movement: schemas.MovementCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+):
+    return UnitService.move_unit(db, unit_id, movement, current_user.id)
+
+@router.get("/{unit_id}/active-transfer", response_model=schemas.Transfer)
+def get_active_transfer(
+    unit_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    transfer = db.query(models.Transfer).options(
+        selectinload(models.Transfer.from_location),
+        selectinload(models.Transfer.to_location),
+        selectinload(models.Transfer.user),
+    ).join(models.TransferUnit).filter(
+        models.TransferUnit.unit_id == unit_id,
+        models.Transfer.status.in_(["pending", "in_transit"])
+    ).order_by(models.Transfer.created_at.desc()).first()
+
+    if not transfer:
+        raise HTTPException(status_code=404, detail="No active transfer found")
+    return transfer

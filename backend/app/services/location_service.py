@@ -38,7 +38,7 @@ class LocationService:
 
         unit_count = LocationRepository.count_units_at_location(db, location_id)
         if unit_count > 0:
-            raise HTTPException(status_code=400, detail="Cannot delete location with existing units")
+            raise HTTPException(status_code=400, detail=f"No se puede eliminar: hay {unit_count} unidad{'es' if unit_count > 1 else ''} en esta ubicación")
 
         LocationRepository.delete_location(db, db_location)
         return {"message": "Location deleted successfully"}

@@ -50,13 +50,11 @@ services:
     container_name: thunderrol_frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      BACKEND_URL: http://backend:8000
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: your-nextauth-secret-here-thunderrol-2024
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
 
