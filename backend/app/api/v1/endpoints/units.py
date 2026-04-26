@@ -74,11 +74,11 @@ def get_unit_transfers(
 @router.post("/{unit_id}/move")
 def move_unit(
     unit_id: int,
-    movement: schemas.MovementCreate,
+    transfer: schemas.TransferCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    return UnitService.move_unit(db, unit_id, movement, current_user.id)
+    return UnitService.move_unit(db, unit_id, transfer, current_user.id)
 
 @router.get("/{unit_id}/active-transfer", response_model=schemas.Transfer)
 def get_active_transfer(
