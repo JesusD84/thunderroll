@@ -2,7 +2,8 @@ from datetime import datetime, UTC
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer, TransferStatus
+from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
+from app.models.schemas import TransferCreate as UnitTransferCreate
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
@@ -30,6 +31,88 @@ class TransferService:
         if payload.status == TransferStatus.RECEIVED and payload.received_at is None:
             payload.received_at = datetime.now(UTC)
         return TransferRepository.create_transfer(db, payload)
+
+    @staticmethod
+    def transfer_unit_with_status_update(
+        db: Session,
+        unit_id: int,
+        transfer_data: UnitTransferCreate,
+        user_id: int,
+    ) -> Unit:
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+
+        from_location_id = getattr(transfer_data, "from_location_id", None)
+        to_location_id = getattr(transfer_data, "to_location_id", None)
+        unit_ids = getattr(transfer_data, "unit_ids", None)
+
+        if unit_ids is not None and unit_id not in unit_ids:
+            raise HTTPException(status_code=400, detail="unit_id path does not match transfer payload")
+
+        if from_location_id is None:
+            from_location_id = unit.current_location_id
+
+        if from_location_id and to_location_id and from_location_id == to_location_id:
+            raise HTTPException(status_code=400, detail="Origin and destination locations must be different")
+
+        if to_location_id is not None:
+            transfer_status = TransferStatus.IN_TRANSIT
+            unit.status = UnitStatus.IN_TRANSIT
+        else:
+            transfer_status = TransferStatus.RECEIVED
+            unit.status = UnitStatus.SOLD
+            unit.sold_date = datetime.now(UTC)
+
+        db.commit()
+        db.refresh(unit)
+
+        TransferRepository.create_unit_transfer(
+            db=db,
+            unit_id=unit_id,
+            dispatched_by_id=user_id,
+            origin_location_id=from_location_id,
+            destination_location_id=to_location_id,
+            status=transfer_status,
+            dispatched_at=datetime.now(UTC),
+            received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None,
+        )
+
+        return UnitRepository.get_unit(db, unit.id)
+
+    @staticmethod
+    def create_unit_transfer_record(
+        db: Session,
+        unit_id: int,
+        user_id: int,
+        origin_location_id: int | None = None,
+        destination_location_id: int | None = None,
+        status: TransferStatus = TransferStatus.PENDING,
+        dispatched_at: datetime | None = None,
+        received_at: datetime | None = None,
+    ) -> Transfer:
+        return TransferRepository.create_unit_transfer(
+            db=db,
+            unit_id=unit_id,
+            dispatched_by_id=user_id,
+            origin_location_id=origin_location_id,
+            destination_location_id=destination_location_id,
+            status=status,
+            dispatched_at=dispatched_at,
+            received_at=received_at,
+        )
+
+    @staticmethod
+    def get_active_transfer_for_unit(db: Session, unit_id: int) -> Transfer:
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+
+        transfer = TransferRepository.get_active_transfer_by_unit(db, unit_id)
+        if not transfer:
+            raise HTTPException(status_code=404, detail="No active transfer found")
+
+        return transfer
 
     @staticmethod
     def update_transfer(db: Session, transfer_id: int, transfer_update: TransferUpdate) -> Transfer:

@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
-from datetime import datetime, UTC
-from app.models.models import Unit, Transfer, TransferStatus, UnitStatus, Location
+from app.models.models import Unit, Transfer, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -75,37 +74,14 @@ class UnitRepository:
         return UnitRepository.get_unit(db, unit.id)
 
     @staticmethod
-    def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate, user_id: int) -> Unit:
+    def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate) -> Unit:
         update_data = unit_update.model_dump(exclude_unset=True)
-        old_location_id = unit.current_location_id
-        old_status = unit.status
 
         for field, value in update_data.items():
             setattr(unit, field, value)
 
         db.commit()
         db.refresh(unit)
-
-        if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
-            db.add(Transfer(
-                unit_id=unit.id,
-                dispatched_by_id=user_id,
-                origin_location_id=old_location_id,
-                destination_location_id=update_data["current_location_id"],
-                status=TransferStatus.IN_TRANSIT,
-                dispatched_at=datetime.now(UTC)
-            ))
-            db.commit()
-
-        if "status" in update_data and update_data["status"] != old_status:
-            transfer_status = TransferStatus.RECEIVED if update_data["status"] == UnitStatus.SOLD else TransferStatus.PENDING
-            db.add(Transfer(
-                unit_id=unit.id,
-                dispatched_by_id=user_id,
-                status=transfer_status,
-                received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None
-            ))
-            db.commit()
 
         return UnitRepository.get_unit(db, unit.id)
 
@@ -114,6 +90,23 @@ class UnitRepository:
         db.query(Transfer).filter(Transfer.unit_id == unit_id).delete()
         db.query(Unit).filter(Unit.id == unit_id).delete()
         db.commit()
+
+    @staticmethod
+    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
+        return (
+            db.query(Transfer)
+            .options(
+                selectinload(Transfer.dispatched_by),
+                selectinload(Transfer.received_by),
+                selectinload(Transfer.origin_location),
+                selectinload(Transfer.destination_location)
+            )
+            .filter(Transfer.unit_id == unit_id)
+            .order_by(Transfer.dispatched_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def get_stats(db: Session) -> dict:
@@ -139,20 +132,3 @@ class UnitRepository:
                 for loc in inventory_by_location
             ]
         }
-
-    @staticmethod
-    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
-        return (
-            db.query(Transfer)
-            .options(
-                selectinload(Transfer.dispatched_by),
-                selectinload(Transfer.received_by),
-                selectinload(Transfer.origin_location),
-                selectinload(Transfer.destination_location)
-            )
-            .filter(Transfer.unit_id == unit_id)
-            .order_by(Transfer.dispatched_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
