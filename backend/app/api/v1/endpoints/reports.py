@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, desc, or_
+from sqlalchemy import func, desc, or_, and_
 from datetime import datetime, timedelta
 from typing import List, Optional
 import pandas as pd
