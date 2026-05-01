@@ -1,17 +1,24 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat su-exec
 
 WORKDIR /app
+RUN chown node:node /app
 
-COPY package.json package-lock.json* ./
+USER node
+
+COPY --chown=node:node package.json package-lock.json* ./
 RUN npm install
 
-COPY . .
+COPY --chown=node:node . .
 
 EXPOSE 3000
+ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
 
-ENV PORT 3000
-ENV NEXT_TELEMETRY_DISABLED 1
+USER root
+COPY entrypoint.dev.sh /entrypoint.dev.sh
+RUN chmod +x /entrypoint.dev.sh
 
+ENTRYPOINT ["/entrypoint.dev.sh"]
 CMD ["npm", "run", "dev"]
