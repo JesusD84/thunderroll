@@ -46,6 +46,15 @@ export default function SettingsPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  const mapDeleteLocationErrorToSpanish = (detail: string): string => {
+    const match = detail.match(/^Cannot delete: there (?:is|are) (\d+) units? at this location$/);
+    if (match) {
+      const unitCount = Number(match[1]);
+      return `No se puede eliminar: hay ${unitCount} unidad${unitCount === 1 ? '' : 'es'} en esta ubicación`;
+    }
+    return detail;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       const token = (session as any)?.accessToken;
@@ -148,7 +157,7 @@ export default function SettingsPage() {
         setLocations(prev => prev.filter(loc => loc.id !== locationId));
       } else {
         const err = await res.json();
-        setLocationError(typeof err.detail === 'string' ? err.detail : 'Error eliminando ubicación');
+        setLocationError(typeof err.detail === 'string' ? mapDeleteLocationErrorToSpanish(err.detail) : 'Error eliminando ubicación');
       }
     } catch {
       setLocationError('Error de conexión');
