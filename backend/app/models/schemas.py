@@ -40,8 +40,8 @@ class Location(LocationBase):
 class UnitBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    engine_number: str
-    chassis_number: str
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
     model: str
     brand: str
     color: str

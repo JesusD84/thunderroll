@@ -59,8 +59,8 @@ class Unit(Base):
     __tablename__ = "units"
 
     id = Column(Integer, primary_key=True, index=True)
-    engine_number = Column(String(100), unique=True, nullable=False, index=True)
-    chassis_number = Column(String(100), unique=True, nullable=False, index=True)
+    engine_number = Column(String(100), unique=True, nullable=True, index=True)
+    chassis_number = Column(String(100), unique=True, nullable=True, index=True)
     model = Column(String(100), nullable=False)
     brand = Column(String(100), nullable=False)
     color = Column(String(100), nullable=False)

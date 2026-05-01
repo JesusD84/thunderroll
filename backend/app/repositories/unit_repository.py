@@ -37,29 +37,35 @@ class UnitRepository:
         )
 
     @staticmethod
-    def get_by_engine_or_chassis(db: Session, engine_number: str, chassis_number: str) -> Unit | None:
-        return (
-            db.query(Unit)
-            .filter(
-                (Unit.engine_number == engine_number) |
-                (Unit.chassis_number == chassis_number)
-            )
-            .first()
-        )
+    def get_by_engine_or_chassis(
+        db: Session, engine_number: str | None, chassis_number: str | None
+    ) -> Unit | None:
+        conditions = []
+        if engine_number is not None:
+            conditions.append(Unit.engine_number == engine_number)
+        if chassis_number is not None:
+            conditions.append(Unit.chassis_number == chassis_number)
+        if not conditions:
+            return None
+        return db.query(Unit).filter(or_(*conditions)).first()
 
     @staticmethod
     def get_by_engine_or_chassis_excluding(
-        db: Session, engine_number: str, chassis_number: str, exclude_id: int
+        db: Session, engine_number: str | None, chassis_number: str | None, exclude_id: int
     ) -> Unit | None:
+        conditions = []
+        if engine_number is not None:
+            conditions.append(Unit.engine_number == engine_number)
+        if chassis_number is not None:
+            conditions.append(Unit.chassis_number == chassis_number)
+        if not conditions:
+            return None
         return (
             db.query(Unit)
             .filter(
                 and_(
                     Unit.id != exclude_id,
-                    or_(
-                        Unit.engine_number == engine_number,
-                        Unit.chassis_number == chassis_number
-                    )
+                    or_(*conditions)
                 )
             )
             .first()
