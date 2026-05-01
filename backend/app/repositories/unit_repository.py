@@ -73,7 +73,10 @@ class UnitRepository:
 
     @staticmethod
     def create_unit(db: Session, unit_data: UnitCreate) -> Unit:
-        unit = Unit(**unit_data.model_dump())
+        payload = unit_data.model_dump()
+        if payload.get("current_location_id") is None:
+            raise ValueError("current_location_id is required")
+        unit = Unit(**payload)
         db.add(unit)
         db.commit()
         db.refresh(unit)
@@ -82,6 +85,8 @@ class UnitRepository:
     @staticmethod
     def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate) -> Unit:
         update_data = unit_update.model_dump(exclude_unset=True)
+        if "current_location_id" in update_data and update_data["current_location_id"] is None:
+            raise ValueError("current_location_id is required")
 
         for field, value in update_data.items():
             setattr(unit, field, value)

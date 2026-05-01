@@ -8,6 +8,7 @@ from datetime import datetime, UTC
 from app.models.models import Unit, Transfer, UnitStatus, TransferStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 from app.models.schemas import TransferCreate
+from app.repositories.location_repository import LocationRepository
 from app.repositories.unit_repository import UnitRepository
 from app.services.transfer_service import TransferService
 
@@ -21,6 +22,9 @@ class UnitService:
 
     @staticmethod
     def create_unit(db: Session, unit_data: UnitCreate) -> Unit:
+        if not LocationRepository.get_location(db, unit_data.current_location_id):
+            raise HTTPException(status_code=404, detail="Location not found")
+
         existing = UnitRepository.get_by_engine_or_chassis(
             db, unit_data.engine_number, unit_data.chassis_number
         )
@@ -29,7 +33,10 @@ class UnitService:
                 status_code=400,
                 detail="A unit with this engine number or chassis number already exists"
             )
-        return UnitRepository.create_unit(db, unit_data)
+        try:
+            return UnitRepository.create_unit(db, unit_data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @staticmethod
     def get_unit_by_id(db: Session, unit_id: int) -> Unit:
@@ -45,6 +52,12 @@ class UnitService:
             raise HTTPException(status_code=404, detail="Unit not found")
 
         update_data = unit_update.model_dump(exclude_unset=True)
+        if "current_location_id" in update_data:
+            if update_data["current_location_id"] is None:
+                raise HTTPException(status_code=422, detail="current_location_id is required")
+            if not LocationRepository.get_location(db, update_data["current_location_id"]):
+                raise HTTPException(status_code=404, detail="Location not found")
+
         if "engine_number" in update_data or "chassis_number" in update_data:
             engine_check = update_data.get("engine_number", unit.engine_number)
             chassis_check = update_data.get("chassis_number", unit.chassis_number)
@@ -60,7 +73,10 @@ class UnitService:
         old_location_id = unit.current_location_id
         old_status = unit.status
 
-        updated_unit = UnitRepository.update_unit(db, unit, unit_update)
+        try:
+            updated_unit = UnitRepository.update_unit(db, unit, unit_update)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
             TransferService.create_unit_transfer_record(
