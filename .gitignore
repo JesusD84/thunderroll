@@ -1,6 +1,7 @@
 # Agent local instructions
 AGENTS.md
 agents.md
+.codellm/rules
 
 # ================================
 # PYTHON / FASTAPI BACKEND
