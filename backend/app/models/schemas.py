@@ -40,12 +40,12 @@ class Location(LocationBase):
 class UnitBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    engine_number: str
-    chassis_number: str
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
     model: str
     brand: str
     color: str
-    current_location_id: Optional[int] = None
+    current_location_id: int
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: Optional[str] = None
 

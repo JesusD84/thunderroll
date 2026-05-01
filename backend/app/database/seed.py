@@ -149,6 +149,15 @@ def create_demo_data():
                 color=negro,
                 current_location_id=warehouse.id,
                 status=UnitStatus.IN_STOCK
+            ),
+            Unit(
+                engine_number=None,
+                chassis_number=None,
+                model=ybr125,
+                brand=yamaha,
+                color=blanco,
+                current_location_id=warehouse.id,
+                status=UnitStatus.WAREHOUSE_UNIDENTIFIED
             )
         ]
         
