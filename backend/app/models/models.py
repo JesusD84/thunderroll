@@ -64,7 +64,7 @@ class Unit(Base):
     model = Column(String(100), nullable=False)
     brand = Column(String(100), nullable=False)
     color = Column(String(100), nullable=False)
-    current_location_id = Column(Integer, ForeignKey("locations.id"))
+    current_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
     status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.WAREHOUSE_UNIDENTIFIED)
     sold_date = Column(DateTime(timezone=True))
     notes = Column(Text)

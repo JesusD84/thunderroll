@@ -12,7 +12,7 @@ class UnitBase(BaseModel):
     model: str = Field(..., min_length=1, max_length=100)
     brand: str = Field(..., min_length=1, max_length=100)
     color: str = Field(..., min_length=1, max_length=100)
-    current_location_id: Optional[int] = Field(None, gt=0)
+    current_location_id: int = Field(..., gt=0)
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: Optional[str] = None
 

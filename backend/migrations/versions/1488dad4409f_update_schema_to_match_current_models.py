@@ -47,7 +47,7 @@ def downgrade() -> None:
     sa.Column('model', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('brand', sa.VARCHAR(length=100), autoincrement=False, nullable=False),
     sa.Column('color',  sa.VARCHAR(length=100), autoincrement=False, nullable=False),
-    sa.Column('current_location_id', sa.INTEGER(), autoincrement=False, nullable=True),
+    sa.Column('current_location_id', sa.INTEGER(), autoincrement=False, nullable=False),
     sa.Column('status', postgresql.ENUM('WAREHOUSE_UNIDENTIFIED', 'IN_STOCK', 'SOLD', 'IN_TRANSIT', name='unitstatus'), autoincrement=False, nullable=False),
     sa.Column('sold_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True),
     sa.Column('notes', sa.TEXT(), autoincrement=False, nullable=True),

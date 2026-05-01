@@ -45,7 +45,7 @@ class UnitBase(BaseModel):
     model: str
     brand: str
     color: str
-    current_location_id: Optional[int] = None
+    current_location_id: int
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: Optional[str] = None
 
