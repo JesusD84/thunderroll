@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
-from datetime import datetime, UTC
-from app.models.models import Unit, Transfer, TransferStatus, UnitStatus, Location
+from app.models.models import Unit, Transfer, UnitStatus, Location
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
@@ -38,29 +37,35 @@ class UnitRepository:
         )
 
     @staticmethod
-    def get_by_engine_or_chassis(db: Session, engine_number: str, chassis_number: str) -> Unit | None:
-        return (
-            db.query(Unit)
-            .filter(
-                (Unit.engine_number == engine_number) |
-                (Unit.chassis_number == chassis_number)
-            )
-            .first()
-        )
+    def get_by_engine_or_chassis(
+        db: Session, engine_number: str | None, chassis_number: str | None
+    ) -> Unit | None:
+        conditions = []
+        if engine_number is not None:
+            conditions.append(Unit.engine_number == engine_number)
+        if chassis_number is not None:
+            conditions.append(Unit.chassis_number == chassis_number)
+        if not conditions:
+            return None
+        return db.query(Unit).filter(or_(*conditions)).first()
 
     @staticmethod
     def get_by_engine_or_chassis_excluding(
-        db: Session, engine_number: str, chassis_number: str, exclude_id: int
+        db: Session, engine_number: str | None, chassis_number: str | None, exclude_id: int
     ) -> Unit | None:
+        conditions = []
+        if engine_number is not None:
+            conditions.append(Unit.engine_number == engine_number)
+        if chassis_number is not None:
+            conditions.append(Unit.chassis_number == chassis_number)
+        if not conditions:
+            return None
         return (
             db.query(Unit)
             .filter(
                 and_(
                     Unit.id != exclude_id,
-                    or_(
-                        Unit.engine_number == engine_number,
-                        Unit.chassis_number == chassis_number
-                    )
+                    or_(*conditions)
                 )
             )
             .first()
@@ -68,44 +73,26 @@ class UnitRepository:
 
     @staticmethod
     def create_unit(db: Session, unit_data: UnitCreate) -> Unit:
-        unit = Unit(**unit_data.model_dump())
+        payload = unit_data.model_dump()
+        if payload.get("current_location_id") is None:
+            raise ValueError("current_location_id is required")
+        unit = Unit(**payload)
         db.add(unit)
         db.commit()
         db.refresh(unit)
         return UnitRepository.get_unit(db, unit.id)
 
     @staticmethod
-    def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate, user_id: int) -> Unit:
+    def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate) -> Unit:
         update_data = unit_update.model_dump(exclude_unset=True)
-        old_location_id = unit.current_location_id
-        old_status = unit.status
+        if "current_location_id" in update_data and update_data["current_location_id"] is None:
+            raise ValueError("current_location_id is required")
 
         for field, value in update_data.items():
             setattr(unit, field, value)
 
         db.commit()
         db.refresh(unit)
-
-        if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
-            db.add(Transfer(
-                unit_id=unit.id,
-                dispatched_by_id=user_id,
-                origin_location_id=old_location_id,
-                destination_location_id=update_data["current_location_id"],
-                status=TransferStatus.IN_TRANSIT,
-                dispatched_at=datetime.now(UTC)
-            ))
-            db.commit()
-
-        if "status" in update_data and update_data["status"] != old_status:
-            transfer_status = TransferStatus.RECEIVED if update_data["status"] == UnitStatus.SOLD else TransferStatus.PENDING
-            db.add(Transfer(
-                unit_id=unit.id,
-                dispatched_by_id=user_id,
-                status=transfer_status,
-                received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None
-            ))
-            db.commit()
 
         return UnitRepository.get_unit(db, unit.id)
 
@@ -114,6 +101,23 @@ class UnitRepository:
         db.query(Transfer).filter(Transfer.unit_id == unit_id).delete()
         db.query(Unit).filter(Unit.id == unit_id).delete()
         db.commit()
+
+    @staticmethod
+    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
+        return (
+            db.query(Transfer)
+            .options(
+                selectinload(Transfer.dispatched_by),
+                selectinload(Transfer.received_by),
+                selectinload(Transfer.origin_location),
+                selectinload(Transfer.destination_location)
+            )
+            .filter(Transfer.unit_id == unit_id)
+            .order_by(Transfer.dispatched_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def get_stats(db: Session) -> dict:
@@ -139,20 +143,3 @@ class UnitRepository:
                 for loc in inventory_by_location
             ]
         }
-
-    @staticmethod
-    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
-        return (
-            db.query(Transfer)
-            .options(
-                selectinload(Transfer.dispatched_by),
-                selectinload(Transfer.received_by),
-                selectinload(Transfer.origin_location),
-                selectinload(Transfer.destination_location)
-            )
-            .filter(Transfer.unit_id == unit_id)
-            .order_by(Transfer.dispatched_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )

@@ -7,16 +7,24 @@ from  app.schemas.location import Location
 class UnitBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    engine_number: str = Field(..., min_length=1, max_length=100)
-    chassis_number: str = Field(..., min_length=1, max_length=100)
+    engine_number: Optional[str] = Field(None, max_length=100)
+    chassis_number: Optional[str] = Field(None, max_length=100)
     model: str = Field(..., min_length=1, max_length=100)
     brand: str = Field(..., min_length=1, max_length=100)
     color: str = Field(..., min_length=1, max_length=100)
-    current_location_id: Optional[int] = Field(None, gt=0)
+    current_location_id: int = Field(..., gt=0)
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: Optional[str] = None
 
-    @field_validator("engine_number", "chassis_number", "model", "brand", "color", mode="before")
+    @field_validator("engine_number", "chassis_number", mode="before")
+    @classmethod
+    def normalize_optional_identifier(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        value = str(v).strip().upper()
+        return value or None
+
+    @field_validator("model", "brand", "color", mode="before")
     @classmethod
     def strip_and_upper(cls, v: str) -> str:
         return v.strip().upper()
@@ -27,8 +35,8 @@ class UnitCreate(UnitBase):
 class UnitUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    engine_number: Optional[str] = Field(None, min_length=1, max_length=100)
-    chassis_number: Optional[str] = Field(None, min_length=1, max_length=100)
+    engine_number: Optional[str] = Field(None, max_length=100)
+    chassis_number: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, min_length=1, max_length=100)
     brand: Optional[str] = Field(None, min_length=1, max_length=100)
     color: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -37,7 +45,15 @@ class UnitUpdate(BaseModel):
     sold_date: Optional[datetime] = None
     notes: Optional[str] = None
 
-    @field_validator("engine_number", "chassis_number", "model", "brand", "color", mode="before")
+    @field_validator("engine_number", "chassis_number", mode="before")
+    @classmethod
+    def normalize_optional_identifier_update(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        value = str(v).strip().upper()
+        return value or None
+
+    @field_validator("model", "brand", "color", mode="before")
     @classmethod
     def strip_and_upper(cls, v: Optional[str]) -> Optional[str]:
         if v is None:

@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from datetime import datetime
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.models import Transfer, TransferStatus
 from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
@@ -62,3 +63,46 @@ class TransferRepository:
     @staticmethod
     def get_recent_transfers(db: Session, limit: int = 10) -> list[Transfer]:
         return db.query(Transfer).order_by(Transfer.dispatched_at.desc()).limit(limit).all()
+
+    @staticmethod
+    def create_unit_transfer(
+        db: Session,
+        unit_id: int,
+        dispatched_by_id: int,
+        origin_location_id: int | None = None,
+        destination_location_id: int | None = None,
+        status: TransferStatus = TransferStatus.PENDING,
+        dispatched_at: datetime | None = None,
+        received_at: datetime | None = None,
+    ) -> Transfer:
+        db_transfer = Transfer(
+            unit_id=unit_id,
+            dispatched_by_id=dispatched_by_id,
+            origin_location_id=origin_location_id,
+            destination_location_id=destination_location_id,
+            status=status,
+            dispatched_at=dispatched_at,
+            received_at=received_at,
+        )
+        db.add(db_transfer)
+        db.commit()
+        db.refresh(db_transfer)
+        return db_transfer
+
+    @staticmethod
+    def get_active_transfer_by_unit(db: Session, unit_id: int) -> Transfer | None:
+        return (
+            db.query(Transfer)
+            .options(
+                selectinload(Transfer.dispatched_by),
+                selectinload(Transfer.received_by),
+                selectinload(Transfer.origin_location),
+                selectinload(Transfer.destination_location),
+            )
+            .filter(
+                Transfer.unit_id == unit_id,
+                Transfer.status.in_([TransferStatus.PENDING, TransferStatus.IN_TRANSIT]),
+            )
+            .order_by(Transfer.dispatched_at.desc())
+            .first()
+        )

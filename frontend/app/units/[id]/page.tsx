@@ -210,7 +210,7 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/units/${unitId}/move`, {
+      const res = await fetch(`${API_URL}/api/v1/units/${unitId}/transfer`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
