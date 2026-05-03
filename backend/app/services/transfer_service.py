@@ -30,6 +30,13 @@ class TransferService:
         payload = transfer_data.model_copy(deep=True)
         if payload.status == TransferStatus.RECEIVED and payload.received_at is None:
             payload.received_at = datetime.now(UTC)
+
+        # Update unit status based on transfer
+        unit = UnitRepository.get_unit(db, transfer_data.unit_id)
+        if unit and transfer_data.destination_location_id:
+            unit.status = UnitStatus.IN_TRANSIT
+            db.commit()
+
         return TransferRepository.create_transfer(db, payload)
 
     @staticmethod
@@ -135,6 +142,16 @@ class TransferService:
         update_payload = transfer_update.model_copy(deep=True)
         if update_payload.status == TransferStatus.RECEIVED and update_payload.received_at is None:
             update_payload.received_at = datetime.now(UTC)
+
+        # When marking as RECEIVED, update unit status and location
+        if update_payload.status == TransferStatus.RECEIVED:
+            unit = UnitRepository.get_unit(db, db_transfer.unit_id)
+            if unit:
+                unit.status = UnitStatus.AVAILABLE
+                dest = merged_data.destination_location_id
+                if dest:
+                    unit.current_location_id = dest
+                db.commit()
 
         return TransferRepository.update_transfer(db, db_transfer, update_payload)
 
