@@ -68,13 +68,14 @@ export default function NewUnitPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          engine_number: formData.engine_number,
-          chassis_number: formData.chassis_number,
+          engine_number: formData.engine_number || null,
+          chassis_number: formData.chassis_number || null,
           model: formData.model,
           brand: formData.brand,
           color: formData.color,
           current_location_id: formData.current_location_id ? parseInt(formData.current_location_id) : null,
           notes: formData.notes || null,
+          status: (formData.engine_number && formData.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
         }),
       });
 
@@ -229,7 +230,7 @@ export default function NewUnitPage() {
                     Cancelar
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading || !formData.engine_number || !formData.chassis_number || !formData.model || !formData.brand || !formData.color}>
+                <Button type="submit" disabled={loading || !formData.model || !formData.brand || !formData.color || !formData.current_location_id}>
                   {loading ? (
                     <>Guardando...</>
                   ) : (

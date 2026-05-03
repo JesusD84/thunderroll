@@ -191,7 +191,7 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
                 brand=brand_name,
                 color=color_name,
                 current_location_id=default_location.id,
-                status=UnitStatus.IN_STOCK
+                status=UnitStatus.AVAILABLE
             )
             db.add(unit)
             db.commit()

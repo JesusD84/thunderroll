@@ -20,8 +20,8 @@ interface Unit {
   brand: string;
   model: string;
   color: string;
-  engine_number: string;
-  chassis_number: string;
+  engine_number: string | null;
+  chassis_number: string | null;
   status: string;
   current_location_id: number;
   current_location: { name: string; id: number } | null;
@@ -34,42 +34,34 @@ interface Unit {
 interface Movement {
   id: number;
   unit_id: number;
-  movement_type: string;
-  from_location_id: number | null;
-  to_location_id: number | null;
-  quantity: number;
-  notes: string | null;
-  movement_date: string;
-  created_at: string;
-  user: {
-    email: string;
-    first_name: string;
-    last_name: string;
-  } | null;
-  from_location: { name: string } | null;
-  to_location: { name: string } | null;
+  dispatched_by_id: number | null;
+  received_by_id: number | null;
+  origin_location_id: number | null;
+  destination_location_id: number | null;
+  status: string;
+  dispatched_at: string | null;
+  received_at: string | null;
 }
 
 const statusColors: Record<string, string> = {
-  'available': 'bg-green-100 text-green-800',
-  'sold': 'bg-gray-100 text-gray-800',
-  'in_transit': 'bg-blue-100 text-blue-800',
-  'reserved': 'bg-yellow-100 text-yellow-800',
+  'AVAILABLE': 'bg-green-100 text-green-800',
+  'WAREHOUSE_UNIDENTIFIED': 'bg-yellow-100 text-yellow-800',
+  'SOLD': 'bg-gray-100 text-gray-800',
+  'IN_TRANSIT': 'bg-blue-100 text-blue-800',
 };
 
 const statusLabels: Record<string, string> = {
-  'available': 'Disponible',
-  'sold': 'Vendida',
-  'in_transit': 'En Tránsito',
-  'reserved': 'Reservada',
+  'AVAILABLE': 'Disponible',
+  'WAREHOUSE_UNIDENTIFIED': 'Sin Identificar',
+  'SOLD': 'Vendida',
+  'IN_TRANSIT': 'En Tránsito',
 };
 
-const movementTypeLabels: Record<string, string> = {
-  'import': 'Importación',
-  'sale': 'Venta',
-  'transfer': 'Transferencia',
-  'return': 'Devolución',
-  'adjustment': 'Ajuste',
+const transferStatusLabels: Record<string, string> = {
+  'PENDING': 'Pendiente',
+  'IN_TRANSIT': 'En Tránsito',
+  'RECEIVED': 'Recibida',
+  'CANCELLED': 'Cancelada',
 };
 
 const colorMap: Record<string, string> = {
@@ -134,15 +126,17 @@ export default function UnitDetailPage() {
   const refreshData = async (token: string) => {
     const [uRes, mRes] = await Promise.all([
       fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-      fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
     ]);
     if (uRes.ok) setUnit(await uRes.json());
     if (mRes.ok) setMovements(await mRes.json());
     // Check for active transfer
-    const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+    try {
+      const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+    } catch { setActiveTransferId(null); }
   };
 
   const handleTransfer = async (toLocationId: number, notes?: string) => {
@@ -155,10 +149,9 @@ export default function UnitDetailPage() {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          unit_ids: [unit.id],
-          from_location_id: unit.current_location_id,
-          to_location_id: toLocationId,
-          notes: notes || null,
+          unit_id: unit.id,
+          origin_location_id: unit.current_location_id,
+          destination_location_id: toLocationId,
         }),
       });
       if (res.ok) {
@@ -185,14 +178,14 @@ export default function UnitDetailPage() {
         res = await fetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'completed' }),
+          body: JSON.stringify({ status: 'RECEIVED' }),
         });
       } else {
         // Legacy: no Transfer record, just update unit status
         res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'available' }),
+          body: JSON.stringify({ status: 'AVAILABLE' }),
         });
       }
       if (res.ok) {
@@ -241,7 +234,7 @@ export default function UnitDetailPage() {
           fetch(`${API_URL}/api/v1/units/${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, {
+          fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
@@ -262,7 +255,7 @@ export default function UnitDetailPage() {
         if (locsRes.ok) setLocations(await locsRes.json());
 
         // Check for active transfer if unit is in transit
-        if (unitData.status === 'in_transit') {
+        if (unitData.status === 'IN_TRANSIT') {
           const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -309,20 +302,21 @@ export default function UnitDetailPage() {
     });
   };
 
+  const getLocName = (id: number | null) => {
+    if (!id) return '-';
+    return locations.find(l => l.id === id)?.name || `Loc #${id}`;
+  };
+
   const formatMovementDesc = (m: Movement) => {
-    const type = movementTypeLabels[m.movement_type] || m.movement_type;
-    if (m.movement_type === 'import') {
-      return m.to_location ? `Importada a ${m.to_location.name}` : 'Importada al sistema';
-    }
-    if (m.movement_type === 'sale') {
-      return 'Unidad vendida';
-    }
-    if (m.movement_type === 'transfer') {
-      const from = m.from_location?.name || '?';
-      const to = m.to_location?.name || '?';
+    const from = getLocName(m.origin_location_id);
+    const to = getLocName(m.destination_location_id);
+    if (m.origin_location_id && m.destination_location_id) {
       return `${from} → ${to}`;
     }
-    return type;
+    if (m.destination_location_id) {
+      return `Recibida en ${to}`;
+    }
+    return 'Transferencia';
   };
 
   return (
@@ -362,7 +356,7 @@ export default function UnitDetailPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
-              {unit.status === 'in_transit' ? (
+              {unit.status === 'IN_TRANSIT' ? (
                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmArrival}
                   disabled={actionLoading}>
                   <Truck className="mr-2 h-4 w-4" />
@@ -371,12 +365,12 @@ export default function UnitDetailPage() {
               ) : (
                 <>
                   <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
-                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
                     <Truck className="mr-2 h-4 w-4" />
                     Transferir
                   </Button>
                   <Button onClick={() => { setShowSell(true); setActionError(null); }}
-                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
                     <DollarSign className="mr-2 h-4 w-4" />
                     Vender
                   </Button>
@@ -393,7 +387,7 @@ export default function UnitDetailPage() {
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
               <CardTitle>Transferir Unidad</CardTitle>
-              <CardDescription>Mover unidad {unit.engine_number} a otra ubicación</CardDescription>
+              <CardDescription>Mover unidad {unit.engine_number || `#${unit.id}`} a otra ubicación</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 bg-gray-50 rounded-lg text-sm">
@@ -437,7 +431,7 @@ export default function UnitDetailPage() {
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
               <CardTitle>Vender Unidad</CardTitle>
-              <CardDescription>Registrar venta de {unit.engine_number}</CardDescription>
+              <CardDescription>Registrar venta de {unit.engine_number || `#${unit.id}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
@@ -487,9 +481,10 @@ export default function UnitDetailPage() {
                       brand: editForm.brand || undefined,
                       model: editForm.model || undefined,
                       color: editForm.color || undefined,
-                      engine_number: editForm.engine_number || undefined,
-                      chassis_number: editForm.chassis_number || undefined,
+                      engine_number: editForm.engine_number || null,
+                      chassis_number: editForm.chassis_number || null,
                       notes: editForm.notes || null,
+                      status: (editForm.engine_number && editForm.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
                     }),
                   });
                   if (res.ok) {
@@ -655,7 +650,7 @@ export default function UnitDetailPage() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">
-                        {movementTypeLabels[movement.movement_type] || movement.movement_type}
+                        Transferencia — {transferStatusLabels[movement.status] || movement.status}
                       </div>
                       
                       <div className="text-sm text-gray-600 mt-1">
@@ -663,15 +658,8 @@ export default function UnitDetailPage() {
                       </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
-                        {formatDateTime(movement.movement_date || movement.created_at)}
-                        {movement.user && ` • ${movement.user.first_name} ${movement.user.last_name}`}
+                        {formatDateTime(movement.dispatched_at || movement.received_at || '')}
                       </div>
-                      
-                      {movement.notes && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {movement.notes}
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}

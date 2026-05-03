@@ -111,7 +111,7 @@ def create_demo_data():
                 brand=yamaha,
                 color=negro,
                 current_location_id=warehouse.id,
-                status=UnitStatus.IN_STOCK
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="YBR125002",
@@ -120,7 +120,7 @@ def create_demo_data():
                 brand=kawasaki,
                 color=rojo,
                 current_location_id=warehouse.id,
-                status=UnitStatus.IN_STOCK
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="CB125F001",
@@ -129,7 +129,7 @@ def create_demo_data():
                 brand=kawasaki,
                 color=azul,
                 current_location_id=warehouse.id,
-                status=UnitStatus.IN_STOCK
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number="CB125F002",
@@ -148,7 +148,7 @@ def create_demo_data():
                 brand=suzuki,
                 color=negro,
                 current_location_id=warehouse.id,
-                status=UnitStatus.IN_STOCK
+                status=UnitStatus.AVAILABLE
             ),
             Unit(
                 engine_number=None,
