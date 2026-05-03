@@ -20,8 +20,8 @@ interface Unit {
   brand: string;
   model: string;
   color: string;
-  engine_number: string;
-  chassis_number: string;
+  engine_number: string | null;
+  chassis_number: string | null;
   status: string;
   current_location_id: number;
   current_location: { name: string; id: number } | null;
@@ -393,7 +393,7 @@ export default function UnitDetailPage() {
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
               <CardTitle>Transferir Unidad</CardTitle>
-              <CardDescription>Mover unidad {unit.engine_number} a otra ubicación</CardDescription>
+              <CardDescription>Mover unidad {unit.engine_number || `#${unit.id}`} a otra ubicación</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 bg-gray-50 rounded-lg text-sm">
@@ -437,7 +437,7 @@ export default function UnitDetailPage() {
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
               <CardTitle>Vender Unidad</CardTitle>
-              <CardDescription>Registrar venta de {unit.engine_number}</CardDescription>
+              <CardDescription>Registrar venta de {unit.engine_number || `#${unit.id}`}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-3 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
@@ -487,8 +487,8 @@ export default function UnitDetailPage() {
                       brand: editForm.brand || undefined,
                       model: editForm.model || undefined,
                       color: editForm.color || undefined,
-                      engine_number: editForm.engine_number || undefined,
-                      chassis_number: editForm.chassis_number || undefined,
+                      engine_number: editForm.engine_number || null,
+                      chassis_number: editForm.chassis_number || null,
                       notes: editForm.notes || null,
                     }),
                   });

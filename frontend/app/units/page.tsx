@@ -20,8 +20,8 @@ interface Unit {
   brand: string;
   model: string;
   color: string;
-  engine_number: string;
-  chassis_number: string;
+  engine_number: string | null;
+  chassis_number: string | null;
   status: string;
   current_location_id: number;
   current_location: { name: string; id: number } | null;
