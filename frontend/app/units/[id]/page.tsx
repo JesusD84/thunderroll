@@ -34,20 +34,13 @@ interface Unit {
 interface Movement {
   id: number;
   unit_id: number;
-  movement_type: string;
-  from_location_id: number | null;
-  to_location_id: number | null;
-  quantity: number;
-  notes: string | null;
-  movement_date: string;
-  created_at: string;
-  user: {
-    email: string;
-    first_name: string;
-    last_name: string;
-  } | null;
-  from_location: { name: string } | null;
-  to_location: { name: string } | null;
+  dispatched_by_id: number | null;
+  received_by_id: number | null;
+  origin_location_id: number | null;
+  destination_location_id: number | null;
+  status: string;
+  dispatched_at: string | null;
+  received_at: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -64,12 +57,11 @@ const statusLabels: Record<string, string> = {
   'IN_TRANSIT': 'En Tránsito',
 };
 
-const movementTypeLabels: Record<string, string> = {
-  'import': 'Importación',
-  'sale': 'Venta',
-  'transfer': 'Transferencia',
-  'return': 'Devolución',
-  'adjustment': 'Ajuste',
+const transferStatusLabels: Record<string, string> = {
+  'PENDING': 'Pendiente',
+  'IN_TRANSIT': 'En Tránsito',
+  'RECEIVED': 'Recibida',
+  'CANCELLED': 'Cancelada',
 };
 
 const colorMap: Record<string, string> = {
@@ -134,7 +126,7 @@ export default function UnitDetailPage() {
   const refreshData = async (token: string) => {
     const [uRes, mRes] = await Promise.all([
       fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-      fetch(`${API_URL}/api/v1/units/${unitId}/movements`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
     ]);
     if (uRes.ok) setUnit(await uRes.json());
     if (mRes.ok) setMovements(await mRes.json());
@@ -155,10 +147,9 @@ export default function UnitDetailPage() {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          unit_ids: [unit.id],
-          from_location_id: unit.current_location_id,
-          to_location_id: toLocationId,
-          notes: notes || null,
+          unit_id: unit.id,
+          origin_location_id: unit.current_location_id,
+          destination_location_id: toLocationId,
         }),
       });
       if (res.ok) {
@@ -241,7 +232,7 @@ export default function UnitDetailPage() {
           fetch(`${API_URL}/api/v1/units/${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`${API_URL}/api/v1/units/${unitId}/movements`, {
+          fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
@@ -309,20 +300,21 @@ export default function UnitDetailPage() {
     });
   };
 
+  const getLocName = (id: number | null) => {
+    if (!id) return '-';
+    return locations.find(l => l.id === id)?.name || `Loc #${id}`;
+  };
+
   const formatMovementDesc = (m: Movement) => {
-    const type = movementTypeLabels[m.movement_type] || m.movement_type;
-    if (m.movement_type === 'import') {
-      return m.to_location ? `Importada a ${m.to_location.name}` : 'Importada al sistema';
-    }
-    if (m.movement_type === 'sale') {
-      return 'Unidad vendida';
-    }
-    if (m.movement_type === 'transfer') {
-      const from = m.from_location?.name || '?';
-      const to = m.to_location?.name || '?';
+    const from = getLocName(m.origin_location_id);
+    const to = getLocName(m.destination_location_id);
+    if (m.origin_location_id && m.destination_location_id) {
       return `${from} → ${to}`;
     }
-    return type;
+    if (m.destination_location_id) {
+      return `Recibida en ${to}`;
+    }
+    return 'Transferencia';
   };
 
   return (
@@ -655,7 +647,7 @@ export default function UnitDetailPage() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">
-                        {movementTypeLabels[movement.movement_type] || movement.movement_type}
+                        Transferencia — {transferStatusLabels[movement.status] || movement.status}
                       </div>
                       
                       <div className="text-sm text-gray-600 mt-1">
@@ -663,15 +655,8 @@ export default function UnitDetailPage() {
                       </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
-                        {formatDateTime(movement.movement_date || movement.created_at)}
-                        {movement.user && ` • ${movement.user.first_name} ${movement.user.last_name}`}
+                        {formatDateTime(movement.dispatched_at || movement.received_at || '')}
                       </div>
-                      
-                      {movement.notes && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          {movement.notes}
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}

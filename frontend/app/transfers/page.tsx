@@ -28,33 +28,16 @@ interface AvailableUnit {
   color: string;
 }
 
-interface TransferUnit {
-  id: number;
-  unit_id: number;
-  unit: {
-    id: number;
-    brand: string;
-    model: string;
-    engine_number: string;
-    color: string;
-  } | null;
-}
-
 interface Transfer {
   id: number;
-  from_location_id: number;
-  to_location_id: number;
-  user_id: number;
+  unit_id: number;
+  dispatched_by_id: number | null;
+  received_by_id: number | null;
+  origin_location_id: number | null;
+  destination_location_id: number | null;
   status: string;
-  total_units: number;
-  notes: string | null;
-  transfer_date: string | null;
-  completed_date: string | null;
-  created_at: string;
-  from_location: { name: string } | null;
-  to_location: { name: string } | null;
-  user: { email: string; first_name: string; last_name: string } | null;
-  transfer_units: TransferUnit[] | null;
+  dispatched_at: string | null;
+  received_at: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -144,10 +127,9 @@ export default function TransfersPage() {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          unit_ids: [parseInt(selectedUnitId)],
-          from_location_id: parseInt(fromLocationId),
-          to_location_id: parseInt(toLocationId),
-          notes: transferNotes || null,
+          unit_id: parseInt(selectedUnitId),
+          origin_location_id: parseInt(fromLocationId),
+          destination_location_id: parseInt(toLocationId),
         }),
       });
       if (res.ok) {
@@ -201,18 +183,9 @@ export default function TransfersPage() {
     });
   };
 
-  const getUnitLabel = (transfer: Transfer) => {
-    const units = transfer.transfer_units;
-    if (!units || units.length === 0) return '-';
-    const u = units[0].unit;
-    if (!u) return `ID: ${units[0].unit_id}`;
-    return `${u.brand} ${u.model}`;
-  };
-
-  const getUnitId = (transfer: Transfer): number | null => {
-    const units = transfer.transfer_units;
-    if (!units || units.length === 0) return null;
-    return units[0].unit_id;
+  const getLocationName = (id: number | null) => {
+    if (!id) return '-';
+    return locations.find(l => l.id === id)?.name || `Loc #${id}`;
   };
 
   const filteredTransfers = statusFilter === 'all'
@@ -355,72 +328,61 @@ export default function TransfersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransfers.map((transfer) => {
-                    const unitId = getUnitId(transfer);
-                    return (
-                      <TableRow key={transfer.id}>
-                        <TableCell className="font-mono text-sm">{transfer.id}</TableCell>
-                        <TableCell>
-                          {unitId ? (
-                            <Link href={`/units/${unitId}`} className="text-blue-600 hover:underline text-sm font-medium">
-                              {getUnitLabel(transfer)}
-                            </Link>
-                          ) : (
-                            <span className="text-sm text-gray-500">-</span>
+                  {filteredTransfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell className="font-mono text-sm">{transfer.id}</TableCell>
+                      <TableCell>
+                        <Link href={`/units/${transfer.unit_id}`} className="text-blue-600 hover:underline text-sm font-medium">
+                          Unidad #{transfer.unit_id}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm">{getLocationName(transfer.origin_location_id)}</span>
+                          <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm">{getLocationName(transfer.destination_location_id)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[transfer.status] || 'bg-gray-100 text-gray-800'}>
+                          {statusLabels[transfer.status] || transfer.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatDate(transfer.dispatched_at)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatDate(transfer.received_at)}
+                      </TableCell>
+                      <TableCell className="text-sm">-</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {(transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT') && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => handleConfirmArrival(transfer.id)}
+                              disabled={actionLoading === transfer.id}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              {actionLoading === transfer.id ? 'Confirmando...' : 'Confirmar Llegada'}
+                            </Button>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm">{transfer.from_location?.name || '-'}</span>
-                            <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm">{transfer.to_location?.name || '-'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={statusColors[transfer.status] || 'bg-gray-100 text-gray-800'}>
-                            {statusLabels[transfer.status] || transfer.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatDate(transfer.transfer_date || transfer.created_at)}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatDate(transfer.completed_date)}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {transfer.user ? `${transfer.user.first_name} ${transfer.user.last_name}` : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {(transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT') && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => handleConfirmArrival(transfer.id)}
-                                disabled={actionLoading === transfer.id}
-                              >
-                                <CheckCircle className="mr-1 h-4 w-4" />
-                                {actionLoading === transfer.id ? 'Confirmando...' : 'Confirmar Llegada'}
-                              </Button>
-                            )}
-                            {transfer.status === 'RECEIVED' && (
-                              <Badge variant="outline" className="text-green-700 border-green-300">
-                                <CheckCircle className="mr-1 h-3 w-3" />
-                                Completada
-                              </Badge>
-                            )}
-                            {unitId && (
-                              <Link href={`/units/${unitId}`}>
-                                <Button size="sm" variant="ghost">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </Link>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                          {transfer.status === 'RECEIVED' && (
+                            <Badge variant="outline" className="text-green-700 border-green-300">
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Completada
+                            </Badge>
+                          )}
+                          <Link href={`/units/${transfer.unit_id}`}>
+                            <Button size="sm" variant="ghost">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                   {filteredTransfers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-8">
