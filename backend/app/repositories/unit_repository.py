@@ -122,7 +122,7 @@ class UnitRepository:
     @staticmethod
     def get_stats(db: Session) -> dict:
         total_units = db.query(Unit).count()
-        in_stock_units = db.query(Unit).filter(Unit.status == UnitStatus.IN_STOCK).count()
+        in_stock_units = db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
         sold_units = db.query(Unit).filter(Unit.status == UnitStatus.SOLD).count()
         in_transit_units = db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
 

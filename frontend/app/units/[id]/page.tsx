@@ -51,17 +51,17 @@ interface Movement {
 }
 
 const statusColors: Record<string, string> = {
-  'available': 'bg-green-100 text-green-800',
-  'sold': 'bg-gray-100 text-gray-800',
-  'in_transit': 'bg-blue-100 text-blue-800',
-  'reserved': 'bg-yellow-100 text-yellow-800',
+  'AVAILABLE': 'bg-green-100 text-green-800',
+  'WAREHOUSE_UNIDENTIFIED': 'bg-yellow-100 text-yellow-800',
+  'SOLD': 'bg-gray-100 text-gray-800',
+  'IN_TRANSIT': 'bg-blue-100 text-blue-800',
 };
 
 const statusLabels: Record<string, string> = {
-  'available': 'Disponible',
-  'sold': 'Vendida',
-  'in_transit': 'En Tránsito',
-  'reserved': 'Reservada',
+  'AVAILABLE': 'Disponible',
+  'WAREHOUSE_UNIDENTIFIED': 'Sin Identificar',
+  'SOLD': 'Vendida',
+  'IN_TRANSIT': 'En Tránsito',
 };
 
 const movementTypeLabels: Record<string, string> = {
@@ -185,14 +185,14 @@ export default function UnitDetailPage() {
         res = await fetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'completed' }),
+          body: JSON.stringify({ status: 'RECEIVED' }),
         });
       } else {
         // Legacy: no Transfer record, just update unit status
         res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'available' }),
+          body: JSON.stringify({ status: 'AVAILABLE' }),
         });
       }
       if (res.ok) {
@@ -262,7 +262,7 @@ export default function UnitDetailPage() {
         if (locsRes.ok) setLocations(await locsRes.json());
 
         // Check for active transfer if unit is in transit
-        if (unitData.status === 'in_transit') {
+        if (unitData.status === 'IN_TRANSIT') {
           const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -362,7 +362,7 @@ export default function UnitDetailPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </Button>
-              {unit.status === 'in_transit' ? (
+              {unit.status === 'IN_TRANSIT' ? (
                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmArrival}
                   disabled={actionLoading}>
                   <Truck className="mr-2 h-4 w-4" />
@@ -371,12 +371,12 @@ export default function UnitDetailPage() {
               ) : (
                 <>
                   <Button variant="outline" onClick={() => { setShowTransfer(true); setActionError(null); }}
-                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
                     <Truck className="mr-2 h-4 w-4" />
                     Transferir
                   </Button>
                   <Button onClick={() => { setShowSell(true); setActionError(null); }}
-                    disabled={unit.status.toUpperCase() === 'SOLD' || unit.status === 'in_transit'}>
+                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
                     <DollarSign className="mr-2 h-4 w-4" />
                     Vender
                   </Button>

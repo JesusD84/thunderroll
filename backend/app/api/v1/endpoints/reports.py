@@ -23,7 +23,7 @@ def get_dashboard_stats(
     
     # Basic unit counts
     total_units = db.query(models.Unit).count()
-    in_stock_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_STOCK).count()
+    in_stock_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.AVAILABLE).count()
     sold_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.SOLD).count()
     in_transit_units = db.query(models.Unit).filter(models.Unit.status == UnitStatus.IN_TRANSIT).count()
     
@@ -77,7 +77,7 @@ def get_dashboard_stats(
     return {
         "units": {
             "total": total_units,
-            "in_stock": in_stock_units,
+            "available": in_stock_units,
             "sold": sold_units,
             "in_transit": in_transit_units,
         },

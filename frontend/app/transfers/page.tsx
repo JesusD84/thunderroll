@@ -58,17 +58,17 @@ interface Transfer {
 }
 
 const statusColors: Record<string, string> = {
-  'pending': 'bg-yellow-100 text-yellow-800',
-  'in_transit': 'bg-blue-100 text-blue-800',
-  'completed': 'bg-green-100 text-green-800',
-  'cancelled': 'bg-red-100 text-red-800',
+  'PENDING': 'bg-yellow-100 text-yellow-800',
+  'IN_TRANSIT': 'bg-blue-100 text-blue-800',
+  'RECEIVED': 'bg-green-100 text-green-800',
+  'CANCELLED': 'bg-red-100 text-red-800',
 };
 
 const statusLabels: Record<string, string> = {
-  'pending': 'Pendiente',
-  'in_transit': 'En Tránsito',
-  'completed': 'Completada',
-  'cancelled': 'Cancelada',
+  'PENDING': 'Pendiente',
+  'IN_TRANSIT': 'En Tránsito',
+  'RECEIVED': 'Completada',
+  'CANCELLED': 'Cancelada',
 };
 
 export default function TransfersPage() {
@@ -121,7 +121,7 @@ export default function TransfersPage() {
       setSelectedUnitId('');
       try {
         const res = await fetch(
-          `${API_URL}/api/v1/units/?status=available&location_id=${fromLocationId}`,
+          `${API_URL}/api/v1/units/?status=AVAILABLE&location_id=${fromLocationId}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
         if (res.ok) setAvailableUnits(await res.json());
@@ -177,7 +177,7 @@ export default function TransfersPage() {
       const res = await fetch(`${API_URL}/api/v1/transfers/${transferId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
+        body: JSON.stringify({ status: 'RECEIVED' }),
       });
 
       if (res.ok) {
@@ -219,7 +219,7 @@ export default function TransfersPage() {
     ? transfers
     : transfers.filter(t => t.status === statusFilter);
 
-  const pendingCount = transfers.filter(t => t.status === 'pending' || t.status === 'in_transit').length;
+  const pendingCount = transfers.filter(t => t.status === 'PENDING' || t.status === 'IN_TRANSIT').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -329,10 +329,10 @@ export default function TransfersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="in_transit">En Tránsito</SelectItem>
-                  <SelectItem value="completed">Completada</SelectItem>
-                  <SelectItem value="cancelled">Cancelada</SelectItem>
+                  <SelectItem value="PENDING">Pendiente</SelectItem>
+                  <SelectItem value="IN_TRANSIT">En Tránsito</SelectItem>
+                  <SelectItem value="RECEIVED">Completada</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -392,7 +392,7 @@ export default function TransfersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            {(transfer.status === 'pending' || transfer.status === 'in_transit') && (
+                            {(transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT') && (
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700"
@@ -403,7 +403,7 @@ export default function TransfersPage() {
                                 {actionLoading === transfer.id ? 'Confirmando...' : 'Confirmar Llegada'}
                               </Button>
                             )}
-                            {transfer.status === 'completed' && (
+                            {transfer.status === 'RECEIVED' && (
                               <Badge variant="outline" className="text-green-700 border-green-300">
                                 <CheckCircle className="mr-1 h-3 w-3" />
                                 Completada

@@ -31,14 +31,16 @@ interface DashboardData {
   };
   locations: { total: number };
   transfers: { active: number };
-  recent_movements: {
+  recent_transfers: {
     id: number;
     unit_engine: string | null;
-    movement_type: string;
-    from_location: string | null;
-    to_location: string | null;
-    user: string | null;
-    date: string;
+    origin_location: string | null;
+    destination_location: string | null;
+    dispatched_by: string | null;
+    received_by: string | null;
+    status: string;
+    dispatched_at: string | null;
+    received_at: string | null;
   }[];
   inventory_by_location: { location: string; count: number }[];
   inventory_by_brand: { brand: string; count: number }[];
@@ -54,21 +56,6 @@ interface DashboardData {
   }[];
 }
 
-const movementTypeLabels: Record<string, string> = {
-  'import': 'Importación',
-  'sale': 'Venta',
-  'transfer': 'Transferencia',
-  'return': 'Devolución',
-  'adjustment': 'Ajuste',
-};
-
-const movementTypeIcons: Record<string, string> = {
-  'import': 'IMPORT',
-  'sale': 'SALE',
-  'transfer': 'TRANSFER',
-  'return': 'TRANSFER',
-  'adjustment': 'IDENTIFICATION',
-};
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -120,21 +107,17 @@ export default function DashboardPage() {
   const units = dashboardData?.units;
   const locationData = dashboardData?.inventory_by_location || [];
   const brandData = dashboardData?.inventory_by_brand || [];
-  const movements = dashboardData?.recent_movements || [];
+  const recentTransfers = dashboardData?.recent_transfers || [];
 
-  const formatMovementDescription = (m: DashboardData['recent_movements'][0]) => {
-    const engine = m.unit_engine || 'Unidad';
-    const type = movementTypeLabels[m.movement_type] || m.movement_type;
-    if (m.movement_type === 'transfer' && m.from_location && m.to_location) {
-      return `${engine} transferida de ${m.from_location} a ${m.to_location}`;
+  const formatTransferDescription = (t: DashboardData['recent_transfers'][0]) => {
+    const engine = t.unit_engine || 'Unidad';
+    if (t.origin_location && t.destination_location) {
+      return `${engine}: ${t.origin_location} → ${t.destination_location}`;
     }
-    if (m.movement_type === 'sale') {
-      return `${engine} vendida${m.from_location ? ` en ${m.from_location}` : ''}`;
+    if (t.destination_location) {
+      return `${engine} recibida en ${t.destination_location}`;
     }
-    if (m.movement_type === 'import') {
-      return `${engine} importada${m.to_location ? ` a ${m.to_location}` : ''}`;
-    }
-    return `${type}: ${engine}`;
+    return `Transferencia: ${engine}`;
   };
 
   const formatTimeAgo = (dateStr: string) => {
@@ -292,7 +275,7 @@ export default function DashboardPage() {
                       <div className="font-medium text-blue-900">Unidades en Tránsito</div>
                       <div className="text-sm text-blue-700">{units?.in_transit} unidades en camino</div>
                     </div>
-                    <Link href="/units?status=in_transit">
+                    <Link href="/units?status=IN_TRANSIT">
                       <Button size="sm" variant="outline">Ver</Button>
                     </Link>
                   </div>
@@ -330,29 +313,23 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {movements.map((m) => {
-                  const iconType = movementTypeIcons[m.movement_type] || 'IMPORT';
-                  return (
-                    <div key={m.id} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0">
-                        {iconType === 'SALE' && <DollarSign className="h-5 w-5 text-green-600" />}
-                        {iconType === 'TRANSFER' && <Truck className="h-5 w-5 text-blue-600" />}
-                        {iconType === 'IDENTIFICATION' && <Wrench className="h-5 w-5 text-purple-600" />}
-                        {iconType === 'IMPORT' && <Package className="h-5 w-5 text-orange-600" />}
+                {recentTransfers.map((t) => (
+                  <div key={t.id} className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <Truck className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900">
+                        {formatTransferDescription(t)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatMovementDescription(m)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatTimeAgo(m.date)} • {m.user || 'Sistema'}
-                        </div>
+                      <div className="text-xs text-gray-500">
+                        {formatTimeAgo(t.dispatched_at || t.received_at || '')} • {t.dispatched_by || 'Sistema'}
                       </div>
                     </div>
-                  );
-                })}
-                {movements.length === 0 && (
-                  <div className="text-sm text-gray-500">No hay movimientos recientes</div>
+                  </div>
+                ))}
+                {recentTransfers.length === 0 && (
+                  <div className="text-sm text-gray-500">No hay transferencias recientes</div>
                 )}
               </div>
             </CardContent>

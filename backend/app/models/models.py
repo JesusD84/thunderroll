@@ -12,10 +12,10 @@ class UserRole(str, enum.Enum):
     VIEWER = "viewer"
 
 class UnitStatus(str, enum.Enum):
-    WAREHOUSE_UNIDENTIFIED = "warehouse_unidentified"
-    IN_STOCK = "IN_STOCK"
-    SOLD = "sold"
-    IN_TRANSIT = "in_transit"
+    WAREHOUSE_UNIDENTIFIED = "WAREHOUSE_UNIDENTIFIED"
+    AVAILABLE = "AVAILABLE"
+    SOLD = "SOLD"
+    IN_TRANSIT = "IN_TRANSIT"
 
 class TransferStatus(str, enum.Enum):
     PENDING = "PENDING"
