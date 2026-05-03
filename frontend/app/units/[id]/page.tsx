@@ -484,6 +484,7 @@ export default function UnitDetailPage() {
                       engine_number: editForm.engine_number || null,
                       chassis_number: editForm.chassis_number || null,
                       notes: editForm.notes || null,
+                      status: (editForm.engine_number && editForm.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
                     }),
                   });
                   if (res.ok) {

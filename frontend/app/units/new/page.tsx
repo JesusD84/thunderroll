@@ -75,6 +75,7 @@ export default function NewUnitPage() {
           color: formData.color,
           current_location_id: formData.current_location_id ? parseInt(formData.current_location_id) : null,
           notes: formData.notes || null,
+          status: (formData.engine_number && formData.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
         }),
       });
 
