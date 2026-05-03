@@ -131,10 +131,12 @@ export default function UnitDetailPage() {
     if (uRes.ok) setUnit(await uRes.json());
     if (mRes.ok) setMovements(await mRes.json());
     // Check for active transfer
-    const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+    try {
+      const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+    } catch { setActiveTransferId(null); }
   };
 
   const handleTransfer = async (toLocationId: number, notes?: string) => {
