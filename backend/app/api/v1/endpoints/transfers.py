@@ -73,7 +73,7 @@ def get_unit_transfers(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     return TransferService.get_unit_transfers(db, unit_id, skip, limit)
 
@@ -82,6 +82,6 @@ def get_unit_transfers(
 def get_active_transfer(
     unit_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     return TransferService.get_active_transfer_by_unit(db, unit_id)
