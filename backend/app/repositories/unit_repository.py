@@ -103,23 +103,6 @@ class UnitRepository:
         db.commit()
 
     @staticmethod
-    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
-        return (
-            db.query(Transfer)
-            .options(
-                selectinload(Transfer.dispatched_by),
-                selectinload(Transfer.received_by),
-                selectinload(Transfer.origin_location),
-                selectinload(Transfer.destination_location)
-            )
-            .filter(Transfer.unit_id == unit_id)
-            .order_by(Transfer.dispatched_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
-
-    @staticmethod
     def get_stats(db: Session) -> dict:
         total_units = db.query(Unit).count()
         in_stock_units = db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()

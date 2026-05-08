@@ -62,16 +62,6 @@ def delete_unit(
 ):
     return UnitService.delete_unit(db, unit_id)
 
-@router.get("/{unit_id}/transfers", response_model=List[schemas.Transfer])
-def get_unit_transfers(
-    unit_id: int,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    return UnitService.get_unit_transfers(db, unit_id, skip, limit)
-
 @router.post("/{unit_id}/transfer")
 def transfer_unit(
     unit_id: int,
@@ -80,11 +70,3 @@ def transfer_unit(
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
     return UnitService.transfer_unit(db, unit_id, transfer, current_user.id)
-
-@router.get("/{unit_id}/active-transfer", response_model=TransferSchema)
-def get_active_transfer(
-    unit_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    return UnitService.get_active_transfer(db, unit_id)
