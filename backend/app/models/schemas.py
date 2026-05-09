@@ -161,30 +161,6 @@ class Transfer(TransferBase):
     class Config:
         from_attributes = True
 
-# Dashboard/Reports Schemas
-class DashboardStats(BaseModel):
-    total_units: int
-    in_stock_units: int
-    sold_units: int
-    in_transit_units: int
-    total_locations: int
-    recent_transfers: List[Transfer]
-    inventory_by_location: List[dict]
-    sales_by_month: List[dict]
-
-class InventoryReport(BaseModel):
-    units: List[Unit]
-    total_units: int
-    by_status: dict
-    by_location: dict
-
-class TransferReport(BaseModel):
-    transfers: List[Transfer]
-    total_transfers: int
-    by_type: dict
-    by_month: dict
-    by_user: dict
-
 # File Upload Schema
 class FileUploadResponse(BaseModel):
     filename: str
