@@ -1,138 +1,125 @@
+"""Test configuration and fixtures.
 
-"""Test configuration and fixtures."""
+Uses the real app models (app.models.models) with an in-memory SQLite database.
+Sync engine matches production (app uses sync SQLAlchemy).
+"""
 
 import pytest
 import asyncio
-from typing import AsyncGenerator
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from typing import Generator
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from tests.db.base import Base
-from tests.core.deps import get_db
-from app.models.user import User, UserRole
-from app.models.location import Location, LocationType
-from tests.core.security import get_password_hash
+from app.database.database import Base, get_db
+from app.models.models import User, UserRole, Location, Unit, Transfer, Import, ImportError
+from app.models.models import UnitStatus, TransferStatus
+from app.core.security import Security
 
-# Test database URL (in-memory SQLite for tests)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
-# Create test engine
-test_engine = create_async_engine(
+test_engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
 
-# Create test session maker
-TestingSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=test_engine,
 )
 
 
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with TestingSessionLocal() as session:
-        yield session
+def override_get_db() -> Generator[Session, None, None]:
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-# Override the dependency
 app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(scope="session")
 def event_loop():
-    """Create an instance of the default event loop for the test session."""
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
 
 @pytest.fixture(scope="session")
-async def setup_database():
-    """Create test database tables."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def setup_database():
+    Base.metadata.create_all(bind=test_engine)
     yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture(scope="session")
+def db_session(setup_database) -> Generator[Session, None, None]:
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @pytest.fixture
-async def db_session(setup_database) -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session."""
-    async with TestingSessionLocal() as session:
-        yield session
-
-
-@pytest.fixture
-async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
-    """Create test HTTP client."""
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+async def client(db_session) -> AsyncClient:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
-@pytest.fixture
-async def test_locations(db_session: AsyncSession):
-    """Create test locations."""
+@pytest.fixture(scope="session")
+def test_locations(db_session: Session):
     locations = [
-        Location(name="Test Bodega", type=LocationType.BODEGA, active=True),
-        Location(name="Test Taller", type=LocationType.TALLER, active=True),
-        Location(name="Test Sucursal", type=LocationType.SUCURSAL, active=True),
+        Location(name="Test Bodega", address="Calle 1"),
+        Location(name="Test Taller", address="Calle 2"),
+        Location(name="Test Sucursal", address="Calle 3"),
     ]
-    
-    for location in locations:
-        db_session.add(location)
-    
-    await db_session.commit()
-    
-    for location in locations:
-        await db_session.refresh(location)
-    
+    for loc in locations:
+        db_session.add(loc)
+    db_session.commit()
+    for loc in locations:
+        db_session.refresh(loc)
     return locations
 
 
-@pytest.fixture
-async def test_users(db_session: AsyncSession):
-    """Create test users."""
+@pytest.fixture(scope="session")
+def test_users(db_session: Session):
     users = [
         User(
-            name="Test Admin",
+            first_name="Test",
+            last_name="Admin",
+            username="admin",
             email="admin@test.com",
-            password_hash=get_password_hash("testpass123"),
-            role=UserRole.ADMIN
+            hashed_password=Security.get_password_hash("testpass123"),
+            role=UserRole.ADMIN,
         ),
         User(
-            name="Test Inventario",
-            email="inventario@test.com", 
-            password_hash=get_password_hash("testpass123"),
-            role=UserRole.INVENTARIO
+            first_name="Test",
+            last_name="Inventario",
+            username="inventario",
+            email="inventario@test.com",
+            hashed_password=Security.get_password_hash("testpass123"),
+            role=UserRole.OPERATOR,
         ),
     ]
-    
     for user in users:
         db_session.add(user)
-    
-    await db_session.commit()
-    
+    db_session.commit()
     for user in users:
-        await db_session.refresh(user)
-    
+        db_session.refresh(user)
     return users
 
 
 @pytest.fixture
 async def auth_headers(client: AsyncClient, test_users):
-    """Get authentication headers for admin user."""
-    login_data = {
-        "email": "admin@test.com",
-        "password": "testpass123"
-    }
-    
-    response = await client.post("/api/v1/auth/login", json=login_data)
-    assert response.status_code == 200
-    
+    login_data = {"username": "admin", "password": "testpass123"}
+    response = await client.post("/api/v1/auth/login", data=login_data)
+    assert response.status_code == 200, f"Login failed: {response.text}"
     token_data = response.json()
     return {"Authorization": f"Bearer {token_data['access_token']}"}

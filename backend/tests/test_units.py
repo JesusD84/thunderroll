@@ -8,14 +8,11 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_get_units(client: AsyncClient, auth_headers, test_users, test_locations):
     """Test get units endpoint."""
-    response = await client.get("/api/v1/units", headers=auth_headers)
+    response = await client.get("/api/v1/units/", headers=auth_headers)
     assert response.status_code == 200
     
     data = response.json()
-    assert "items" in data
-    assert "total" in data
-    assert "page" in data
-    assert "size" in data
+    assert isinstance(data, list)
 
 
 @pytest.mark.asyncio
@@ -41,5 +38,5 @@ async def test_create_unit(client: AsyncClient, auth_headers, test_users, test_l
 @pytest.mark.asyncio
 async def test_get_units_unauthorized(client: AsyncClient):
     """Test get units without authentication."""
-    response = await client.get("/api/v1/units")
+    response = await client.get("/api/v1/units/")
     assert response.status_code == 401
