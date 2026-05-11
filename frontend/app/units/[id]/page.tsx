@@ -132,7 +132,7 @@ export default function UnitDetailPage() {
     if (mRes.ok) setMovements(await mRes.json());
     // Check for active transfer
     try {
-      const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+      const atRes = await fetch(`${API_URL}/api/v1/transfers/${unitId}/active-transfer`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
@@ -256,7 +256,7 @@ export default function UnitDetailPage() {
 
         // Check for active transfer if unit is in transit
         if (unitData.status === 'IN_TRANSIT') {
-          const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+          const atRes = await fetch(`${API_URL}/api/v1/transfers/${unitId}/active-transfer`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           if (atRes.ok) setActiveTransferId((await atRes.json()).id);

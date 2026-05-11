@@ -110,7 +110,7 @@ class TransferService:
         )
 
     @staticmethod
-    def get_active_transfer_for_unit(db: Session, unit_id: int) -> Transfer:
+    def get_active_transfer_by_unit(db: Session, unit_id: int) -> Transfer:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
@@ -120,6 +120,13 @@ class TransferService:
             raise HTTPException(status_code=404, detail="No active transfer found")
 
         return transfer
+
+    @staticmethod
+    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+        return TransferRepository.get_unit_transfers(db, unit_id, skip, limit)
 
     @staticmethod
     def update_transfer(db: Session, transfer_id: int, transfer_update: TransferUpdate) -> Transfer:

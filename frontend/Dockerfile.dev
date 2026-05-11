@@ -18,7 +18,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 USER root
 COPY entrypoint.dev.sh /entrypoint.dev.sh
+RUN sed -i 's/\r$//' /entrypoint.dev.sh
 RUN chmod +x /entrypoint.dev.sh
 
 ENTRYPOINT ["/entrypoint.dev.sh"]
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev"]
