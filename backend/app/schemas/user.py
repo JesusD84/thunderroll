@@ -2,7 +2,7 @@
 """User schemas."""
 
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from app.models.models import UserRole
 from typing import Optional
 
@@ -35,9 +35,7 @@ class User(UserBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserFilters(BaseModel):
     email: Optional[str] = None
