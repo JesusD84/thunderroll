@@ -32,9 +32,7 @@ class LocationUpdate(BaseModel):
 class Location(LocationBase):
     id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Unit Schemas
 class UnitBase(BaseModel):
@@ -74,9 +72,7 @@ class Unit(UnitBase):
     brand: Optional[str] = None
     color: Optional[str] = None
     current_location: Optional[Location] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Transfer Schemas
 class TransferBase(BaseModel):
@@ -94,9 +90,7 @@ class TransferCreate(TransferBase):
 
 class Transfer(TransferBase):
     id: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Import Schemas
 class ImportBase(BaseModel):
@@ -117,9 +111,7 @@ class Import(ImportBase):
     import_date: datetime
     completed_at: Optional[datetime] = None
     user: Optional[User] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Transfer Schemas
 class TransferBase(BaseModel):
@@ -141,9 +133,7 @@ class TransferUnit(BaseModel):
     transfer_id: int
     unit_id: int
     unit: Optional[Unit] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class Transfer(TransferBase):
     id: int
@@ -157,9 +147,7 @@ class Transfer(TransferBase):
     to_location: Optional[Location] = None
     user: Optional[User] = None
     transfer_units: Optional[List[TransferUnit]] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # File Upload Schema
 class FileUploadResponse(BaseModel):

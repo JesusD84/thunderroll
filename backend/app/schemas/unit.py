@@ -74,6 +74,4 @@ class Unit(UnitBase):
     brand: Optional[str] = None
     color: Optional[str] = None
     current_location: Optional[Location] = None
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
