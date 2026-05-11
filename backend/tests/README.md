@@ -26,6 +26,9 @@ tests/
 ├── test_location_repository.py # Location repository unit tests (mocked DB)
 ├── test_location_service.py    # Location service unit tests (mocked DB)
 ├── test_locations.py           # Location endpoint integration tests
+├── test_transfer_repository.py # Transfer repository unit tests (mocked DB)
+├── test_transfer_service.py    # Transfer service unit tests (mocked DB)
+├── test_transfers.py           # Transfer endpoint integration tests
 ├── test_unit_repository.py     # Unit repository unit tests (mocked DB)
 ├── test_unit_service.py        # Unit service unit tests (mocked DB)
 ├── test_units.py               # Units endpoint integration tests
