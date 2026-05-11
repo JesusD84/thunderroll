@@ -23,6 +23,7 @@ tests/
 ├── test_user_repository.py     # User repository unit tests (mocked DB)
 ├── test_user_service.py        # User service unit tests (mocked DB)
 ├── test_users.py               # User endpoint integration tests
+├── test_email.py               # Email service unit tests (mocked FastMail)
 ├── test_imports.py             # Import endpoint integration tests
 ├── test_location_repository.py # Location repository unit tests (mocked DB)
 ├── test_location_service.py    # Location service unit tests (mocked DB)
