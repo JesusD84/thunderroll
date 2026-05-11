@@ -32,6 +32,7 @@ tests/
 ├── test_unit_repository.py     # Unit repository unit tests (mocked DB)
 ├── test_unit_service.py        # Unit service unit tests (mocked DB)
 ├── test_units.py               # Units endpoint integration tests
+├── test_report_service.py      # Report service unit tests (mocked DB)
 ├── test_reports.py             # Reports endpoint integration tests
 └── README.md                   # This file
 ```
