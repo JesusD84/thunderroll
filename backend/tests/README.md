@@ -17,12 +17,15 @@ docker compose exec backend python -m pytest tests/ --cov=app --cov-report=term-
 
 ```
 tests/
-├── conftest.py              # Shared fixtures (DB, client, auth headers)
-├── test_auth.py              # Auth endpoint integration tests
-├── test_auth_service.py      # Auth service unit tests (mocked DB)
-├── test_units.py             # Units endpoint integration tests
-├── test_reports.py           # Reports endpoint integration tests
-└── README.md                 # This file
+├── conftest.py                # Shared fixtures (DB, client, auth headers)
+├── test_auth.py                # Auth endpoint integration tests
+├── test_auth_service.py        # Auth service unit tests (mocked DB)
+├── test_user_repository.py     # User repository unit tests (mocked DB)
+├── test_user_service.py        # User service unit tests (mocked DB)
+├── test_users.py               # User endpoint integration tests
+├── test_units.py               # Units endpoint integration tests
+├── test_reports.py             # Reports endpoint integration tests
+└── README.md                   # This file
 ```
 
 ## Two types of tests
