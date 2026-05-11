@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import pandas as pd
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, desc, or_, and_
+from sqlalchemy import func, desc, or_, and_, cast, String
 from fastapi import Response
 
 from app.models.models import Unit, Location, Transfer, Import, UnitStatus, TransferStatus
@@ -43,12 +43,12 @@ class ReportService:
 
         six_months_ago = datetime.now() - timedelta(days=180)
         sales_by_month = db.query(
-            func.date_trunc('month', Unit.sold_date).label("month"),
+            func.substr(cast(Unit.sold_date, String), 1, 7).label("month"),
             func.count(Unit.id).label("count"),
         ).filter(
             and_(Unit.status == UnitStatus.SOLD, Unit.sold_date >= six_months_ago)
-        ).group_by(func.date_trunc('month', Unit.sold_date)) \
-         .order_by(func.date_trunc('month', Unit.sold_date)).all()
+        ).group_by(func.substr(cast(Unit.sold_date, String), 1, 7)) \
+         .order_by(func.substr(cast(Unit.sold_date, String), 1, 7)).all()
 
         recent_imports = db.query(Import).options(
             selectinload(Import.user)
@@ -212,10 +212,10 @@ class ReportService:
         ).group_by(Transfer.status).all()
 
         by_month = db.query(
-            func.date_trunc('month', Transfer.dispatched_at).label("month"),
+            func.substr(cast(Transfer.dispatched_at, String), 1, 7).label("month"),
             func.count(Transfer.id).label("count"),
-        ).group_by(func.date_trunc('month', Transfer.dispatched_at)) \
-         .order_by(func.date_trunc('month', Transfer.dispatched_at)).all()
+        ).group_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7)) \
+         .order_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7)).all()
 
         return {
             "total_transfers": total_transfers,
