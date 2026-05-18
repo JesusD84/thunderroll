@@ -4,7 +4,6 @@ import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.skip(reason="PostgreSQL date_trunc not available in SQLite")
 @pytest.mark.asyncio
 async def test_get_dashboard_stats(client: AsyncClient, auth_headers, test_users, test_locations):
     """Test dashboard stats endpoint."""
@@ -56,7 +55,6 @@ async def test_get_inventory_report_with_filters(client: AsyncClient, auth_heade
         assert unit["status"] == "AVAILABLE"
 
 
-@pytest.mark.skip(reason="PostgreSQL date_trunc not available in SQLite")
 @pytest.mark.asyncio
 async def test_get_transfers_report(client: AsyncClient, auth_headers, test_users, test_locations):
     """Test transfers report endpoint."""
@@ -72,7 +70,6 @@ async def test_get_transfers_report(client: AsyncClient, auth_headers, test_user
     assert "by_month" in data["summary"]
 
 
-@pytest.mark.skip(reason="PostgreSQL date_trunc not available in SQLite")
 @pytest.mark.asyncio
 async def test_get_transfers_report_pagination(client: AsyncClient, auth_headers, test_users, test_locations):
     """Test transfers report pagination."""
@@ -113,7 +110,6 @@ async def test_export_inventory_excel(client: AsyncClient, auth_headers, test_us
     assert "attachment" in response.headers["content-disposition"]
 
 
-@pytest.mark.skip(reason="PostgreSQL date_trunc not available in SQLite")
 @pytest.mark.asyncio
 async def test_export_transfers_excel(client: AsyncClient, auth_headers, test_users, test_locations):
     """Test transfers Excel export endpoint."""

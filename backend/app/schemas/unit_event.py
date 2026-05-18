@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UnitEvent(BaseModel):
@@ -19,6 +19,4 @@ class UnitEvent(BaseModel):
     
     # Related objects
     user: dict | None = None
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
