@@ -59,12 +59,3 @@ def delete_unit(
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     return UnitService.delete_unit(db, unit_id)
-
-@router.post("/{unit_id}/transfer")
-def transfer_unit(
-    unit_id: int,
-    transfer: schemas.TransferCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
-):
-    return UnitService.transfer_unit(db, unit_id, transfer, current_user.id)
