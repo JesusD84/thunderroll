@@ -73,7 +73,7 @@ def get_unit_transfers(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR, UserRole.VIEWER]))
 ):
     return TransferService.get_unit_transfers(db, unit_id, skip, limit)
 
