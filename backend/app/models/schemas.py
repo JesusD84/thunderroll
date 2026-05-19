@@ -74,24 +74,6 @@ class Unit(UnitBase):
     current_location: Optional[Location] = None
     model_config = ConfigDict(from_attributes=True)
 
-# Transfer Schemas
-class TransferBase(BaseModel):
-    unit_id: int
-    dispatched_by_id: Optional[int] = None
-    received_by_id: Optional[int] = None
-    origin_location_id: Optional[int] = None
-    destination_location_id: Optional[int] = None
-    status: TransferStatus = TransferStatus.PENDING
-    dispatched_at: Optional[datetime] = None
-    received_at: Optional[datetime] = None
-
-class TransferCreate(TransferBase):
-    pass
-
-class Transfer(TransferBase):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
 # Import Schemas
 class ImportBase(BaseModel):
     filename: str
@@ -111,42 +93,6 @@ class Import(ImportBase):
     import_date: datetime
     completed_at: Optional[datetime] = None
     user: Optional[User] = None
-    model_config = ConfigDict(from_attributes=True)
-
-# Transfer Schemas
-class TransferBase(BaseModel):
-    from_location_id: int
-    to_location_id: int
-    notes: Optional[str] = None
-    transfer_date: Optional[datetime] = None
-
-class TransferCreate(TransferBase):
-    unit_ids: List[int]
-
-class TransferUpdate(BaseModel):
-    status: Optional[str] = None
-    notes: Optional[str] = None
-    completed_date: Optional[datetime] = None
-
-class TransferUnit(BaseModel):
-    id: int
-    transfer_id: int
-    unit_id: int
-    unit: Optional[Unit] = None
-    model_config = ConfigDict(from_attributes=True)
-
-class Transfer(TransferBase):
-    id: int
-    user_id: int
-    status: str
-    total_units: int
-    completed_date: Optional[datetime] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    from_location: Optional[Location] = None
-    to_location: Optional[Location] = None
-    user: Optional[User] = None
-    transfer_units: Optional[List[TransferUnit]] = None
     model_config = ConfigDict(from_attributes=True)
 
 # File Upload Schema

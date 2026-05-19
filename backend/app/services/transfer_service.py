@@ -3,7 +3,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
-from app.models.schemas import TransferCreate as UnitTransferCreate
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
@@ -43,7 +42,7 @@ class TransferService:
     def transfer_unit_with_status_update(
         db: Session,
         unit_id: int,
-        transfer_data: UnitTransferCreate,
+        transfer_data: TransferCreate,
         user_id: int,
     ) -> Unit:
         unit = UnitRepository.get_unit(db, unit_id)
