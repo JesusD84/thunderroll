@@ -18,7 +18,10 @@ frontend/
 │   ├── setup.ts            # Test setup (jest-dom matchers)
 │   ├── smoke.test.tsx       # Infra smoke test
 │   ├── ui-components-1.test.tsx  # Badge, Button, Card, Alert, Table (18 tests)
-│   └── ui-components-2.test.tsx  # Input, Label, Select, Calendar, DatePicker, Popover (12 tests)
+│   ├── ui-components-2.test.tsx  # Input, Label, Select, Calendar, DatePicker, Popover (12 tests)
+│   ├── navigation.test.tsx  # Navigation component (7 tests)
+│   ├── login.test.tsx       # Login page (6 tests)
+│   └── session-provider.test.tsx  # SessionProvider (1 test)
 ├── e2e/                    # End-to-end tests (Playwright)
 │   └── smoke.spec.ts       # E2E smoke test
 ├── vitest.config.ts        # Vitest configuration
