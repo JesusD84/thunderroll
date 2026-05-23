@@ -21,7 +21,9 @@ frontend/
 │   ├── ui-components-2.test.tsx  # Input, Label, Select, Calendar, DatePicker, Popover (12 tests)
 │   ├── navigation.test.tsx  # Navigation component (7 tests)
 │   ├── login.test.tsx       # Login page (6 tests)
-│   └── session-provider.test.tsx  # SessionProvider (1 test)
+│   ├── session-provider.test.tsx  # SessionProvider (1 test)
+│   ├── dashboard.test.tsx    # Dashboard page (10 tests)
+│   └── units.test.tsx        # Units list + create form (23 tests)
 ├── e2e/                    # End-to-end tests (Playwright)
 │   └── smoke.spec.ts       # E2E smoke test
 ├── vitest.config.ts        # Vitest configuration
@@ -55,7 +57,7 @@ See [TEST_PLAN.md](../TEST_PLAN.md) for the full 10-phase strategy (157-191 test
 | 1 | UI Components | 30-40 |
 | 2 | Navigation & Auth | 15-20 |
 | 3 | Dashboard | 10-12 |
-| 4 | Units | 18-22 |
+| 4 | Units | ✅ Done (23) |
 | 5 | Transfers | 10-12 |
 | 6 | Imports | 8-10 |
 | 7 | Reports | 8-10 |
