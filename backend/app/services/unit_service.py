@@ -7,7 +7,6 @@ from datetime import datetime, UTC
 
 from app.models.models import Unit, Transfer, UnitStatus, TransferStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
-from app.models.schemas import TransferCreate
 from app.repositories.location_repository import LocationRepository
 from app.repositories.unit_repository import UnitRepository
 from app.services.transfer_service import TransferService
@@ -119,7 +118,3 @@ class UnitService:
     @staticmethod
     def get_stats(db: Session) -> dict:
         return UnitRepository.get_stats(db)
-
-    @staticmethod
-    def transfer_unit(db: Session, unit_id: int, transfer_data: TransferCreate, user_id: int) -> Unit:
-        return TransferService.transfer_unit_with_status_update(db, unit_id, transfer_data, user_id)

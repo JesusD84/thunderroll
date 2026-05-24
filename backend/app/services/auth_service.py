@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.models import User
-from app.models.schemas import TokenData
+from app.schemas.auth import TokenData
 from app.core.security import Security
 import os
 

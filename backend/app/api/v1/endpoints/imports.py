@@ -8,13 +8,14 @@ from typing import List, Dict, Any
 import json
 
 from app.database.database import get_db
-from app.models import models, schemas
+from app.models import models
+from app.schemas.import_record import Import
 from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.Import])
+@router.get("/", response_model=List[Import])
 def get_imports(
     skip: int = 0,
     limit: int = 100,
@@ -25,7 +26,7 @@ def get_imports(
                 .offset(skip).limit(limit).all()
     return imports
 
-@router.get("/{import_id}", response_model=schemas.Import)
+@router.get("/{import_id}", response_model=Import)
 def get_import(
     import_id: int,
     db: Session = Depends(get_db),
