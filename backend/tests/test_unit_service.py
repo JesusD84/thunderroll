@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from app.services.unit_service import UnitService
 from app.models.models import Unit, Location, UnitStatus, TransferStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
-from app.models.schemas import TransferCreate
+from app.schemas.transfer import TransferCreate
 
 
 # ---------------------------------------------------------------------------

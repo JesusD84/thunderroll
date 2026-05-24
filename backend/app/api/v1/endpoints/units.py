@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.database import get_db
-from app.models import models, schemas
+from app.models import models
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
 from app.models.models import UserRole
 from app.services.auth_service import get_current_active_user, require_role
