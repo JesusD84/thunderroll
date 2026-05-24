@@ -1,11 +1,9 @@
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.database import get_db
-from app.models import models, schemas
+from app.models import models
 from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
-from app.schemas.transfer import Transfer as TransferSchema
 from app.models.models import UserRole
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.unit_service import UnitService
@@ -58,33 +56,6 @@ def update_unit(
 def delete_unit(
     unit_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     return UnitService.delete_unit(db, unit_id)
-
-@router.get("/{unit_id}/transfers", response_model=List[schemas.Transfer])
-def get_unit_transfers(
-    unit_id: int,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    return UnitService.get_unit_transfers(db, unit_id, skip, limit)
-
-@router.post("/{unit_id}/transfer")
-def transfer_unit(
-    unit_id: int,
-    transfer: schemas.TransferCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
-):
-    return UnitService.transfer_unit(db, unit_id, transfer, current_user.id)
-
-@router.get("/{unit_id}/active-transfer", response_model=TransferSchema)
-def get_active_transfer(
-    unit_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    return UnitService.get_active_transfer(db, unit_id)
