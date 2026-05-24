@@ -126,7 +126,7 @@ export default function UnitDetailPage() {
   const refreshData = async (token: string) => {
     const [uRes, mRes] = await Promise.all([
       fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-      fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/v1/transfers/unit/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
     ]);
     if (uRes.ok) setUnit(await uRes.json());
     if (mRes.ok) setMovements(await mRes.json());
@@ -234,7 +234,7 @@ export default function UnitDetailPage() {
           fetch(`${API_URL}/api/v1/units/${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
+          fetch(`${API_URL}/api/v1/transfers/unit/${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);

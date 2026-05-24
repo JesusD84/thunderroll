@@ -139,6 +139,6 @@ async def test_get_unit_transfers(client: AsyncClient, auth_headers, test_users,
     create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
     unit_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/units/{unit_id}/transfers", headers=auth_headers)
+    response = await client.get(f"/api/v1/transfers/unit/{unit_id}", headers=auth_headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)

@@ -67,7 +67,7 @@ def delete_transfer(
     return TransferService.delete_transfer(db, transfer_id)
 
 
-@router.get("/{unit_id}/transfers", response_model=List[Transfer])
+@router.get("/unit/{unit_id}", response_model=List[Transfer])
 def get_unit_transfers(
     unit_id: int,
     skip: int = Query(0, ge=0),
