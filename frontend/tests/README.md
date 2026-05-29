@@ -23,9 +23,18 @@ frontend/
 │   ├── login.test.tsx       # Login page (6 tests)
 │   ├── session-provider.test.tsx  # SessionProvider (1 test)
 │   ├── dashboard.test.tsx    # Dashboard page (10 tests)
-│   └── units.test.tsx        # Units list + create form (23 tests)
+│   ├── units.test.tsx        # Units list + create form (23 tests)
+│   ├── transfers.test.tsx    # Transfers list + create (16 tests)
+│   ├── imports.test.tsx      # Imports page (11 tests)
+│   ├── reports.test.tsx      # Reports page (15 tests)
+│   ├── settings.test.tsx     # Settings page (13 tests)
+│   ├── use-cases.test.tsx    # Smoke/acceptance tests (17 tests)
+│   └── mocks/               # MSW handlers + server
+│       ├── handlers.ts
+│       └── server.ts
 ├── e2e/                    # End-to-end tests (Playwright)
-│   └── smoke.spec.ts       # E2E smoke test
+│   ├── auth.spec.ts        # Auth flows + navigation (10 tests)
+│   └── responsive.spec.ts  # Responsive design (1 test)
 ├── vitest.config.ts        # Vitest configuration
 ├── playwright.config.ts    # Playwright configuration
 └── TEST_PLAN.md            # Full test plan (10 phases)
@@ -54,13 +63,14 @@ See [TEST_PLAN.md](../TEST_PLAN.md) for the full 10-phase strategy (157-191 test
 | Phase | Scope | Tests |
 |---|---|---|
 | 0 | Infra | ✅ Done |
-| 1 | UI Components | 30-40 |
-| 2 | Navigation & Auth | 15-20 |
-| 3 | Dashboard | 10-12 |
+| 1 | UI Components | ✅ Done (30) |
+| 2 | Navigation & Auth | ✅ Done (14) |
+| 3 | Dashboard | ✅ Done (10) |
 | 4 | Units | ✅ Done (23) |
-| 5 | Transfers | 10-12 |
-| 6 | Imports | 8-10 |
-| 7 | Reports | 8-10 |
-| 8 | Settings | 10-12 |
-| 9 | E2E (Playwright) | 12-15 |
-| 10 | Use Cases (Smoke) | 32 |
+| 5 | Transfers | ✅ Done (16) |
+| 6 | Imports | ✅ Done (11) |
+| 7 | Reports | ✅ Done (15) |
+| 8 | Settings | ✅ Done (13) |
+| 9 | E2E (Playwright) | ✅ Done (11) |
+| 10 | Use Cases (Smoke) | ✅ Done (17) |
+| **Total** | | **150** |

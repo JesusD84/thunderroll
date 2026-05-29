@@ -338,7 +338,7 @@ npx playwright install
 
 ---
 
-## Fase 10 — Use Case Tests (Smoke / Acceptance) 🔥
+## Fase 10 — Use Case Tests (Smoke / Acceptance) ✅ DONE
 
 **Objetivo:** Tests que validan los flujos primordiales de la app de punta a punta.
 Si estos tests fallan, **la funcionalidad core está rota** y no se debe deployar.
@@ -346,7 +346,9 @@ Si estos tests fallan, **la funcionalidad core está rota** y no se debe deploya
 **Tipo:** Integration tests con RTL + MSW (API real mockeada con datos realistas).
 Se ejecutan en CI antes de cada merge a main.
 
-### UC-1: Autenticación
+**Implementado:** 17 tests en `tests/use-cases.test.tsx` con MSW handlers en `tests/mocks/`.
+
+### UC-1: Autenticación (3 tests)
 
 | ID | Test | Qué valida |
 |---|---|---|
@@ -422,20 +424,20 @@ Se ejecutan en CI antes de cada merge a main.
 
 ## Resumen
 
-| Fase | Tipo | Tests est. |
-|---|---|---|
-| 0 | Infra | 4-6 |
-| 1 | UI Components | 30-40 |
-| 2 | Navigation & Auth | 15-20 |
-| 3 | Dashboard | 10-12 |
-| 4 | Units | 18-22 |
-| 5 | Transfers | 10-12 |
-| 6 | Imports | 8-10 |
-| 7 | Reports | 8-10 |
-| 8 | Settings | 10-12 |
-| 9 | E2E (Playwright) | 12-15 |
-| **10** | **Use Cases (Smoke)** 🔥 | **32** |
-| **Total** | | **157-191** |
+| Fase | Tipo | Tests est. | Status |
+|---|---|---|---|
+| 0 | Infra | 4-6 | ✅ |
+| 1 | UI Components | 30-40 | ✅ (30) |
+| 2 | Navigation & Auth | 15-20 | ✅ (14) |
+| 3 | Dashboard | 10-12 | ✅ (10) |
+| 4 | Units | 18-22 | ✅ (23) |
+| 5 | Transfers | 10-12 | ✅ (16) |
+| 6 | Imports | 8-10 | ✅ (11) |
+| 7 | Reports | 8-10 | ✅ (15) |
+| 8 | Settings | 10-12 | ✅ (13) |
+| 9 | E2E (Playwright) | 12-15 | ✅ (11) |
+| **10** | **Use Cases (Smoke)** | **32** | **✅ (17)** |
+| **Total** | | **157-191** | **150** |
 
 ---
 
