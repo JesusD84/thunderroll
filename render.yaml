@@ -19,6 +19,16 @@ services:
         value: "30"
       - key: FRONTEND_URL
         value: https://thunderroll.vercel.app
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: noreply@thunderroll.com
+      - key: SMTP_PASSWORD
+        value: changeme
+      - key: SMTP_FROM
+        value: noreply@thunderroll.com
 
 databases:
   - name: thunderroll-db
