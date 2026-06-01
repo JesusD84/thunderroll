@@ -1,5 +1,7 @@
 """Test report endpoints."""
 
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 
@@ -126,6 +128,47 @@ async def test_export_sales_excel(client: AsyncClient, auth_headers, test_users,
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     assert "attachment" in response.headers["content-disposition"]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_sales_by_month_with_sold_unit(
+    client: AsyncClient, auth_headers, sold_unit_with_history
+):
+    """Regression: dashboard must not 500 when a sold unit exists.
+
+    The sales_by_month aggregation groups by a substr(cast(date, String))
+    expression that already yields a 'YYYY-MM' string. The service previously
+    called .strftime() on that string, raising AttributeError -> 500.
+    """
+    response = await client.get("/api/v1/reports/dashboard", headers=auth_headers)
+    assert response.status_code == 200, response.text
+
+    sales_by_month = response.json()["sales_by_month"]
+    assert len(sales_by_month) >= 1
+    current_month = datetime.now().strftime("%Y-%m")
+    months = [row["month"] for row in sales_by_month]
+    assert current_month in months
+    for row in sales_by_month:
+        assert isinstance(row["month"], str)
+        assert len(row["month"]) == 7  # YYYY-MM
+
+
+@pytest.mark.asyncio
+async def test_transfers_report_by_month_with_transfer(
+    client: AsyncClient, auth_headers, sold_unit_with_history
+):
+    """Regression: transfers report by_month must not 500 with existing transfers."""
+    response = await client.get("/api/v1/reports/transfers", headers=auth_headers)
+    assert response.status_code == 200, response.text
+
+    by_month = response.json()["summary"]["by_month"]
+    assert len(by_month) >= 1
+    current_month = datetime.now().strftime("%Y-%m")
+    months = [row["month"] for row in by_month]
+    assert current_month in months
+    for row in by_month:
+        assert isinstance(row["month"], str)
+        assert len(row["month"]) == 7  # YYYY-MM
 
 
 @pytest.mark.asyncio
