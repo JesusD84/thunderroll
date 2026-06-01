@@ -6,6 +6,7 @@ Sync engine matches production (app uses sync SQLAlchemy).
 
 import pytest
 import asyncio
+from datetime import datetime
 from typing import Generator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import create_engine
@@ -123,3 +124,48 @@ async def auth_headers(client: AsyncClient, test_users):
     assert response.status_code == 200, f"Login failed: {response.text}"
     token_data = response.json()
     return {"Authorization": f"Bearer {token_data['access_token']}"}
+
+
+@pytest.fixture
+def sold_unit_with_history(test_users, test_locations):
+    """Create a SOLD unit (with sold_date) and a transfer (with dispatched_at).
+
+    This exercises the month aggregations in the report service, which group by
+    a substr(cast(date, String)) expression that already returns a 'YYYY-MM'
+    string. Regression coverage for the bug where the service called .strftime()
+    on that string, raising AttributeError -> 500. Function-scoped and cleaned up
+    so it does not leak into other tests.
+    """
+    db = TestingSessionLocal()
+    unit = Unit(
+        engine_number="REG-ENG-001",
+        chassis_number="REG-CHS-001",
+        brand="RegressionBrand",
+        model="RegModel",
+        color="Negro",
+        current_location_id=test_locations[0].id,
+        status=UnitStatus.SOLD,
+        sold_date=datetime.now(),
+    )
+    db.add(unit)
+    db.commit()
+    db.refresh(unit)
+
+    transfer = Transfer(
+        unit_id=unit.id,
+        dispatched_by_id=test_users[0].id,
+        destination_location_id=test_locations[0].id,
+        status=TransferStatus.RECEIVED,
+        dispatched_at=datetime.now(),
+        received_at=datetime.now(),
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+
+    yield unit, transfer
+
+    db.delete(transfer)
+    db.delete(unit)
+    db.commit()
+    db.close()

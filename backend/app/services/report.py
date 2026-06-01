@@ -91,7 +91,7 @@ class ReportService:
             ],
             "sales_by_month": [
                 {
-                    "month": item.month.strftime("%Y-%m") if item.month else None,
+                    "month": item.month if item.month else None,
                     "count": item.count,
                 }
                 for item in sales_by_month
@@ -222,7 +222,7 @@ class ReportService:
             "summary": {
                 "by_status": {item.status.value: item.count for item in by_status},
                 "by_month": [
-                    {"month": item.month.strftime("%Y-%m") if item.month else None, "count": item.count}
+                    {"month": item.month if item.month else None, "count": item.count}
                     for item in by_month
                 ],
             },
