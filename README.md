@@ -1,269 +1,199 @@
+# Thunderroll - Sistema de Trazabilidad de Inventario
 
-# Thunderrol - Sistema de Trazabilidad de Inventario
+Sistema de trazabilidad de inventario para Thunderroll (scooters/motos en Guadalajara). Permite seguir cada unidad desde su llegada a bodega hasta su venta, con importación masiva desde Excel, transferencias entre ubicaciones, reportes y control de acceso por roles.
 
-Sistema completo de trazabilidad de inventario para Thunderrol (empresa de scooters/motos en Guadalajara).
+## Stack
 
-## 🚀 Características
+- **Backend**: FastAPI + SQLAlchemy + PostgreSQL. Autenticación JWT con RBAC. Email vía `fastapi-mail`.
+- **Frontend**: Next.js 14 (App Router) + TypeScript + TailwindCSS + shadcn/ui. Autenticación con NextAuth (credentials provider contra el backend).
+- **Infra**: Docker Compose para desarrollo local. Despliegue en Vercel (frontend) y Render (backend + PostgreSQL).
 
-- **Backend FastAPI** con PostgreSQL, SQLAlchemy, Alembic
-- **Frontend Next.js** con TypeScript, TailwindCSS, shadcn/ui
-- **Autenticación JWT** con RBAC (ADMIN, INVENTARIO, TALLER, VENTAS)
-- **Trazabilidad completa** de unidades desde bodega hasta venta
-- **Importación Excel** del proveedor con validaciones
-- **Reportes** CSV/XLSX por fechas
-- **Auditoría completa** de todas las operaciones
-- **Docker Compose** para despliegue local
+## Arquitectura
 
-## 🏗️ Arquitectura
-
-### Estados de la Máquina
 ```
-EN_BODEGA_NO_IDENTIFICADA → IDENTIFICADA_EN_TALLER → EN_TRANSITO_TALLER_SUCURSAL → EN_SUCURSAL_DISPONIBLE → VENDIDA
++------------------+        +------------------+        +------------------+
+|  Next.js (front) | <----> |  FastAPI (back)  | <----> |   PostgreSQL     |
+|  Vercel          |  HTTP  |  Render          |  SQL   |   Render         |
++------------------+        +------------------+        +------------------+
 ```
 
-### Ubicaciones
-- **BODEGA**: Almacén principal
-- **TALLER**: Centro de identificación y ensamble
-- **SUCURSALES**: Centro, Norte, Sur
+- El login corre **server-side** en NextAuth y llama al backend usando `BACKEND_URL`.
+- Las llamadas del navegador (dashboard, listados) usan `NEXT_PUBLIC_API_URL`.
+- Las tablas se crean automáticamente al arrancar el backend (`Base.metadata.create_all`) y se cargan datos demo vía el evento `lifespan`.
 
-### Roles de Usuario
-- **ADMIN**: Acceso total al sistema
-- **INVENTARIO**: Importar, editar, transferir, vender
-- **TALLER**: Identificar, transferir taller→sucursal
-- **VENTAS**: Ver catálogo, vender, reportes
+## Roles
 
-## 🚦 Inicio Rápido
+| Rol | Descripción |
+|---|---|
+| `ADMIN` | Acceso total |
+| `MANAGER` | Gestión de inventario, transferencias y reportes |
+| `OPERATOR` | Operación de unidades y transferencias |
+| `VIEWER` | Solo lectura |
 
-### Prerrequisitos
-- Docker y Docker Compose
-- Node.js 18+ (para desarrollo local)
-- Python 3.11+ (para desarrollo local)
+## Inicio rápido (Docker Compose)
 
-### 1. Clonar y configurar
+Requisitos: **Docker** y **Docker Compose**.
+
+### 1. Crear el archivo `.env` en la raíz
+
+`docker-compose.yml` lee estas variables para el backend:
+
 ```bash
-git clone <repo-url>
-cd thunderrol
-cp .env.example .env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=noreply@thunderroll.com
+SMTP_PASSWORD=changeme
+SMTP_FROM=noreply@thunderroll.com
+FRONTEND_URL=http://localhost:3000
 ```
 
-### 2. Levantar con Docker
+> Los valores SMTP pueden ser placeholders; el backend arranca igual, solo no enviará emails reales.
+
+### 2. Levantar todo
+
 ```bash
-# Construcción y inicio completo
 docker compose up --build
-
-# En segundo plano
-docker compose up -d
 ```
 
-### 3. Acceder a la aplicación
+### 3. Acceder
+
 - **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs
-- **Adminer**: http://localhost:8080
+- **Backend API**: http://localhost:8000
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **Health check**: http://localhost:8000/health
 
-### 4. Credenciales Demo
+### 4. Credenciales demo
+
 ```
-admin@thunderrol.com / admin123 (ADMIN)
-inventario@thunderrol.com / inv123 (INVENTARIO)
-taller@thunderrol.com / taller123 (TALLER)
-ventas@thunderrol.com / ventas123 (VENTAS)
+admin@thunderrol.com    / admin123     (ADMIN)
+manager@thunderrol.com  / manager123   (MANAGER)
+operator@thunderrol.com / operator123  (OPERATOR)
+viewer@thunderrol.com   / viewer123    (VIEWER)
 ```
 
-## 🛠️ Desarrollo Local
+## Desarrollo local sin Docker
 
 ### Backend
+
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Migrar base de datos
-alembic upgrade head
-
-# Ejecutar seeds
-python -m app.database.seed
-
-# Ejecutar servidor
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+Variables de entorno del backend (en `backend/.env` o exportadas):
+
+```bash
+DATABASE_URL=postgresql://thunderrol:thunderrol123@localhost:5432/thunderrol
+SECRET_KEY=tu-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=noreply@thunderroll.com
+SMTP_PASSWORD=changeme
+SMTP_FROM=noreply@thunderroll.com
+FRONTEND_URL=http://localhost:3000
+```
+
 ### Frontend
+
 ```bash
 cd frontend
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
 
-### Base de Datos
+Variables de entorno del frontend (en `frontend/.env.local`):
+
 ```bash
-# Nueva migración
-cd backend
-alembic revision --autogenerate -m "descripción"
-
-# Aplicar migraciones
-alembic upgrade head
-
-# Revertir migración
-alembic downgrade -1
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=genera-uno-con-openssl-rand-base64-32
+NEXT_PUBLIC_API_URL=http://localhost:8000
+BACKEND_URL=http://localhost:8000
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Backend (pytest)
+
 ```bash
 cd backend
-make test
-# o
+source venv/bin/activate
 pytest tests/ -v
 ```
 
-### Frontend (Playwright)
+Los tests usan SQLite en memoria, así que no requieren PostgreSQL.
+
+### Frontend (Vitest + Playwright)
+
 ```bash
 cd frontend
-npm run test:e2e
+npm test            # unit/integration (Vitest)
+npm run test:e2e    # end-to-end (Playwright)
 ```
 
-### Linting y Formateo
-```bash
-# Backend
-make fmt    # Black formatting
-make lint   # Ruff linting
-make type   # mypy type checking
+## CI/CD
 
-# Frontend
-npm run lint
-npm run type-check
-```
+### Integración continua (GitHub Actions)
 
-## 📊 API Endpoints
+En cada Pull Request hacia `main` corren dos checks:
 
-### Autenticación
-- `POST /auth/login` - Login JWT
-- `GET /auth/me` - Perfil usuario
+- **Backend Tests** (`.github/workflows/backend-ci.yml`) — ejecuta `pytest`.
+- **Frontend Tests** (`.github/workflows/frontend-ci.yml`) — ejecuta `vitest`.
 
-### Unidades
-- `GET /units` - Listar con filtros
-- `POST /units` - Crear manual
-- `GET /units/{id}` - Detalle + timeline
-- `PATCH /units/{id}` - Actualizar
+`main` está protegida: se requiere PR y que ambos checks pasen antes de mergear.
 
-### Importación
-- `POST /imports/excel` - Subir Excel
-- `GET /imports/{id}/errors` - Ver errores
+### Despliegue continuo
 
-### Identificación
-- `POST /units/match-identification` - Match motor/chasis
+- **Frontend (Vercel)**: deploy automático. Preview por cada PR, producción al mergear a `main` (`thunderroll.vercel.app`).
+- **Backend + DB (Render)**: deploy automático al hacer push a `main`, definido en `render.yaml` (servicio web FastAPI + base de datos PostgreSQL).
 
-### Transferencias
-- `POST /transfers` - Crear transferencia
-- `POST /transfers/{id}/receive` - Recibir
+Más detalle en `CI_CD_PLAN.md`.
 
-### Reportes
-- `GET /reports/transfers` - Exportar movimientos
-
-### Catálogos
-- `GET /locations` - Ubicaciones
-- `GET /users` - Usuarios (limitado por rol)
-
-## 📁 Estructura del Proyecto
+## Estructura del proyecto
 
 ```
-thunderrol/
+thunderroll/
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # API routers
-│   │   ├── core/         # Config, security, deps
-│   │   ├── models/       # SQLAlchemy models
-│   │   ├── schemas/      # Pydantic schemas
-│   │   ├── services/     # Business logic
-│   │   ├── db/           # Database session, seeds
-│   │   └── main.py       # FastAPI app
-│   ├── migrations/       # Alembic migrations
-│   ├── tests/           # pytest tests
+│   │   ├── api/          # Routers y endpoints (v1)
+│   │   ├── core/         # Seguridad y configuración
+│   │   ├── database/     # Sesión, engine y seed de datos demo
+│   │   ├── models/       # Modelos SQLAlchemy
+│   │   ├── schemas/      # Schemas Pydantic
+│   │   ├── services/     # Lógica de negocio
+│   │   └── main.py       # App FastAPI (CORS, lifespan, routers)
+│   ├── tests/            # pytest (SQLite en memoria)
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── pyproject.toml
+│   └── Dockerfile
 ├── frontend/
-│   ├── app/             # Next.js app router
-│   ├── components/      # React components
-│   ├── lib/            # Utilities, API client
+│   ├── app/              # Rutas Next.js (App Router)
+│   ├── components/       # Componentes React
+│   ├── tests/            # Vitest
+│   ├── e2e/              # Playwright
 │   ├── package.json
-│   ├── Dockerfile
-│   └── next.config.js
+│   ├── vercel.json
+│   └── Dockerfile
 ├── docker-compose.yml
-├── .env.example
+├── render.yaml           # Blueprint de Render (backend + DB)
+├── CI_CD_PLAN.md
 └── README.md
 ```
 
-## 🔧 Configuración de Entorno
+## Flujo de uso
 
-Ver `.env.example` para todas las variables disponibles.
+1. **Importar Excel** del proveedor → unidades ingresan a bodega.
+2. **Identificar** unidades (motor/chasis) en taller.
+3. **Transferir** entre ubicaciones (bodega → taller → sucursal).
+4. **Recibir** la transferencia en destino.
+5. **Vender** la unidad → queda registrada con fecha de venta.
 
-### Variables Principales
-```bash
-# Database
-DATABASE_URL=postgresql://thunderrol:password@db:5432/thunderrol
+## Troubleshooting
 
-# JWT
-JWT_SECRET_KEY=your-secret-key
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# App
-ENVIRONMENT=development
-DEBUG=true
-```
-
-## 📈 Flujo de Uso
-
-1. **Importar Excel** del proveedor → unidades en `EN_BODEGA_NO_IDENTIFICADA`
-2. **Identificar en taller** → `IDENTIFICADA_EN_TALLER`
-3. **Transferir a sucursal** → `EN_TRANSITO_TALLER_SUCURSAL`
-4. **Recibir en sucursal** → `EN_SUCURSAL_DISPONIBLE`
-5. **Vender** → `VENDIDA`
-
-## 🔒 Seguridad
-
-- Autenticación JWT con refresh tokens
-- RBAC por endpoints
-- Passwords hasheados con bcrypt
-- CORS configurado
-- Validación de datos con Pydantic
-- Auditoría completa de operaciones
-
-## 📝 Logs y Monitoreo
-
-- Logs estructurados con loguru
-- Request ID para trazabilidad
-- Auditoría en `unit_events`
-- Métricas básicas en dashboard
-
-## 🐛 Troubleshooting
-
-### Base de datos no conecta
-```bash
-docker compose logs db
-```
-
-### Error de permisos
-```bash
-sudo chown -R $USER:$USER .
-```
-
-### Limpiar Docker
-```bash
-docker compose down -v
-docker system prune -f
-```
-
-## 🤝 Contribución
-
-1. Fork del proyecto
-2. Crear rama feature
-3. Commit cambios
-4. Push a la rama
-5. Crear Pull Request
-
-## 📄 Licencia
-
-MIT License - ver archivo LICENSE
+- **El backend no conecta a la DB localmente**: verifica que PostgreSQL esté arriba y que `DATABASE_URL` apunte al host correcto. Con Docker Compose se gestiona solo.
+- **Login da "Credenciales inválidas" en producción**: asegúrate de que `BACKEND_URL` (no solo `NEXT_PUBLIC_API_URL`) esté configurada en Vercel apuntando al backend de Render.
+- **Errores de CORS desde el navegador**: el backend permite el origen de `FRONTEND_URL`; verifica que esa variable tenga el dominio correcto del frontend.
+- **Backend lento en el primer request**: el plan free de Render duerme el servicio tras inactividad; el primer request puede tardar ~30-50s en despertar.

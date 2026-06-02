@@ -46,7 +46,7 @@ thunderroll/
 │   │   │   ├── database.py             # Engine, SessionLocal, Base, get_db
 │   │   │   └── seed.py                 # Demo data (corre en startup)
 │   │   ├── models/
-│   │   │   ├── models.py               # SQLAlchemy models (User, Unit, Movement, etc.)
+│   │   │   ├── models.py               # SQLAlchemy models (User, Location, Unit, Transfer, Import, ImportError)
 │   │   │   └── schemas.py              # Pydantic schemas (Token, Unit, Transfer, etc.)
 │   │   ├── repositories/               # Capa de acceso a datos
 │   │   ├── schemas/                    # Schemas Pydantic adicionales por dominio
@@ -59,8 +59,8 @@ thunderroll/
 │   │   │   ├── email.py
 │   │   │   └── ...
 │   │   └── main.py                     # FastAPI app, CORS, lifespan
-│   ├── migrations/                     # Alembic
-│   ├── tests/                          # pytest (usa SQLite in-memory async)
+│   ├── migrations/                     # Alembic (configurado; el deploy NO lo usa, las tablas se crean con create_all)
+│   ├── tests/                          # pytest (SQLite en memoria, SYNC)
 │   ├── requirements.txt
 │   ├── pyproject.toml                  # ruff, black, mypy, pytest config
 │   └── Dockerfile
@@ -87,9 +87,8 @@ thunderroll/
 │   ├── tailwind.config.ts
 │   ├── next.config.js
 │   └── Dockerfile
-├── docker-compose.yml
-├── Makefile                            # Comandos principales (start, stop, test, migrate, etc.)
-├── start.sh / status.sh / test.sh / reset_db.sh
+├── docker-compose.yml                 # Stack local (postgres + backend + frontend)
+├── render.yaml                         # Blueprint de Render (backend + DB)
 └── .env.example
 ```
 
@@ -97,20 +96,20 @@ thunderroll/
 
 ## Modelos de datos clave
 
-### Enums
+### Enums (valores reales en `models.py`)
 - **UserRole**: `admin`, `manager`, `operator`, `viewer`
-- **UnitStatus**: `available`, `sold`, `in_transit`
-- **MovementType**: `import`, `sale`, `transfer`, `return`, `damaged`, `maintenance`
+- **UnitStatus**: `WAREHOUSE_UNIDENTIFIED`, `AVAILABLE`, `SOLD`, `IN_TRANSIT`
+- **TransferStatus**: `PENDING`, `IN_TRANSIT`, `RECEIVED`, `CANCELLED`
 
 ### Tablas principales
 - **users** — email, username, first_name, last_name, role, hashed_password, is_active
 - **locations** — name, address
-- **units** — engine_number (unique), chassis_number (unique), model, brand, color, current_location_id, status, sold_date
-- **movements** — unit_id, user_id, movement_type, from/to_location_id, notes (auditoría)
-- **imports** — filename, total_records, successful/failed_imports, status
+- **units** — engine_number (unique, nullable), chassis_number (unique, nullable), model, brand, color, current_location_id, status, sold_date, notes
+- **transfers** — unit_id, dispatched_by_id, received_by_id, origin_location_id, destination_location_id, status, dispatched_at, received_at (**una transferencia = una unidad**, no hay tabla pivote)
+- **imports** — filename, original_filename, total_records, successful_imports, failed_imports, user_id, status, import_date, completed_at
 - **import_errors** — import_id, row_number, error_message, raw_data
-- **transfers** — from/to_location_id, user_id, status (pending/in_transit/completed/cancelled), total_units
-- **transfer_units** — transfer_id, unit_id (tabla pivote)
+
+> No existe tabla `movements` ni enum `MovementType`. La trazabilidad se reconstruye a partir de los `transfers` y del `status`/`sold_date` de cada unidad.
 
 ---
 
@@ -145,28 +144,41 @@ docker compose down -v             # Bajar y limpiar volúmenes
 ### Local (sin Docker)
 ```bash
 # Backend
-make install-backend               # Crear venv + instalar deps
-make dev-backend                   # uvicorn --reload en :8000
-make migrate                       # alembic upgrade head
-make create-migration DESC="msg"   # Nueva migración
-make seed-db                       # Poblar datos demo
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   # servidor
+python -m app.database.seed                                # poblar datos demo
+alembic upgrade head                                       # migraciones (opcional)
 
-# Frontend (cwd: frontend/app)
-make install-frontend              # yarn/npm install
-make dev-frontend                  # next dev en :3000
+# Frontend
+cd frontend
+npm install --legacy-peer-deps
+npm run dev                        # next dev en :3000
 ```
 
 ### Testing
 ```bash
-make test                          # Todos los tests
-cd backend && pytest tests/ -v     # Solo backend
+cd backend && pytest tests/ -v     # Backend (pytest)
+cd frontend && npm test            # Frontend (vitest)
+cd frontend && npm run test:e2e    # E2E con Playwright
 ```
 
-### Linting
+### Linting / Formateo (backend)
 ```bash
-make lint                          # Backend (ruff) + Frontend (eslint)
-make format                        # Backend (black) + Frontend (eslint --fix)
+cd backend && ruff check app/      # lint
+cd backend && black app/           # formateo
 ```
+
+---
+
+## CI/CD
+
+- **CI (GitHub Actions)**: en cada PR hacia `main` corren dos checks, `Backend Tests` (pytest) y `Frontend Tests` (vitest). No tienen filtros de path: ambos corren siempre.
+- **Branch protection en `main`**: requiere PR, que ambos checks pasen, rama actualizada (strict) y conversaciones resueltas. No se permite push directo ni force-push.
+- **CD Frontend (Vercel)**: preview por PR, producción al mergear a `main` (`thunderroll.vercel.app`).
+- **CD Backend + DB (Render)**: deploy al push a `main` vía `render.yaml` (runtime python; FastAPI + PostgreSQL).
+- **Variables clave en Vercel**: `BACKEND_URL` (login server-side de NextAuth) **y** `NEXT_PUBLIC_API_URL` (llamadas del navegador) — ambas necesarias y distintas. Detalle completo en `CI_CD_PLAN.md`.
 
 ---
 
@@ -197,7 +209,7 @@ Todos los endpoints de negocio van bajo `/api/v1/` (ej: `/api/v1/auth/login`, `/
 
 ## Cosas importantes a saber
 
-1. **La DB es sync, no async**: Aunque los tests en `conftest.py` usan `aiosqlite` y `AsyncSession`, el app real usa SQLAlchemy sync con `psycopg2-binary`. Hay un mismatch entre test fixtures y el app — los tests probablemente no corren correctamente.
+1. **La DB es sync**: el app usa SQLAlchemy sync con `psycopg2-binary`. Los tests en `conftest.py` también usan SQLite en memoria **sync** (no async), coinciden con el app y **corren correctamente** (pasan en CI).
 
 2. **Schemas duplicados**: Pydantic schemas existen en dos lugares: `app/models/schemas.py` (monolítico) y `app/schemas/` (separados por dominio). Al agregar/modificar schemas, verificar cuál se usa en el endpoint correspondiente.
 
@@ -205,11 +217,11 @@ Todos los endpoints de negocio van bajo `/api/v1/` (ej: `/api/v1/auth/login`, `/
 
 4. **Múltiples libs de forms**: react-hook-form + zod y formik + yup coexisten.
 
-5. **El frontend cwd del Makefile apunta a `frontend/app`**, no a `frontend/`. Esto puede causar confusión con algunos comandos.
+5. **Desarrollo local**: la forma recomendada es `docker compose up --build`. No hay Makefile; los comandos sin Docker están en la sección "Comandos de desarrollo".
 
-6. **`prisma` está en devDeps pero no hay schema.prisma visible**: El Makefile referencia `prisma generate` y `prisma db seed`, lo cual sugiere que se planeó usar Prisma en el frontend pero puede no estar configurado.
+6. **Prisma NO se usa**: aunque pueda aparecer en devDeps, no hay `schema.prisma` ni configuración. La autenticación es NextAuth con credentials provider que llama al backend.
 
-7. **CORS**: Hardcodeado en `main.py` para `localhost:3000` y `frontend:3000`.
+7. **CORS**: `main.py` permite `localhost:3000`, `frontend:3000` y el valor de la variable `FRONTEND_URL` (para producción).
 
 8. **No hay .env comprometido** — copiar `.env.example` a `.env` antes de iniciar.
 

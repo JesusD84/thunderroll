@@ -15,20 +15,18 @@ GitHub (repo) ──PR──▶ GitHub Actions (tests) ──✅──▶ merge 
 
 ## Fase 1: CI — GitHub Actions
 
-Al abrir PR hacia `main`, se ejecutan automáticamente:
+En **todo** PR hacia `main` (y en push a `main`) se ejecutan ambos checks. No hay filtros de path: ambos corren siempre, para poder exigirlos en branch protection sin que queden colgados.
 
-### Backend CI
-- **Trigger:** cambios en `backend/**`
-- Python 3.11 + pip install
+### Backend CI (job: `Backend Tests`)
+- Python 3.11 + `pip install -r requirements.txt`
 - `pytest` con SQLite en memoria (sin Postgres)
+- Variables dummy (SECRET_KEY, SMTP_*, FRONTEND_URL) para que arranque el servicio de email
 - Resultado visible en el PR: ✅ o ❌
 
-### Frontend CI
-- **Trigger:** cambios en `frontend/**`
-- Node 18 + `npm ci`
-- `vitest run` (150 tests)
-- `npm run lint`
-- `npm run build`
+### Frontend CI (job: `Frontend Tests`)
+- Node 22 + `npm install --legacy-peer-deps`
+- `npm test` (Vitest)
+- Lint y build **no** corren en CI (incompatibilidades con ESLint v9 y `@vitejs/plugin-react`); el build real lo valida Vercel en cada deploy
 - Resultado visible en el PR: ✅ o ❌
 
 ---
@@ -40,7 +38,7 @@ Al mergear a `main`, se despliega automáticamente:
 | Componente | Plataforma | Plan | Detalle |
 |---|---|---|---|
 | Frontend (Next.js) | **Vercel** | Free | Auto-detecta Next.js, deploy instantáneo |
-| Backend (FastAPI) | **Render** | Free | Web Service desde Dockerfile |
+| Backend (FastAPI) | **Render** | Free | Web Service runtime `python` (pip install + uvicorn) vía `render.yaml` |
 | Base de datos | **Render** | Free | PostgreSQL 1GB (renovable cada 90 días) |
 
 **Limitaciones del free tier:**
@@ -50,11 +48,15 @@ Al mergear a `main`, se despliega automáticamente:
 
 ---
 
-## Fase 3: Branch Protection (opcional)
+## Fase 3: Branch Protection (configurada en `main`)
 
-En GitHub → Settings → Branches → `main`:
-- Require a pull request before merging
-- Require status checks: `Backend CI`, `Frontend CI`
+Ya aplicada vía API. Reglas activas:
+- **Require a pull request before merging** (0 aprobaciones requeridas, para flujo solo-dev)
+- **Require status checks to pass**: `Backend Tests` y `Frontend Tests`
+- **Strict**: la rama del PR debe estar actualizada con `main`
+- **Require conversation resolution**: resolver comentarios antes de mergear
+- **No force pushes / no deletions** sobre `main`
+- `enforce_admins: false` (el admin puede hacer bypass en emergencias)
 
 ---
 
@@ -64,7 +66,7 @@ En GitHub → Settings → Branches → `main`:
 .
 ├── .github/workflows/
 │   ├── backend-ci.yml       # pytest en PR
-│   └── frontend-ci.yml      # vitest + lint + build en PR
+│   └── frontend-ci.yml      # vitest en PR
 ├── render.yaml              # Render Blueprint (backend + DB)
 ├── vercel.json              # Vercel config (opcional)
 └── CI_CD_PLAN.md            # Este documento
@@ -94,17 +96,22 @@ En GitHub → Settings → Branches → `main`:
 
 ## Variables de entorno necesarias
 
-### Backend (Render)
+### Backend (Render) — definidas en `render.yaml`
 ```
-DATABASE_URL=postgresql://...  (Render lo genera auto)
-SECRET_KEY=your-secret-key-here-thunderrol-2024
+DATABASE_URL                 # Render lo inyecta desde la DB del blueprint
+SECRET_KEY                   # generado por Render
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+FRONTEND_URL=https://thunderroll.vercel.app   # habilita CORS para el front
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM   # placeholders
 ```
 
 ### Frontend (Vercel)
 ```
-NEXT_PUBLIC_API_URL=https://thunderroll-backend.onrender.com
+NEXT_PUBLIC_API_URL=https://thunderroll-backend.onrender.com   # llamadas del navegador
+BACKEND_URL=https://thunderroll-backend.onrender.com           # login server-side de NextAuth
 NEXTAUTH_URL=https://thunderroll.vercel.app
-NEXTAUTH_SECRET=your-nextauth-secret-here-thunderrol-2024
+NEXTAUTH_SECRET=...                                            # openssl rand -base64 32
 ```
+
+> **Importante:** `BACKEND_URL` y `NEXT_PUBLIC_API_URL` son distintas y ambas necesarias. El login de NextAuth corre server-side y usa `BACKEND_URL`; si falta, el login falla con "Credenciales inválidas" aunque el resto funcione.
