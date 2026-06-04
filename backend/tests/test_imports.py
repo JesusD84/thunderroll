@@ -1,7 +1,43 @@
 """Integration tests for import endpoints."""
 
+import importlib
+
 import pytest
 from httpx import AsyncClient
+
+
+def test_canonical_model_is_models_module():
+    """TR-01: app.models.models is the canonical source of truth.
+
+    The active import endpoint and seed/repositories all use this module, and
+    the app creates its tables from `models.Base.metadata`. This guards the
+    decision against regressions (e.g. reintroducing the alternate model set).
+    """
+    from app.models.models import Unit
+
+    columns = Unit.__table__.columns
+    # engine_number is a string (alphanumeric supplier values), not BigInteger.
+    assert str(columns["engine_number"].type).upper().startswith("VARCHAR")
+    assert "brand" in columns
+    assert "color" in columns
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "app.services.import_excel",
+        "app.schemas.shipment",
+        "app.schemas.unit_event",
+    ],
+)
+def test_dead_modules_removed(module_name):
+    """TR-02: broken/dead modules must stay deleted.
+
+    These referenced non-existent models (app.models.unit/shipment/unit_event)
+    and were never wired into the running app.
+    """
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
 @pytest.mark.asyncio
