@@ -40,6 +40,29 @@ def test_dead_modules_removed(module_name):
         importlib.import_module(module_name)
 
 
+def test_xlrd_available_for_legacy_xls():
+    """TR-03: xlrd must be installed so legacy .xls files can be parsed."""
+    xlrd = importlib.import_module("xlrd")
+    assert xlrd is not None
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_engine"),
+    [
+        ("inventory.xls", "xlrd"),
+        ("INVENTORY.XLS", "xlrd"),
+        ("inventory.xlsx", "openpyxl"),
+        ("inventory.XLSX", "openpyxl"),
+        ("inventory.xlsm", "openpyxl"),
+    ],
+)
+def test_excel_engine_selection(filename, expected_engine):
+    """TR-03: engine is selected explicitly by extension (case-insensitive)."""
+    from app.api.v1.endpoints.imports import excel_engine_for
+
+    assert excel_engine_for(filename) == expected_engine
+
+
 @pytest.mark.asyncio
 async def test_get_imports(client: AsyncClient, auth_headers, test_users, test_locations):
     """Authenticated user can list imports."""

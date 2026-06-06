@@ -1,4 +1,5 @@
 
+import io
 import os
 import pandas as pd
 from datetime import datetime, UTC
@@ -13,6 +14,18 @@ from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
 
 router = APIRouter()
+
+
+def excel_engine_for(filename: str) -> str:
+    """Return the explicit pandas engine for an Excel filename.
+
+    Legacy .xls files require ``xlrd``; modern .xlsx/.xlsm files use
+    ``openpyxl``. Selecting the engine explicitly avoids relying on pandas'
+    auto-detection and makes the .xls dependency a hard, visible requirement.
+    """
+    if filename.lower().endswith(".xls"):
+        return "xlrd"
+    return "openpyxl"
 
 @router.get("/", response_model=List[schemas.Import])
 def get_imports(
@@ -117,7 +130,7 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
         if file_path.endswith('.csv'):
             df = pd.read_csv(file_path)
         else:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(file_path, engine=excel_engine_for(file_path))
     except Exception as e:
         raise Exception(f"Error reading file: {str(e)}")
     
@@ -251,10 +264,13 @@ async def preview_inventory_file(
         
         # Read first few rows
         if file.filename.endswith('.csv'):
-            import io
             df = pd.read_csv(io.StringIO(content.decode('utf-8')), nrows=5)
         else:
-            df = pd.read_excel(io.BytesIO(content), nrows=5)
+            df = pd.read_excel(
+                io.BytesIO(content),
+                engine=excel_engine_for(file.filename),
+                nrows=5,
+            )
         
         # Expected columns
         expected_columns = ['brand', 'model', 'color', 'engine_number', 'chassis_number']
