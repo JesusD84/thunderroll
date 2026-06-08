@@ -20,7 +20,7 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union
+from typing import Any, Iterator, Optional, Union
 
 import pandas as pd
 
@@ -101,11 +101,45 @@ class ParsedTable:
 
 
 @dataclass
+class SheetRow:
+    """A single data row tagged with its source sheet and field mapping.
+
+    This is the flattened, cross-sheet view consumers iterate over. The sheet
+    name is preserved so downstream code (TR-05 model equivalence, TR-08
+    persistence) can use it as the model when the file has no model column.
+    """
+
+    sheet: Optional[str]
+    has_header: bool
+    field_map: dict[str, str]
+    values: dict[str, Any]
+
+    def canonical(self) -> dict[str, Any]:
+        """Return the row keyed by canonical field (frame/motor/color/model).
+
+        Only includes fields resolved for the sheet. Type normalization of the
+        values is TR-04d; mapping to the persistence model is TR-08.
+        """
+        return {field_name: self.values.get(col) for field_name, col in self.field_map.items()}
+
+
+@dataclass
 class WorkbookParseResult:
     """Aggregate result for a whole file (one entry per non-empty sheet)."""
 
     tables: list[ParsedTable] = field(default_factory=list)
     issues: list[ParseIssue] = field(default_factory=list)
+
+    def iter_rows(self) -> Iterator[SheetRow]:
+        """Iterate every data row across all sheets, tagged with its origin."""
+        for table in self.tables:
+            for values in table.rows:
+                yield SheetRow(
+                    sheet=table.sheet,
+                    has_header=table.has_header,
+                    field_map=table.field_map,
+                    values=values,
+                )
 
 
 def excel_engine_for(filename: str) -> str:
@@ -319,8 +353,10 @@ def _read_raw_sheets(source: Source, filename: str) -> dict[str, pd.DataFrame]:
 def parse_workbook(source: Source, filename: str) -> WorkbookParseResult:
     """Single entry point: read a file and return normalized rows + issues.
 
-    Empty sheets are skipped (with an info issue). Per-sheet semantics such as
-    using the sheet name as the model and cross-sheet dedup are TR-04c.
+    Every sheet is read; sheets that are empty or yield no data rows are skipped
+    with an info issue. Each surviving sheet keeps its name as ``ParsedTable.sheet``
+    so the origin is available to downstream model resolution (TR-05). Use
+    ``WorkbookParseResult.iter_rows()`` for a flattened, origin-tagged view.
     """
     result = WorkbookParseResult()
     raw_sheets = _read_raw_sheets(source, filename)
@@ -336,6 +372,17 @@ def parse_workbook(source: Source, filename: str) -> WorkbookParseResult:
             )
             continue
         table = parse_sheet(raw, sheet_name=sheet_name)
+        if not table.rows:
+            # A sheet with only blank rows (or a header and no data) carries no
+            # units; treat it like an empty sheet so it is not processed.
+            result.issues.append(
+                ParseIssue(
+                    level="info",
+                    message="Sheet has no data rows; skipped.",
+                    sheet=sheet_name,
+                )
+            )
+            continue
         result.tables.append(table)
         result.issues.extend(table.issues)
 
