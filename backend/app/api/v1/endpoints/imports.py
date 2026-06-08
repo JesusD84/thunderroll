@@ -12,20 +12,10 @@ from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
+from app.services.import_parser import excel_engine_for
 
 router = APIRouter()
 
-
-def excel_engine_for(filename: str) -> str:
-    """Return the explicit pandas engine for an Excel filename.
-
-    Legacy .xls files require ``xlrd``; modern .xlsx/.xlsm files use
-    ``openpyxl``. Selecting the engine explicitly avoids relying on pandas'
-    auto-detection and makes the .xls dependency a hard, visible requirement.
-    """
-    if filename.lower().endswith(".xls"):
-        return "xlrd"
-    return "openpyxl"
 
 @router.get("/", response_model=List[schemas.Import])
 def get_imports(
