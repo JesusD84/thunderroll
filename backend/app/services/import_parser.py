@@ -18,6 +18,7 @@ it can be unit-tested without standing up the FastAPI app.
 from __future__ import annotations
 
 import io
+import re
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union
 
@@ -53,6 +54,22 @@ _MIN_HEADER_MATCHES = 2
 # How many leading rows to scan when looking for a header.
 _MAX_HEADER_SCAN = 10
 
+# Canonical fields the parser resolves supplier columns into. Mapping these to
+# the persistence model (chassis_number/engine_number/...) happens downstream.
+CANONICAL_FIELDS: tuple[str, ...] = ("frame", "motor", "color", "model")
+
+# Substring synonyms per canonical field, stored in normalized form (lowercased,
+# whitespace removed) to match against normalized column labels. Order matters:
+# a label is assigned to the first canonical field with a matching synonym.
+FIELD_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "frame": ("frame", "chassis", "chasis", "vin", "车架"),
+    "motor": ("motor", "engine", "电机", "发动机"),
+    "color": ("color", "colour", "颜色"),
+    "model": ("model", "modelo", "型号", "车型"),
+}
+
+_WHITESPACE = re.compile(r"\s+")
+
 
 @dataclass
 class ParseIssue:
@@ -78,6 +95,8 @@ class ParsedTable:
     header_row: Optional[int]
     columns: list[str]
     rows: list[dict[str, Any]]
+    # canonical field (frame/motor/color/model) -> resolved column name.
+    field_map: dict[str, str] = field(default_factory=dict)
     issues: list[ParseIssue] = field(default_factory=list)
 
 
@@ -124,6 +143,64 @@ def _looks_like_header_cell(value: Any) -> bool:
         return False
     text = str(value).strip().lower()
     return any(keyword in text for keyword in HEADER_KEYWORDS)
+
+
+def normalize_label(value: Any) -> str:
+    """Normalize a label for synonym matching: lowercase, strip all whitespace.
+
+    Removing internal spaces and newlines lets a single synonym match noisy
+    supplier labels like ``"Frame number"``, ``"Frame\nNo."`` or
+    ``"车架号Frame serial number"``.
+    """
+    if _is_blank(value):
+        return ""
+    return _WHITESPACE.sub("", str(value).strip().lower())
+
+
+def resolve_field(label: Any) -> Optional[str]:
+    """Resolve a single column label to a canonical field, or ``None``.
+
+    A label maps to the first canonical field (in ``FIELD_SYNONYMS`` order)
+    that has a synonym contained in the normalized label.
+    """
+    norm = normalize_label(label)
+    if not norm:
+        return None
+    for field_name, synonyms in FIELD_SYNONYMS.items():
+        if any(syn in norm for syn in synonyms):
+            return field_name
+    return None
+
+
+def resolve_columns(
+    columns: list[str], sheet_name: Optional[str] = None
+) -> tuple[dict[str, str], list[ParseIssue]]:
+    """Map a list of column names to canonical fields.
+
+    Returns ``(field_map, issues)`` where ``field_map`` is
+    ``canonical_field -> column_name``. When several columns resolve to the
+    same field, the first wins and a warning issue is emitted for the rest.
+    """
+    field_map: dict[str, str] = {}
+    issues: list[ParseIssue] = []
+    for col in columns:
+        field_name = resolve_field(col)
+        if field_name is None:
+            continue
+        if field_name in field_map:
+            issues.append(
+                ParseIssue(
+                    level="warning",
+                    message=(
+                        f"Multiple columns map to '{field_name}': "
+                        f"'{field_map[field_name]}' kept, '{col}' ignored."
+                    ),
+                    sheet=sheet_name,
+                )
+            )
+            continue
+        field_map[field_name] = col
+    return field_map, issues
 
 
 def detect_header_row(
@@ -195,6 +272,11 @@ def parse_sheet(raw: pd.DataFrame, sheet_name: Optional[str] = None) -> ParsedTa
             )
         )
 
+    # Resolve columns to canonical fields. Positional (no-header) columns like
+    # ``col_0`` carry no synonyms, so this yields an empty map for Sample 3.
+    field_map, field_issues = resolve_columns(columns, sheet_name=sheet_name)
+    issues.extend(field_issues)
+
     rows: list[dict[str, Any]] = []
     for _, series in data.iterrows():
         values = series.tolist()
@@ -208,6 +290,7 @@ def parse_sheet(raw: pd.DataFrame, sheet_name: Optional[str] = None) -> ParsedTa
         header_row=header_row,
         columns=columns,
         rows=rows,
+        field_map=field_map,
         issues=issues,
     )
 
