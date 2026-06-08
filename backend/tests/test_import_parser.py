@@ -10,12 +10,16 @@ modeled on the four real supplier samples:
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from app.services.import_parser import (
     detect_header_row,
     excel_engine_for,
+    normalize_label,
     parse_sheet,
     parse_workbook,
+    resolve_columns,
+    resolve_field,
 )
 
 
@@ -149,3 +153,108 @@ def test_parse_workbook_csv_without_header():
     assert table.has_header is False
     assert table.columns == ["col_0", "col_1", "col_2"]
     assert len(table.rows) == 2
+
+
+# --- TR-04b: synonym resolution to canonical fields -------------------------
+
+
+def test_normalize_label_strips_all_whitespace():
+    assert normalize_label("Frame number") == "framenumber"
+    assert normalize_label("  Motor\nNo. ") == "motorno."
+    assert normalize_label("车架号Frame serial number") == "车架号frameserialnumber"
+    assert normalize_label(np.nan) == ""
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("Frame number", "frame"),
+        ("frame number", "frame"),
+        ("Frame", "frame"),
+        ("车架号Frame serial number", "frame"),
+        ("Chassis No.", "frame"),
+        ("Motor number", "motor"),
+        ("Motor", "motor"),
+        ("电机Motor serial number", "motor"),
+        ("Engine No", "motor"),
+        ("Color", "color"),
+        ("COLOUR", "color"),
+        ("颜色", "color"),
+        ("Model", "model"),
+        ("型号", "model"),
+        # Unknown / ambiguous labels resolve to None.
+        ("NO", None),
+        ("Observaciones", None),
+        ("", None),
+    ],
+)
+def test_resolve_field(label, expected):
+    assert resolve_field(label) == expected
+
+
+def test_resolve_columns_duplicate_field_keeps_first_and_warns():
+    field_map, issues = resolve_columns(["Frame number", "Frame", "Color"])
+    assert field_map == {"frame": "Frame number", "color": "Color"}
+    assert any(i.level == "warning" and "frame" in i.message for i in issues)
+
+
+def test_field_map_sample1_headers():
+    df = _df(
+        [
+            ["Frame number", "Motor number", "Model"],
+            ["HXY202512001", "20260102061514", "X3"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    assert table.field_map == {
+        "frame": "Frame number",
+        "motor": "Motor number",
+        "model": "Model",
+    }
+
+
+def test_field_map_sample2_with_junk_column():
+    # tricycle.xls sheets: Frame | Motor | Color | <junk col with nan header>
+    df = _df(
+        [
+            ["Frame ", "Motor", "Color", np.nan],
+            ["HXY202603001", "20260417020749", "Red", "legend"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="X3")
+    assert table.field_map == {
+        "frame": "Frame",
+        "motor": "Motor",
+        "color": "Color",
+    }
+    # the junk 4th column is left unmapped
+    assert "col_3" in table.columns
+
+
+def test_field_map_sample4_chinese_headers():
+    df = _df(
+        [
+            [np.nan, "NO", "COLOUR", "电机Motor serial number", "车架号Frame serial number"],
+            [1.0, "TY-D530", "红RED", "YC-48V25011431", "341022025020579"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    assert table.field_map == {
+        "color": "COLOUR",
+        "motor": "电机Motor serial number",
+        "frame": "车架号Frame serial number",
+    }
+    # 'NO' (model column in the file) is not a recognized synonym -> unmapped.
+    assert "model" not in table.field_map
+
+
+def test_field_map_sample3_no_header_is_empty():
+    df = _df(
+        [
+            ["352222655000228", "ZT48V400W2604S008373", "Blue"],
+            ["352222655000149", "ZT48V400W2604S008375", "Blue"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    assert table.has_header is False
+    assert table.field_map == {}
