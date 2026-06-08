@@ -8,6 +8,8 @@ modeled on the four real supplier samples:
 - Sample 4: header with a leading blank column + Chinese/English labels.
 """
 
+import io
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -258,3 +260,71 @@ def test_field_map_sample3_no_header_is_empty():
     table = parse_sheet(df, sheet_name="Sheet1")
     assert table.has_header is False
     assert table.field_map == {}
+
+
+# --- TR-04c: read every sheet that contains data ----------------------------
+
+
+def _xlsx_bytes(sheets: dict) -> bytes:
+    """Build an in-memory .xlsx where each row of the input becomes a sheet row.
+
+    Each value is a list of rows (lists). The first row is treated as the
+    supplier header, mirroring the real sample layout.
+    """
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for name, rows in sheets.items():
+            pd.DataFrame(rows).to_excel(writer, sheet_name=name, index=False, header=False)
+    return buf.getvalue()
+
+
+def test_parse_workbook_multisheet_counts_and_origin():
+    # Mirrors tricycle.xls: three data sheets, each named like a model.
+    content = _xlsx_bytes(
+        {
+            "X3": [["Frame", "Motor", "Color"], ["F1", "M1", "Red"], ["F2", "M2", "Black"]],
+            "xiaodou": [["Frame", "Motor", "Color"], ["F3", "M3", "Grey"]],
+            "diaoyu": [["frame number", "motor number", "Color"], ["F4", "M4", "Blue"]],
+        }
+    )
+    result = parse_workbook(content, "tricycle.xlsx")
+
+    assert [t.sheet for t in result.tables] == ["X3", "xiaodou", "diaoyu"]
+    assert [len(t.rows) for t in result.tables] == [2, 1, 1]
+    # Origin (sheet name) is preserved and headers resolved per sheet.
+    for table in result.tables:
+        assert table.field_map == {"frame": table.columns[0], "motor": table.columns[1], "color": "Color"}
+
+
+def test_parse_workbook_skips_empty_and_header_only_sheets():
+    content = _xlsx_bytes(
+        {
+            "Data": [["Frame", "Motor", "Color"], ["F1", "M1", "Red"]],
+            "Empty": [],  # truly empty sheet
+            "HeaderOnly": [["Frame", "Motor", "Color"]],  # header, no data rows
+        }
+    )
+    result = parse_workbook(content, "wb.xlsx")
+
+    assert [t.sheet for t in result.tables] == ["Data"]
+    skipped = {i.sheet: i.message for i in result.issues if i.level == "info"}
+    assert "Empty" in skipped
+    assert "HeaderOnly" in skipped
+    assert "no data rows" in skipped["HeaderOnly"]
+
+
+def test_iter_rows_flattens_across_sheets_with_origin():
+    content = _xlsx_bytes(
+        {
+            "X3": [["Frame", "Motor", "Color"], ["F1", "M1", "Red"], ["F2", "M2", "Black"]],
+            "xiaodou": [["Frame", "Motor", "Color"], ["F3", "M3", "Grey"]],
+        }
+    )
+    result = parse_workbook(content, "tricycle.xlsx")
+
+    rows = list(result.iter_rows())
+    assert len(rows) == 3
+    assert [r.sheet for r in rows] == ["X3", "X3", "xiaodou"]
+    # canonical() maps to frame/motor/color regardless of sheet.
+    assert rows[0].canonical() == {"frame": "F1", "motor": "M1", "color": "Red"}
+    assert rows[2].canonical() == {"frame": "F3", "motor": "M3", "color": "Grey"}
