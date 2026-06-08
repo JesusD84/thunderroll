@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -74,7 +74,7 @@ const colorLabels: Record<string, string> = {
   'white': 'Blanco', 'green': 'Verde', 'grey': 'Gris', 'pink': 'Rosa',
 };
 
-export default function UnitsPage() {
+function UnitsPageContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [units, setUnits] = useState<Unit[]>([]);
@@ -268,5 +268,13 @@ export default function UnitsPage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function UnitsPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-8">Cargando...</div>}>
+      <UnitsPageContent />
+    </Suspense>
   );
 }

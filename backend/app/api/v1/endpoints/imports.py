@@ -1,4 +1,5 @@
 
+import io
 import os
 import pandas as pd
 from datetime import datetime, UTC
@@ -118,7 +119,7 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
         if file_path.endswith('.csv'):
             df = pd.read_csv(file_path)
         else:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(file_path, engine=excel_engine_for(file_path))
     except Exception as e:
         raise Exception(f"Error reading file: {str(e)}")
     
@@ -252,10 +253,13 @@ async def preview_inventory_file(
         
         # Read first few rows
         if file.filename.endswith('.csv'):
-            import io
             df = pd.read_csv(io.StringIO(content.decode('utf-8')), nrows=5)
         else:
-            df = pd.read_excel(io.BytesIO(content), nrows=5)
+            df = pd.read_excel(
+                io.BytesIO(content),
+                engine=excel_engine_for(file.filename),
+                nrows=5,
+            )
         
         # Expected columns
         expected_columns = ['brand', 'model', 'color', 'engine_number', 'chassis_number']
