@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 RUN apk add --no-cache libc6-compat su-exec
 
@@ -8,7 +8,7 @@ RUN chown node:node /app
 USER node
 
 COPY --chown=node:node package.json package-lock.json* ./
-RUN npm install
+RUN npm ci --legacy-peer-deps
 
 COPY --chown=node:node . .
 
@@ -22,4 +22,4 @@ RUN sed -i 's/\r$//' /entrypoint.dev.sh
 RUN chmod +x /entrypoint.dev.sh
 
 ENTRYPOINT ["/entrypoint.dev.sh"]
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev"]
