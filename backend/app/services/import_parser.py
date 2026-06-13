@@ -18,6 +18,7 @@ it can be unit-tested without standing up the FastAPI app.
 from __future__ import annotations
 
 import io
+import numbers
 import re
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Optional, Union
@@ -70,6 +71,10 @@ FIELD_SYNONYMS: dict[str, tuple[str, ...]] = {
 
 _WHITESPACE = re.compile(r"\s+")
 
+# Identifier fields whose values must be kept as exact strings (no scientific
+# notation, no lost leading zeros, alphanumerics intact). See TR-04d.
+ID_FIELDS: tuple[str, ...] = ("frame", "motor")
+
 
 @dataclass
 class ParseIssue:
@@ -117,10 +122,18 @@ class SheetRow:
     def canonical(self) -> dict[str, Any]:
         """Return the row keyed by canonical field (frame/motor/color/model).
 
-        Only includes fields resolved for the sheet. Type normalization of the
-        values is TR-04d; mapping to the persistence model is TR-08.
+        Only includes fields resolved for the sheet. Identifier fields
+        (``frame``/``motor``) are normalized to exact strings (TR-04d); mapping
+        to the persistence model is TR-08.
         """
-        return {field_name: self.values.get(col) for field_name, col in self.field_map.items()}
+        result: dict[str, Any] = {}
+        for field_name, col in self.field_map.items():
+            value = self.values.get(col)
+            if field_name in ID_FIELDS:
+                result[field_name] = normalize_id_value(value)
+            else:
+                result[field_name] = value
+        return result
 
 
 @dataclass
@@ -189,6 +202,32 @@ def normalize_label(value: Any) -> str:
     if _is_blank(value):
         return ""
     return _WHITESPACE.sub("", str(value).strip().lower())
+
+
+def normalize_id_value(value: Any) -> str:
+    """Normalize an identifier (frame/motor) cell to an exact string.
+
+    Spreadsheets often store long serials as numbers, so a frame read back as a
+    float would otherwise become ``"3.52e+14"`` or ``"352...0.0"``. This:
+    - returns ``""`` for blank/NaN cells,
+    - renders integral numbers without a decimal part or scientific notation
+      (a 15-digit integer stays a 15-digit string),
+    - keeps alphanumeric values (``ZT48V400W...``, ``YC-48V...``) and any
+      existing string (incl. leading zeros) verbatim after trimming.
+    """
+    if _is_blank(value):
+        return ""
+    if isinstance(value, bool):
+        # bool is a subclass of int; treat it as plain text, not 0/1.
+        return str(value).strip()
+    if isinstance(value, numbers.Integral):
+        return str(int(value))
+    if isinstance(value, numbers.Real):
+        as_float = float(value)
+        if as_float.is_integer():
+            return str(int(as_float))
+        return format(as_float, "f").rstrip("0").rstrip(".")
+    return str(value).strip()
 
 
 def resolve_field(label: Any) -> Optional[str]:

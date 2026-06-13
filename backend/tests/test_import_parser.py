@@ -17,6 +17,7 @@ import pytest
 from app.services.import_parser import (
     detect_header_row,
     excel_engine_for,
+    normalize_id_value,
     normalize_label,
     parse_sheet,
     parse_workbook,
@@ -328,3 +329,78 @@ def test_iter_rows_flattens_across_sheets_with_origin():
     # canonical() maps to frame/motor/color regardless of sheet.
     assert rows[0].canonical() == {"frame": "F1", "motor": "M1", "color": "Red"}
     assert rows[2].canonical() == {"frame": "F3", "motor": "M3", "color": "Grey"}
+
+
+# --- TR-04d: frame/motor type normalization ---------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        # 15-digit number stored as int / float must stay a 15-digit string.
+        (352222655000228, "352222655000228"),
+        (352222655000228.0, "352222655000228"),
+        (np.int64(341022025020579), "341022025020579"),
+        (np.float64(341022025020579.0), "341022025020579"),
+        # Alphanumeric motors (Samples 3/4) kept verbatim.
+        ("ZT48V400W2604S008373", "ZT48V400W2604S008373"),
+        ("YC-48V25011431", "YC-48V25011431"),
+        # Existing strings: trimmed, leading zeros preserved.
+        ("  HXY202512001 ", "HXY202512001"),
+        ("00123", "00123"),
+        # Blank / NaN -> empty string.
+        (np.nan, ""),
+        (None, ""),
+        # Non-integral float keeps its fractional part without trailing zeros.
+        (12.5, "12.5"),
+    ],
+)
+def test_normalize_id_value(value, expected):
+    assert normalize_id_value(value) == expected
+
+
+def test_normalize_id_value_no_scientific_notation():
+    # A large float must never render in scientific notation.
+    result = normalize_id_value(3.52222655000228e14)
+    assert "e" not in result.lower()
+    assert result == "352222655000228"
+
+
+def test_canonical_normalizes_only_frame_and_motor():
+    df = _df(
+        [
+            ["Frame", "Motor", "Color"],
+            [352222655000228, 20260102061514, "Blue"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    from app.services.import_parser import SheetRow
+
+    sr = SheetRow(
+        sheet=table.sheet,
+        has_header=table.has_header,
+        field_map=table.field_map,
+        values=table.rows[0],
+    )
+    canonical = sr.canonical()
+    # frame/motor -> exact strings; color untouched.
+    assert canonical["frame"] == "352222655000228"
+    assert canonical["motor"] == "20260102061514"
+    assert canonical["color"] == "Blue"
+
+
+def test_numeric_frame_via_workbook_roundtrip_stays_string():
+    # Frame stored as a number in the .xlsx must come out as a clean string.
+    content = _xlsx_bytes(
+        {
+            "Sheet1": [
+                ["Frame", "Motor", "Color"],
+                [352222655000228, "ZT48V400W2604S008373", "Blue"],
+            ]
+        }
+    )
+    result = parse_workbook(content, "wb.xlsx")
+    canonical = next(result.iter_rows()).canonical()
+    assert canonical["frame"] == "352222655000228"
+    assert "." not in canonical["frame"]
+    assert canonical["motor"] == "ZT48V400W2604S008373"
