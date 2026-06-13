@@ -404,3 +404,82 @@ def test_numeric_frame_via_workbook_roundtrip_stays_string():
     assert canonical["frame"] == "352222655000228"
     assert "." not in canonical["frame"]
     assert canonical["motor"] == "ZT48V400W2604S008373"
+
+
+# --- TR-04e: junk columns and merged-cell forward-fill ----------------------
+
+
+def test_forward_fill_merged_model_column():
+    # Model is a merged cell: only the first row of each block carries it.
+    df = _df(
+        [
+            ["Frame", "Motor", "Model"],
+            ["F1", "M1", "X3"],
+            ["F2", "M2", None],
+            ["F3", "M3", None],
+            ["F4", "M4", "Y5"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    models = [r["Model"] for r in table.rows]
+    assert models == ["X3", "X3", "X3", "Y5"]
+    assert any(
+        i.level == "info" and "Forward-filled" in i.message and "model" in i.message
+        for i in table.issues
+    )
+
+
+def test_identifier_columns_are_never_forward_filled():
+    # A blank frame must stay blank, not inherit the row above.
+    df = _df(
+        [
+            ["Frame", "Motor", "Color"],
+            ["F1", "M1", "Red"],
+            [None, "M2", "Blue"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    # raw second row frame is blank, not "F1"
+    assert table.rows[1]["Frame"] != "F1"
+    # and through canonical(), the blank frame normalizes to "" (not "F1")
+    from app.services.import_parser import SheetRow
+
+    sr = SheetRow(table.sheet, table.has_header, table.field_map, table.rows[1])
+    assert sr.canonical()["frame"] == ""
+
+
+def test_color_legend_column_is_ignored():
+    # Mirrors Sample 2: a 4th column holds a colour legend only in the 1st row.
+    df = _df(
+        [
+            ["Frame", "Motor", "Color", None],
+            ["F1", "M1", "Red", "Red9  Blue5  Black6 Grey4"],
+            ["F2", "M2", "Black", None],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="X3")
+    assert "col_3" not in table.field_map.values()
+    assert any(
+        i.level == "info" and "Ignoring" in i.message and "col_3" in i.message
+        for i in table.issues
+    )
+    from app.services.import_parser import SheetRow
+
+    sr = SheetRow(table.sheet, table.has_header, table.field_map, table.rows[0])
+    # the legend text never appears in the canonical unit row
+    assert sr.canonical() == {"frame": "F1", "motor": "M1", "color": "Red"}
+
+
+def test_missing_optional_fields_do_not_break_parsing():
+    df = _df(
+        [
+            ["Frame number", "Motor number"],
+            ["F1", "M1"],
+        ]
+    )
+    table = parse_sheet(df, sheet_name="Sheet1")
+    assert table.field_map == {"frame": "Frame number", "motor": "Motor number"}
+    from app.services.import_parser import SheetRow
+
+    sr = SheetRow(table.sheet, table.has_header, table.field_map, table.rows[0])
+    assert sr.canonical() == {"frame": "F1", "motor": "M1"}

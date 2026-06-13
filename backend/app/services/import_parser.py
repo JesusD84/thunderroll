@@ -75,6 +75,12 @@ _WHITESPACE = re.compile(r"\s+")
 # notation, no lost leading zeros, alphanumerics intact). See TR-04d.
 ID_FIELDS: tuple[str, ...] = ("frame", "motor")
 
+# Descriptive (category) fields that may live in merged cells spanning several
+# rows; their column is forward-filled so every unit keeps the value (TR-04e).
+# Identifier fields are deliberately excluded: a blank frame/motor means the
+# value is missing, never that it repeats the row above.
+FORWARD_FILL_FIELDS: tuple[str, ...] = ("model",)
+
 
 @dataclass
 class ParseIssue:
@@ -350,12 +356,52 @@ def parse_sheet(raw: pd.DataFrame, sheet_name: Optional[str] = None) -> ParsedTa
     field_map, field_issues = resolve_columns(columns, sheet_name=sheet_name)
     issues.extend(field_issues)
 
-    rows: list[dict[str, Any]] = []
-    for _, series in data.iterrows():
-        values = series.tolist()
-        if all(_is_blank(v) for v in values):
-            continue  # skip fully-empty rows
-        rows.append({columns[i]: values[i] for i in range(width)})
+    # Drop fully-empty rows up front so they cannot receive a forward-filled
+    # value (a blank row is not a merged cell, it is simply not a unit).
+    data = data[~data.apply(lambda r: all(_is_blank(v) for v in r.tolist()), axis=1)].copy()
+
+    # Forward-fill descriptive columns held in merged cells (e.g. a model that
+    # only appears in the first row of its block). Never identifier columns.
+    for field_name in FORWARD_FILL_FIELDS:
+        col = field_map.get(field_name)
+        if col is None:
+            continue
+        pos = columns.index(col)
+        before = data.iloc[:, pos]
+        filled = before.ffill()
+        n_filled = int((before.isna() & filled.notna()).sum())
+        if n_filled:
+            data.iloc[:, pos] = filled
+            issues.append(
+                ParseIssue(
+                    level="info",
+                    message=(
+                        f"Forward-filled {n_filled} merged cell(s) in "
+                        f"'{field_name}' column ('{col}')."
+                    ),
+                    sheet=sheet_name,
+                )
+            )
+
+    # Unmapped columns (index columns, colour legends, blank junk) carry no
+    # canonical field and are ignored by ``SheetRow.canonical()``; surface them
+    # as info so the drop is visible. Skipped for the all-positional no-header
+    # case, which already warns about positional mapping.
+    if has_header:
+        ignored = [c for c in columns if c not in field_map.values()]
+        if ignored:
+            issues.append(
+                ParseIssue(
+                    level="info",
+                    message=f"Ignoring {len(ignored)} unmapped column(s): {', '.join(ignored)}.",
+                    sheet=sheet_name,
+                )
+            )
+
+    rows: list[dict[str, Any]] = [
+        {columns[i]: series.tolist()[i] for i in range(width)}
+        for _, series in data.iterrows()
+    ]
 
     return ParsedTable(
         sheet=sheet_name,
