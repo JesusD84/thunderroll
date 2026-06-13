@@ -4,6 +4,34 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
+def test_get_mail_config_builds_without_smtp_envs(monkeypatch):
+    """The mail config builds lazily even with no SMTP envs set (TR-10)."""
+    for var in ("SMTP_USER", "SMTP_FROM", "SMTP_PASSWORD", "SMTP_HOST", "SMTP_PORT"):
+        monkeypatch.delenv(var, raising=False)
+
+    from app.services import email
+
+    email.get_mail_config.cache_clear()
+    config = email.get_mail_config()
+    # Falls back to a syntactically valid sender instead of raising.
+    assert str(config.MAIL_FROM) == "noreply@example.com"
+    email.get_mail_config.cache_clear()
+
+
+def test_get_mail_config_uses_smtp_from_when_set(monkeypatch):
+    """Real delivery config is honored when SMTP envs are present (TR-10)."""
+    monkeypatch.setenv("SMTP_FROM", "real@company.com")
+    monkeypatch.setenv("SMTP_USER", "smtp-user@company.com")
+
+    from app.services import email
+
+    email.get_mail_config.cache_clear()
+    config = email.get_mail_config()
+    assert str(config.MAIL_FROM) == "real@company.com"
+    assert config.MAIL_USERNAME == "smtp-user@company.com"
+    email.get_mail_config.cache_clear()
+
+
 @patch("app.services.email.FastMail")
 async def test_send_password_reset_email(mock_fastmail_cls):
     """Constructs and sends a password reset email."""
