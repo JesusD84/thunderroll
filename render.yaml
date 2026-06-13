@@ -7,10 +7,11 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     rootDir: backend
     envVars:
+      # Connection string de Neon. Se gestiona en el dashboard de Render
+      # (Environment), no en el blueprint, para no exponer credenciales en git.
+      # Debe incluir ?sslmode=require.
       - key: DATABASE_URL
-        fromDatabase:
-          name: thunderroll-db
-          property: connectionString
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: ALGORITHM
@@ -29,9 +30,3 @@ services:
         value: changeme
       - key: SMTP_FROM
         value: noreply@thunderroll.com
-
-databases:
-  - name: thunderroll-db
-    plan: free
-    databaseName: thunderroll
-    user: thunderroll
