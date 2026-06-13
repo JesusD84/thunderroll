@@ -1,26 +1,42 @@
 import os
+from functools import lru_cache
+
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+# A syntactically valid fallback sender so the config can always be built, even
+# with no SMTP envs (e.g. when running tests). Real delivery still requires
+# SMTP_USER/SMTP_FROM to be set to a real address.
+_DEFAULT_MAIL_FROM = "noreply@example.com"
 
-_mail_config = ConnectionConfig(
-    MAIL_USERNAME=SMTP_USER,
-    MAIL_PASSWORD=SMTP_PASSWORD,
-    MAIL_FROM=SMTP_FROM,
-    MAIL_PORT=SMTP_PORT,
-    MAIL_SERVER=SMTP_HOST,
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True
-)
+
+def _frontend_url() -> str:
+    return os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+
+@lru_cache(maxsize=1)
+def get_mail_config() -> ConnectionConfig:
+    """Build the FastMail connection config lazily.
+
+    Reading the environment and validating ``MAIL_FROM`` happen on first use
+    (when an email is actually sent), not at import time. This keeps importing
+    the app and running the test suite from requiring SMTP envs, while real
+    delivery still works once they are configured. See TR-10.
+    """
+    smtp_user = os.getenv("SMTP_USER", "")
+    return ConnectionConfig(
+        MAIL_USERNAME=smtp_user,
+        MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
+        MAIL_FROM=os.getenv("SMTP_FROM") or smtp_user or _DEFAULT_MAIL_FROM,
+        MAIL_PORT=int(os.getenv("SMTP_PORT", "587")),
+        MAIL_SERVER=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        MAIL_STARTTLS=True,
+        MAIL_SSL_TLS=False,
+        USE_CREDENTIALS=True,
+    )
+
 
 async def send_password_reset_email(to_email: str, reset_token: str) -> None:
-    reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    reset_url = f"{_frontend_url()}/reset-password?token={reset_token}"
 
     html_body = f"""
     <p>You requested a password reset for your Thunderrol account.</p>
@@ -44,5 +60,5 @@ async def send_password_reset_email(to_email: str, reset_token: str) -> None:
         alternative_body=plain_body,
     )
 
-    fm = FastMail(_mail_config)
+    fm = FastMail(get_mail_config())
     await fm.send_message(message)
