@@ -319,6 +319,88 @@ async def test_upload_duplicate_rows_are_reported_not_fatal(
     assert body["failed_imports"] == 1
 
 
+# --- TR-08: atomic batch import, per-row errors, authenticated transfer owner -
+
+
+@pytest.mark.asyncio
+async def test_upload_transfer_uses_authenticated_user(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """The inbound transfer is owned by the authenticated user, not a hardcoded id."""
+    from app.models.models import User, Transfer
+
+    admin = db_session.query(User).filter(User.username == "admin").first()
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["AUTH-FRAME-001", "AUTH-MOTOR-001"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "auth.xlsx", content)
+    assert resp.status_code == 200, resp.text
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "AUTH-FRAME-001").first()
+    transfer = db_session.query(Transfer).filter(Transfer.unit_id == unit.id).first()
+    assert transfer is not None
+    assert transfer.dispatched_by_id == admin.id
+
+
+@pytest.mark.asyncio
+async def test_upload_records_per_row_error_details(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """Failed rows are logged in ImportError with row number + raw data."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["ERR-FRAME-001", "ERR-MOTOR-001"],
+            ["ERR-FRAME-001", "ERR-MOTOR-002"],  # duplicate chassis -> error row
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "errdetail.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    import_id = resp.json()["import_id"]
+
+    errors_resp = await client.get(
+        f"/api/v1/imports/{import_id}/errors", headers=auth_headers
+    )
+    assert errors_resp.status_code == 200
+    errors = errors_resp.json()
+    assert len(errors) == 1
+    err = errors[0]
+    assert err["row_number"] == 2
+    assert "already exists" in err["error_message"]
+    assert "ERR-FRAME-001" in err["raw_data"]
+
+
+@pytest.mark.asyncio
+async def test_upload_existing_db_unit_blocks_duplicate_row(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """A row matching a unit already in the DB is reported, others still import."""
+    first = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["PERSIST-FRAME-001", "PERSIST-MOTOR-001"],
+        ])
+    ])
+    assert (await _upload(client, auth_headers, "first.xlsx", first)).status_code == 200
+
+    second = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["PERSIST-FRAME-001", "PERSIST-MOTOR-999"],  # chassis already in DB
+            ["PERSIST-FRAME-002", "PERSIST-MOTOR-002"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "second.xlsx", second)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["total_records"] == 2
+    assert body["successful_imports"] == 1
+    assert body["failed_imports"] == 1
+
+
 @pytest.mark.asyncio
 async def test_upload_applies_model_equivalence(
     client, auth_headers, test_users, test_locations, db_session

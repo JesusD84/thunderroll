@@ -3,7 +3,6 @@ import os
 import json
 from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -161,6 +160,7 @@ async def upload_inventory_file(
             batch_period=batch_period,
             product_type=product_type,
             column_mapping=manual_mapping,
+            dispatched_by_id=current_user.id,
         )
         
         # Update import record
@@ -193,6 +193,7 @@ async def process_inventory_file(
     batch_period: Optional[str] = None,
     product_type: Optional[str] = None,
     column_mapping: Optional[dict] = None,
+    dispatched_by_id: Optional[int] = None,
 ):
     """Process an uploaded inventory file and import units.
 
@@ -207,6 +208,14 @@ async def process_inventory_file(
 
     ``column_mapping`` is an optional user-confirmed column->field mapping that
     overrides the automatic detection before rows are read (TR-07).
+
+    Persistence is batched (TR-08): rows are validated in a single pass, then the
+    valid units and their inbound transfers are inserted in one transaction
+    (``add_all`` + single ``commit``) instead of committing per row. Invalid rows
+    (duplicate identifiers in the DB or within the file) are recorded in
+    ``ImportError`` with their row number and raw data, without aborting the
+    valid rows. ``dispatched_by_id`` is the authenticated user that owns the
+    inbound transfers (no longer hardcoded).
     """
     filename = os.path.basename(file_path)
     try:
@@ -241,11 +250,11 @@ async def process_inventory_file(
         db.commit()
         db.refresh(default_location)
 
-    total_records = 0
-    successful_imports = 0
-    failed_imports = 0
+    # --- Pass 1: turn every unit-candidate row into a normalized record. -----
+    # No DB writes happen here; we only read (model equivalence lookups) and
+    # collect what we need so the actual insert can be done in one batch.
+    candidates: list[dict] = []
     row_number = 0
-
     for sheet_row in result.iter_rows():
         # Skip rows from sheets that never mapped an identifier column.
         if "frame" not in sheet_row.field_map and "motor" not in sheet_row.field_map:
@@ -259,87 +268,116 @@ async def process_inventory_file(
             continue
 
         row_number += 1
-        total_records += 1
-        try:
-            chassis_number = frame or None
-            engine_number = motor or None
-            # Model falls back to the sheet name (suppliers often put the model
-            # there) and then to a placeholder; brand is never supplied.
-            manufacturer_model = _text_or_default(
-                canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL
-            )
-            # Translate the manufacturer model to the client's internal model when
-            # an equivalence exists; otherwise keep the manufacturer name as-is so
-            # the import never blocks (TR-05).
-            model_name = resolve_internal_model(db, manufacturer_model) or manufacturer_model
-            color_name = _text_or_default(canonical.get("color"), DEFAULT_COLOR)
-            brand_name = DEFAULT_BRAND
+        # Model falls back to the sheet name (suppliers often put the model
+        # there) and then to a placeholder; brand is never supplied.
+        manufacturer_model = _text_or_default(
+            canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL
+        )
+        # Translate the manufacturer model to the client's internal model when
+        # an equivalence exists; otherwise keep the manufacturer name as-is so
+        # the import never blocks (TR-05).
+        model_name = resolve_internal_model(db, manufacturer_model) or manufacturer_model
+        candidates.append({
+            "row_number": row_number,
+            "sheet": sheet_row.sheet,
+            "canonical": canonical,
+            "engine_number": motor or None,
+            "chassis_number": frame or None,
+            "model": model_name,
+            "color": _text_or_default(canonical.get("color"), DEFAULT_COLOR),
+        })
 
-            # Check for duplicates on the identifiers that are actually present.
-            dup_conditions = []
-            if engine_number is not None:
-                dup_conditions.append(models.Unit.engine_number == engine_number)
-            if chassis_number is not None:
-                dup_conditions.append(models.Unit.chassis_number == chassis_number)
-            existing_unit = (
-                db.query(models.Unit).filter(or_(*dup_conditions)).first()
-                if dup_conditions
-                else None
-            )
-            if existing_unit:
-                raise ValueError(
-                    f"Unit with engine number {engine_number} or chassis number "
-                    f"{chassis_number} already exists"
-                )
+    total_records = len(candidates)
 
-            unit = models.Unit(
-                engine_number=engine_number,
-                chassis_number=chassis_number,
-                model=model_name,
-                brand=brand_name,
-                color=color_name,
-                batch_period=batch_period,
-                product_type=product_type,
-                current_location_id=default_location.id,
-                status=UnitStatus.AVAILABLE,
-            )
-            db.add(unit)
-            db.commit()
-            db.refresh(unit)
+    # --- Duplicate detection: one query for existing identifiers in the DB. ---
+    engine_values = [c["engine_number"] for c in candidates if c["engine_number"]]
+    chassis_values = [c["chassis_number"] for c in candidates if c["chassis_number"]]
+    existing_engines = {
+        e for (e,) in db.query(models.Unit.engine_number)
+        .filter(models.Unit.engine_number.in_(engine_values)).all()
+    } if engine_values else set()
+    existing_chassis = {
+        c for (c,) in db.query(models.Unit.chassis_number)
+        .filter(models.Unit.chassis_number.in_(chassis_values)).all()
+    } if chassis_values else set()
 
-            transfer = models.Transfer(
+    # --- Pass 2: validate each candidate and build the batch. ----------------
+    seen_engines: set = set()
+    seen_chassis: set = set()
+    units: list[models.Unit] = []
+    error_records: list[models.ImportError] = []
+
+    for c in candidates:
+        engine_number = c["engine_number"]
+        chassis_number = c["chassis_number"]
+
+        # Reject identifiers already in the DB or seen earlier in this same file.
+        dup_message = None
+        if engine_number is not None and (
+            engine_number in existing_engines or engine_number in seen_engines
+        ):
+            dup_message = f"Unit with engine number {engine_number} already exists"
+        elif chassis_number is not None and (
+            chassis_number in existing_chassis or chassis_number in seen_chassis
+        ):
+            dup_message = f"Unit with chassis number {chassis_number} already exists"
+
+        if dup_message:
+            sheet_label = f"[{c['sheet']}] " if c["sheet"] else ""
+            error_records.append(models.ImportError(
+                import_id=import_id,
+                row_number=c["row_number"],
+                error_message=f"{sheet_label}{dup_message}",
+                raw_data=json.dumps(c["canonical"], default=str),
+            ))
+            continue
+
+        if engine_number is not None:
+            seen_engines.add(engine_number)
+        if chassis_number is not None:
+            seen_chassis.add(chassis_number)
+
+        units.append(models.Unit(
+            engine_number=engine_number,
+            chassis_number=chassis_number,
+            model=c["model"],
+            brand=DEFAULT_BRAND,
+            color=c["color"],
+            batch_period=batch_period,
+            product_type=product_type,
+            current_location_id=default_location.id,
+            status=UnitStatus.AVAILABLE,
+        ))
+
+    # --- Persist the whole batch in a single transaction. --------------------
+    # Valid units and their inbound transfers are inserted together; per-row
+    # errors are written in the same commit. A failure here rolls everything
+    # back and is surfaced to the caller (which marks the import as failed).
+    try:
+        db.add_all(units)
+        db.flush()  # assign unit IDs without ending the transaction
+        now = datetime.now(UTC)
+        db.add_all([
+            models.Transfer(
                 unit_id=unit.id,
-                dispatched_by_id=1,
+                dispatched_by_id=dispatched_by_id,
                 destination_location_id=default_location.id,
                 status=TransferStatus.RECEIVED,
-                dispatched_at=datetime.now(UTC),
-                received_at=datetime.now(UTC),
+                dispatched_at=now,
+                received_at=now,
             )
-            db.add(transfer)
-            db.commit()
-
-            successful_imports += 1
-
-        except Exception as e:
-            # Roll back the failed unit/transfer so the session stays usable
-            # for the remaining rows, then record the per-row error.
-            db.rollback()
-            failed_imports += 1
-            sheet_label = f"[{sheet_row.sheet}] " if sheet_row.sheet else ""
-            error_record = models.ImportError(
-                import_id=import_id,
-                row_number=row_number,
-                error_message=f"{sheet_label}{str(e)}",
-                raw_data=json.dumps(canonical, default=str),
-            )
-            db.add(error_record)
-            db.commit()
-            continue
+            for unit in units
+        ])
+        db.add_all(error_records)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "total_records": total_records,
-        "successful_imports": successful_imports,
-        "failed_imports": failed_imports,
+        "successful_imports": len(units),
+        "failed_imports": len(error_records),
     }
 
 # Cap how many invalid rows the preview reports so a wholly-broken file does

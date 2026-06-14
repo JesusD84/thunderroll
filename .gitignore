@@ -3,6 +3,9 @@ AGENTS.md
 agents.md
 .codellm/rules
 
+# Local-only planning/tracking notes (not for the repo)
+backend/IMPORTS_MODULE_TASKS.md
+
 # ================================
 # PYTHON / FASTAPI BACKEND
 # ================================
