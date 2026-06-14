@@ -2,6 +2,7 @@
 
 import importlib
 import io
+import json
 
 import pytest
 from httpx import AsyncClient
@@ -485,3 +486,131 @@ async def test_preview_reports_detected_fields(
     assert body["validation"]["is_valid"] is True
     assert set(body["detected_fields"]) == {"frame", "motor", "color", "model"}
     assert len(body["preview_data"]) == 1
+
+
+# --- TR-07: assisted mapping (proposed mapping, manual override, invalid rows) -
+
+
+async def _preview(client, auth_headers, filename, content, data=None):
+    files = {
+        "file": (
+            filename,
+            content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
+    return await client.post(
+        "/api/v1/imports/preview", files=files, data=data, headers=auth_headers
+    )
+
+
+@pytest.mark.asyncio
+async def test_preview_reports_columns_and_proposed_mapping(
+    client, auth_headers, test_users, test_locations
+):
+    """Preview exposes raw columns and a column->field proposal per sheet."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "NO"],  # "NO" is not a recognizable synonym
+            ["PM-FRAME-001", "PM-MOTOR-001", "X3"],
+        ])
+    ])
+    resp = await _preview(client, auth_headers, "propose.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    sheet = resp.json()["sheets"][0]
+    assert sheet["columns"] == ["Frame", "Motor", "NO"]
+    assert sheet["column_mapping"]["Frame"] == "frame"
+    assert sheet["column_mapping"]["Motor"] == "motor"
+    assert sheet["column_mapping"]["NO"] is None  # unmapped -> proposed as null
+
+
+@pytest.mark.asyncio
+async def test_preview_flags_invalid_rows_without_persisting(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """Rows with no identifier or duplicate identifiers are flagged; nothing saved."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "Color"],
+            ["IV-FRAME-001", "IV-MOTOR-001", "Rojo"],
+            [None, None, "Verde"],            # no identifier
+            ["IV-FRAME-001", "IV-MOTOR-002", "Azul"],  # duplicate frame
+        ])
+    ])
+    resp = await _preview(client, auth_headers, "invalid.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["invalid_rows_count"] == 2
+    reasons = " ".join(r["reasons"][0] for r in body["invalid_rows"])
+    assert "No identifier" in reasons
+    assert "Duplicate identifier" in reasons
+    # Nothing was persisted by the preview.
+    assert db_session.query(Unit).filter(Unit.chassis_number == "IV-FRAME-001").first() is None
+
+
+@pytest.mark.asyncio
+async def test_preview_applies_manual_mapping(
+    client, auth_headers, test_users, test_locations
+):
+    """A manual mapping passed to preview re-maps the column in the proposal."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "NO"],
+            ["PMM-FRAME-001", "PMM-MOTOR-001", "X3"],
+        ])
+    ])
+    resp = await _preview(
+        client, auth_headers, "manualpreview.xlsx", content,
+        data={"column_mapping": json.dumps({"NO": "model"})},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "model" in body["detected_fields"]
+    assert body["sheets"][0]["column_mapping"]["NO"] == "model"
+    assert body["preview_data"][0]["model"] == "X3"
+
+
+@pytest.mark.asyncio
+async def test_upload_with_manual_mapping_overrides_detection(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """A manual mapping on /upload persists the model from an unmapped column."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "NO"],
+            ["MAP-FRAME-001", "MAP-MOTOR-001", "X3"],
+        ])
+    ])
+    resp = await _upload(
+        client, auth_headers, "manual.xlsx", content,
+        data={"column_mapping": json.dumps({"NO": "model"})},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["successful_imports"] == 1
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "MAP-FRAME-001").first()
+    assert unit.model == "X3"  # without the mapping this would be the sheet name
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_malformed_column_mapping(
+    client, auth_headers, test_users, test_locations
+):
+    """Malformed JSON and unknown fields are rejected with 400 before persisting."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["BAD-FRAME-001", "BAD-MOTOR-001"],
+        ])
+    ])
+    bad_json = await _upload(
+        client, auth_headers, "badjson.xlsx", content,
+        data={"column_mapping": "{not json}"},
+    )
+    assert bad_json.status_code == 400
+
+    bad_field = await _upload(
+        client, auth_headers, "badfield.xlsx", content,
+        data={"column_mapping": json.dumps({"Frame": "bogus"})},
+    )
+    assert bad_field.status_code == 400

@@ -15,6 +15,8 @@ import pandas as pd
 import pytest
 
 from app.services.import_parser import (
+    WorkbookParseResult,
+    apply_manual_mapping,
     detect_header_row,
     excel_engine_for,
     normalize_id_value,
@@ -29,6 +31,12 @@ from app.services.import_parser import (
 def _df(rows):
     """Build a header-less DataFrame (like pd.read_excel(header=None))."""
     return pd.DataFrame(rows)
+
+
+def _result_from_df(rows, sheet_name="Sheet1"):
+    """Parse one DataFrame into a single-table WorkbookParseResult."""
+    table = parse_sheet(_df(rows), sheet_name=sheet_name)
+    return WorkbookParseResult(tables=[table])
 
 
 def test_excel_engine_for():
@@ -483,3 +491,58 @@ def test_missing_optional_fields_do_not_break_parsing():
 
     sr = SheetRow(table.sheet, table.has_header, table.field_map, table.rows[0])
     assert sr.canonical() == {"frame": "F1", "motor": "M1"}
+
+
+# --- TR-07: manual mapping override ------------------------------------------
+
+
+def test_apply_manual_mapping_maps_unrecognized_column_to_model():
+    # Sample-4 shape: the model lives under a "NO" column the parser can't resolve.
+    result = _result_from_df([
+        ["Frame", "Motor", "NO"],
+        ["F1", "M1", "X3"],
+        ["F2", "M2", "xiaodou"],
+    ])
+    table = result.tables[0]
+    assert "model" not in table.field_map  # not auto-detected
+
+    apply_manual_mapping(result, {"NO": "model"})
+
+    assert table.field_map["model"] == "NO"
+    rows = [r for r in result.iter_rows()]
+    assert rows[0].canonical()["model"] == "X3"
+    assert rows[1].canonical()["model"] == "xiaodou"
+
+
+def test_apply_manual_mapping_forward_fills_merged_model_column():
+    result = _result_from_df([
+        ["Frame", "Motor", "NO"],
+        ["F1", "M1", "X3"],
+        ["F2", "M2", None],  # merged cell under the manually mapped model column
+        ["F3", "M3", None],
+    ])
+    apply_manual_mapping(result, {"NO": "model"})
+    models = [r.canonical()["model"] for r in result.iter_rows()]
+    assert models == ["X3", "X3", "X3"]
+
+
+def test_apply_manual_mapping_reassigns_a_column_to_one_field():
+    result = _result_from_df([
+        ["Frame", "Motor"],
+        ["F1", "M1"],
+    ])
+    # Reassign the auto-detected frame column to model; it must not stay as frame.
+    apply_manual_mapping(result, {"Frame": "model"})
+    fm = result.tables[0].field_map
+    assert fm.get("model") == "Frame"
+    assert fm.get("frame") != "Frame"
+
+
+def test_apply_manual_mapping_ignores_unknown_field_and_missing_column():
+    result = _result_from_df([
+        ["Frame", "Motor"],
+        ["F1", "M1"],
+    ])
+    before = dict(result.tables[0].field_map)
+    apply_manual_mapping(result, {"Motor": "bogus", "DoesNotExist": "model"})
+    assert result.tables[0].field_map == before
