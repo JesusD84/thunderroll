@@ -71,6 +71,8 @@ class Unit(UnitBase):
     model: Optional[str] = None
     brand: Optional[str] = None
     color: Optional[str] = None
+    batch_period: Optional[str] = None
+    product_type: Optional[str] = None
     current_location: Optional[Location] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -108,6 +110,8 @@ class Import(ImportBase):
     failed_imports: int
     user_id: int
     status: str
+    batch_period: Optional[str] = None
+    product_type: Optional[str] = None
     import_date: datetime
     completed_at: Optional[datetime] = None
     user: Optional[User] = None

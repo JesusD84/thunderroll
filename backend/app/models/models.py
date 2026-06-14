@@ -66,6 +66,10 @@ class Unit(Base):
     color = Column(String(100), nullable=False)
     current_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
     status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.WAREHOUSE_UNIDENTIFIED)
+    # Batch metadata captured at import time (the supplier sends these by message,
+    # not inside the file): the shipment period/batch and the product type (TR-06).
+    batch_period = Column(String(100), nullable=True, index=True)
+    product_type = Column(String(100), nullable=True, index=True)
     sold_date = Column(DateTime(timezone=True))
     notes = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -123,6 +127,10 @@ class Import(Base):
     failed_imports = Column(Integer, default=0)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(50), default="processing")  # processing, completed, failed
+    # Batch metadata captured at import time, applied to every unit created from
+    # this file (TR-06).
+    batch_period = Column(String(100), nullable=True)
+    product_type = Column(String(100), nullable=True)
     notes = Column(Text)
     import_date = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))

@@ -2,10 +2,10 @@
 import os
 import json
 from datetime import datetime, UTC
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.database.database import get_db
 from app.models import models, schemas
@@ -71,6 +71,8 @@ def get_import_errors(
 @router.post("/upload")
 async def upload_inventory_file(
     file: UploadFile = File(...),
+    batch_period: Optional[str] = Form(None),
+    product_type: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
@@ -80,6 +82,10 @@ async def upload_inventory_file(
             status_code=400,
             detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported."
         )
+
+    # Batch metadata sent by the supplier outside the file (TR-06).
+    batch_period = (batch_period or "").strip() or None
+    product_type = (product_type or "").strip() or None
     
     # Create uploads directory
     os.makedirs("uploads", exist_ok=True)
@@ -96,7 +102,9 @@ async def upload_inventory_file(
         original_filename=file.filename,
         total_records=0,
         user_id=current_user.id,
-        status="processing"
+        status="processing",
+        batch_period=batch_period,
+        product_type=product_type,
     )
     db.add(import_record)
     db.commit()
@@ -104,7 +112,13 @@ async def upload_inventory_file(
     
     # Process file
     try:
-        result = await process_inventory_file(file_path, import_record.id, db)
+        result = await process_inventory_file(
+            file_path,
+            import_record.id,
+            db,
+            batch_period=batch_period,
+            product_type=product_type,
+        )
         
         # Update import record
         import_record.total_records = result["total_records"]
@@ -129,7 +143,13 @@ async def upload_inventory_file(
         db.commit()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
-async def process_inventory_file(file_path: str, import_id: int, db: Session):
+async def process_inventory_file(
+    file_path: str,
+    import_id: int,
+    db: Session,
+    batch_period: Optional[str] = None,
+    product_type: Optional[str] = None,
+):
     """Process an uploaded inventory file and import units.
 
     Uses the schema-tolerant parser (``parse_workbook``) so heterogeneous
@@ -137,6 +157,9 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
     merged cells, numeric serials) resolve to the canonical frame/motor/color/
     model fields before persistence. A row is a unit when it has a frame OR a
     motor; per-row failures are logged and never abort the whole import (TR-04f).
+
+    ``batch_period`` and ``product_type`` are the batch metadata captured at
+    upload time and stamped onto every created unit (TR-06).
     """
     filename = os.path.basename(file_path)
     try:
@@ -224,6 +247,8 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
                 model=model_name,
                 brand=brand_name,
                 color=color_name,
+                batch_period=batch_period,
+                product_type=product_type,
                 current_location_id=default_location.id,
                 status=UnitStatus.AVAILABLE,
             )
