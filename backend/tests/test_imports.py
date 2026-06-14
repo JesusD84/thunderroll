@@ -29,7 +29,7 @@ def _make_xlsx(sheets: list[tuple[str, list[list]]]) -> bytes:
     return buf.getvalue()
 
 
-async def _upload(client, auth_headers, filename, content):
+async def _upload(client, auth_headers, filename, content, data=None):
     files = {
         "file": (
             filename,
@@ -37,7 +37,9 @@ async def _upload(client, auth_headers, filename, content):
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     }
-    return await client.post("/api/v1/imports/upload", files=files, headers=auth_headers)
+    return await client.post(
+        "/api/v1/imports/upload", files=files, data=data, headers=auth_headers
+    )
 
 
 def test_canonical_model_is_models_module():
@@ -375,6 +377,88 @@ async def test_upload_applies_equivalence_to_sheet_name_model(
 
     unit = db_session.query(Unit).filter(Unit.chassis_number == "EQ-FRAME-003").first()
     assert unit.model == "Triciclo Interno Diaoyu"
+
+
+# --- TR-06: batch metadata (period/batch + product type) at upload time ------
+
+
+@pytest.mark.asyncio
+async def test_upload_persists_batch_metadata_on_import_and_units(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """Metadata sent on the form is stored on the import and every unit."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["MD-FRAME-001", "MD-MOTOR-001"],
+            ["MD-FRAME-002", "MD-MOTOR-002"],
+        ])
+    ])
+    resp = await _upload(
+        client, auth_headers, "meta.xlsx", content,
+        data={"batch_period": "2026-ABRIL", "product_type": "triciclo"},
+    )
+    assert resp.status_code == 200, resp.text
+    import_id = resp.json()["import_id"]
+
+    # AC: metadata is returned by GET /imports/{id}
+    get_resp = await client.get(f"/api/v1/imports/{import_id}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert body["batch_period"] == "2026-ABRIL"
+    assert body["product_type"] == "triciclo"
+
+    # AC: metadata is stamped on every created unit
+    for frame in ("MD-FRAME-001", "MD-FRAME-002"):
+        unit = db_session.query(Unit).filter(Unit.chassis_number == frame).first()
+        assert unit.batch_period == "2026-ABRIL"
+        assert unit.product_type == "triciclo"
+
+
+@pytest.mark.asyncio
+async def test_upload_without_metadata_is_allowed(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """Metadata is optional: omitting it stores NULL and does not break import."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["MD-FRAME-003", "MD-MOTOR-003"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "nometa.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    import_id = resp.json()["import_id"]
+
+    get_resp = await client.get(f"/api/v1/imports/{import_id}", headers=auth_headers)
+    assert get_resp.json()["batch_period"] is None
+    assert get_resp.json()["product_type"] is None
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "MD-FRAME-003").first()
+    assert unit.batch_period is None
+    assert unit.product_type is None
+
+
+@pytest.mark.asyncio
+async def test_upload_blank_metadata_is_normalized_to_null(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """Whitespace-only metadata is treated as absent (stored as NULL)."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor"],
+            ["MD-FRAME-004", "MD-MOTOR-004"],
+        ])
+    ])
+    resp = await _upload(
+        client, auth_headers, "blankmeta.xlsx", content,
+        data={"batch_period": "   ", "product_type": ""},
+    )
+    assert resp.status_code == 200, resp.text
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "MD-FRAME-004").first()
+    assert unit.batch_period is None
+    assert unit.product_type is None
 
 
 @pytest.mark.asyncio
