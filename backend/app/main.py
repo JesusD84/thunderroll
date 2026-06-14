@@ -10,12 +10,12 @@ from app.models import models
 from app.api.router import router as api_router
 from app.database.seed import create_demo_data
 
-# Create tables
-models.Base.metadata.create_all(bind=engine)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: create the schema and seed demo data against the prod engine.
+    # This runs on app startup (not at module import) so importing app.main does
+    # not require a reachable DATABASE_URL. See TR-11.
+    models.Base.metadata.create_all(bind=engine)
     create_demo_data()
     yield
     # Shutdown
