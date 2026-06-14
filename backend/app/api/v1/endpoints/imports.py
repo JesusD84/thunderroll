@@ -1,20 +1,36 @@
 
-import io
 import os
-import pandas as pd
+import json
 from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
-import json
+from typing import List
 
 from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
-from app.services.import_parser import excel_engine_for
+from app.services.import_parser import excel_engine_for, parse_workbook
 
 router = APIRouter()
+
+# Persistence defaults for descriptive fields the supplier may omit. The parser
+# resolves frame/motor/color/model; brand is never present in supplier
+# inventories and color/model can be blank, yet Unit requires them NOT NULL.
+DEFAULT_BRAND = "Sin especificar"
+DEFAULT_COLOR = "Sin especificar"
+DEFAULT_MODEL = "Sin especificar"
+
+
+def _text_or_default(value, default: str) -> str:
+    """Coerce a parser cell value to a non-empty string, or fall back."""
+    if value is None:
+        return default
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return default
+    return text
 
 
 @router.get("/", response_model=List[schemas.Import])
@@ -113,45 +129,32 @@ async def upload_inventory_file(
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 async def process_inventory_file(file_path: str, import_id: int, db: Session):
-    """Process uploaded inventory file and import units"""
-    
-    # Read file
+    """Process an uploaded inventory file and import units.
+
+    Uses the schema-tolerant parser (``parse_workbook``) so heterogeneous
+    supplier layouts (English/Chinese headers, multiple sheets, junk columns,
+    merged cells, numeric serials) resolve to the canonical frame/motor/color/
+    model fields before persistence. A row is a unit when it has a frame OR a
+    motor; per-row failures are logged and never abort the whole import (TR-04f).
+    """
+    filename = os.path.basename(file_path)
     try:
-        if file_path.endswith('.csv'):
-            df = pd.read_csv(file_path)
-        else:
-            df = pd.read_excel(file_path, engine=excel_engine_for(file_path))
+        with open(file_path, "rb") as f:
+            content = f.read()
+        result = parse_workbook(content, filename)
     except Exception as e:
         raise Exception(f"Error reading file: {str(e)}")
-    
-    # Expected columns (flexible matching)
-    column_mapping = {
-        'brand': ['brand', 'marca', 'Brand', 'BRAND'],
-        'model': ['model', 'modelo', 'Model', 'MODEL'],
-        'color': ['color', 'colour', 'Color', 'COLOR'],
-        'engine_number': ['engine_number', 'numero_motor', 'Engine Number', 'ENGINE_NUMBER', 'motor'],
-        'chassis_number': ['chassis_number', 'numero_chasis', 'Chassis Number', 'CHASSIS_NUMBER', 'chasis', 'frame']
-    }
-    
-    # Map columns
-    mapped_columns = {}
-    for key, possible_names in column_mapping.items():
-        for col in df.columns:
-            if col in possible_names:
-                mapped_columns[key] = col
-                break
-    
-    # Validate required columns
-    required = ['brand', 'model', 'color', 'engine_number', 'chassis_number']
-    missing_columns = [col for col in required if col not in mapped_columns]
-    
-    if missing_columns:
-        raise Exception(f"Missing required columns: {', '.join(missing_columns)}")
-    
-    total_records = len(df)
-    successful_imports = 0
-    failed_imports = 0
-    
+
+    if not result.tables:
+        raise Exception("No data rows found in file")
+
+    # At least one sheet must expose an identifier column, otherwise we cannot
+    # tell units apart (e.g. a no-header file mapped only positionally).
+    if not any(("frame" in t.field_map or "motor" in t.field_map) for t in result.tables):
+        raise Exception(
+            "No identifier columns found (expected a frame/chassis or motor/engine column)"
+        )
+
     # Get or create default location
     default_location = db.query(models.Location).filter(models.Location.name == "Almacén Principal").first()
     if not default_location:
@@ -162,31 +165,52 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
         db.add(default_location)
         db.commit()
         db.refresh(default_location)
-    
-    # Process each row
-    for index, row in df.iterrows():
+
+    total_records = 0
+    successful_imports = 0
+    failed_imports = 0
+    row_number = 0
+
+    for sheet_row in result.iter_rows():
+        # Skip rows from sheets that never mapped an identifier column.
+        if "frame" not in sheet_row.field_map and "motor" not in sheet_row.field_map:
+            continue
+
+        canonical = sheet_row.canonical()
+        frame = canonical.get("frame", "") or ""
+        motor = canonical.get("motor", "") or ""
+        # A row with neither identifier is not a unit (blank/spacer row).
+        if not frame and not motor:
+            continue
+
+        row_number += 1
+        total_records += 1
         try:
-            # Extract data
-            brand_name = str(row[mapped_columns['brand']]).strip()
-            model_name = str(row[mapped_columns['model']]).strip()
-            color_name = str(row[mapped_columns['color']]).strip()
-            engine_number = str(row[mapped_columns['engine_number']]).strip()
-            chassis_number = str(row[mapped_columns['chassis_number']]).strip()
-            
-            # Validate required fields
-            if not all([brand_name, model_name, color_name, engine_number, chassis_number]):
-                raise ValueError("Missing required data")
-            
-            # Check for duplicates
-            existing_unit = db.query(models.Unit).filter(
-                (models.Unit.engine_number == engine_number) |
-                (models.Unit.chassis_number == chassis_number)
-            ).first()
-            
+            chassis_number = frame or None
+            engine_number = motor or None
+            # Model falls back to the sheet name (suppliers often put the model
+            # there) and then to a placeholder; brand is never supplied.
+            model_name = _text_or_default(canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL)
+            color_name = _text_or_default(canonical.get("color"), DEFAULT_COLOR)
+            brand_name = DEFAULT_BRAND
+
+            # Check for duplicates on the identifiers that are actually present.
+            dup_conditions = []
+            if engine_number is not None:
+                dup_conditions.append(models.Unit.engine_number == engine_number)
+            if chassis_number is not None:
+                dup_conditions.append(models.Unit.chassis_number == chassis_number)
+            existing_unit = (
+                db.query(models.Unit).filter(or_(*dup_conditions)).first()
+                if dup_conditions
+                else None
+            )
             if existing_unit:
-                raise ValueError(f"Unit with engine number {engine_number} or chassis number {chassis_number} already exists")
-            
-            # Create unit
+                raise ValueError(
+                    f"Unit with engine number {engine_number} or chassis number "
+                    f"{chassis_number} already exists"
+                )
+
             unit = models.Unit(
                 engine_number=engine_number,
                 chassis_number=chassis_number,
@@ -194,45 +218,45 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
                 brand=brand_name,
                 color=color_name,
                 current_location_id=default_location.id,
-                status=UnitStatus.AVAILABLE
+                status=UnitStatus.AVAILABLE,
             )
             db.add(unit)
             db.commit()
             db.refresh(unit)
-            
-            # Create import transfer
+
             transfer = models.Transfer(
                 unit_id=unit.id,
                 dispatched_by_id=1,
                 destination_location_id=default_location.id,
                 status=TransferStatus.RECEIVED,
                 dispatched_at=datetime.now(UTC),
-                received_at=datetime.now(UTC)
+                received_at=datetime.now(UTC),
             )
             db.add(transfer)
             db.commit()
-            
+
             successful_imports += 1
-            
+
         except Exception as e:
+            # Roll back the failed unit/transfer so the session stays usable
+            # for the remaining rows, then record the per-row error.
+            db.rollback()
             failed_imports += 1
-            
-            # Log error
+            sheet_label = f"[{sheet_row.sheet}] " if sheet_row.sheet else ""
             error_record = models.ImportError(
                 import_id=import_id,
-                row_number=index + 1,
-                error_message=str(e),
-                raw_data=json.dumps(row.to_dict(), default=str)
+                row_number=row_number,
+                error_message=f"{sheet_label}{str(e)}",
+                raw_data=json.dumps(canonical, default=str),
             )
             db.add(error_record)
             db.commit()
-            
             continue
-    
+
     return {
         "total_records": total_records,
         "successful_imports": successful_imports,
-        "failed_imports": failed_imports
+        "failed_imports": failed_imports,
     }
 
 @router.post("/preview")
@@ -249,59 +273,53 @@ async def preview_inventory_file(
         )
     
     try:
-        # Read content
         content = await file.read()
-        
-        # Read first few rows
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.StringIO(content.decode('utf-8')), nrows=5)
-        else:
-            df = pd.read_excel(
-                io.BytesIO(content),
-                engine=excel_engine_for(file.filename),
-                nrows=5,
-            )
-        
-        # Expected columns
-        expected_columns = ['brand', 'model', 'color', 'engine_number', 'chassis_number']
-        found_columns = []
-        missing_columns = []
-        
-        column_mapping = {
-            'brand': ['brand', 'marca', 'Brand', 'BRAND'],
-            'model': ['model', 'modelo', 'Model', 'MODEL'],
-            'color': ['color', 'colour', 'Color', 'COLOR'],
-            'engine_number': ['engine_number', 'numero_motor', 'Engine Number', 'ENGINE_NUMBER', 'motor'],
-            'chassis_number': ['chassis_number', 'numero_chasis', 'Chassis Number', 'CHASSIS_NUMBER', 'chasis', 'frame']
-        }
-        
-        for key, possible_names in column_mapping.items():
-            found = False
-            for col in df.columns:
-                if col in possible_names:
-                    found_columns.append(f"{key} -> {col}")
-                    found = True
-                    break
-            if not found:
-                missing_columns.append(key)
-        
-        return {
-            "filename": file.filename,
-            "total_rows": len(df),
-            "columns": df.columns.tolist(),
-            "preview_data": df.to_dict('records'),
-            "column_mapping": {
-                "found": found_columns,
-                "missing": missing_columns
-            },
-            "validation": {
-                "is_valid": len(missing_columns) == 0,
-                "message": "File is ready for import" if len(missing_columns) == 0 else f"Missing columns: {', '.join(missing_columns)}"
-            }
-        }
-        
+        result = parse_workbook(content, file.filename)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+    # Per-sheet mapping summary plus a flattened canonical preview.
+    sheets = []
+    detected_fields: set[str] = set()
+    for table in result.tables:
+        detected_fields.update(table.field_map.keys())
+        sheets.append({
+            "sheet": table.sheet,
+            "has_header": table.has_header,
+            "mapped_fields": table.field_map,
+            "rows": len(table.rows),
+        })
+
+    preview_data = []
+    for sheet_row in result.iter_rows():
+        if len(preview_data) >= 10:
+            break
+        if "frame" not in sheet_row.field_map and "motor" not in sheet_row.field_map:
+            continue
+        canonical = sheet_row.canonical()
+        if not (canonical.get("frame") or canonical.get("motor")):
+            continue
+        preview_data.append({"sheet": sheet_row.sheet, **canonical})
+
+    has_identifier = bool(detected_fields & {"frame", "motor"})
+    return {
+        "filename": file.filename,
+        "sheets": sheets,
+        "detected_fields": sorted(detected_fields),
+        "preview_data": preview_data,
+        "issues": [
+            {"level": i.level, "message": i.message, "sheet": i.sheet}
+            for i in result.issues
+        ],
+        "validation": {
+            "is_valid": has_identifier,
+            "message": (
+                "File is ready for import"
+                if has_identifier
+                else "No identifier column (frame/chassis or motor/engine) detected"
+            ),
+        },
+    }
 
 @router.delete("/{import_id}")
 def delete_import(
