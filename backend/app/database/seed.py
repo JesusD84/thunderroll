@@ -1,11 +1,22 @@
 from app.database.database import SessionLocal
 from app.models.models import (
     User, UserRole, Location,
-    Unit, UnitStatus, Transfer, TransferStatus
+    Unit, UnitStatus, Transfer, TransferStatus,
+    ModelEquivalence,
 )
 from app.services.auth_service import get_password_hash
 from datetime import datetime, timedelta
 import asyncio
+
+# Demo manufacturer -> internal model equivalences. The real mapping is supplied
+# by the client later; these exist so the equivalence feature is populated and
+# administrable in demo/dev environments (TR-05).
+DEMO_MODEL_EQUIVALENCES = {
+    "X3": "Triciclo Carga X3",
+    "xiaodou": "Scooter Xiaodou",
+    "diaoyu": "Triciclo Diaoyu",
+    "TY-D530": "Bici Eléctrica D530",
+}
 
 def create_demo_data():
     """Create demo data for the application"""
@@ -193,7 +204,16 @@ def create_demo_data():
         
         db.commit()
         print("✓ Demo transfers created")
-        
+
+        # Create model equivalences (manufacturer -> internal)
+        for manufacturer_model, internal_model in DEMO_MODEL_EQUIVALENCES.items():
+            db.add(ModelEquivalence(
+                manufacturer_model=manufacturer_model,
+                internal_model=internal_model,
+            ))
+        db.commit()
+        print("✓ Model equivalences created")
+
         print("✅ Demo data creation completed successfully!")
         
     except Exception as e:
