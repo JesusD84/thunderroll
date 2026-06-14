@@ -11,7 +11,12 @@ from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
-from app.services.import_parser import excel_engine_for, parse_workbook
+from app.services.import_parser import (
+    CANONICAL_FIELDS,
+    apply_manual_mapping,
+    excel_engine_for,
+    parse_workbook,
+)
 from app.services.model_equivalence_service import resolve_internal_model
 
 router = APIRouter()
@@ -22,6 +27,38 @@ router = APIRouter()
 DEFAULT_BRAND = "Sin especificar"
 DEFAULT_COLOR = "Sin especificar"
 DEFAULT_MODEL = "Sin especificar"
+
+
+def _parse_column_mapping(raw: Optional[str]) -> dict:
+    """Parse the optional manual column->field mapping sent on the upload form.
+
+    Expects a JSON object like ``{"NO": "model", "Color": "color"}`` mapping a
+    source column name to a canonical field. Returns ``{}`` when absent. Raises a
+    400 on malformed JSON, the wrong shape, or an unknown canonical field (TR-07).
+    """
+    if not raw or not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="column_mapping must be valid JSON")
+    if not isinstance(parsed, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="column_mapping must be a JSON object of column -> field",
+        )
+    mapping: dict[str, str] = {}
+    for column, field_name in parsed.items():
+        if not isinstance(field_name, str) or field_name not in CANONICAL_FIELDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid field '{field_name}' for column '{column}'. "
+                    f"Valid fields: {', '.join(CANONICAL_FIELDS)}."
+                ),
+            )
+        mapping[str(column)] = field_name
+    return mapping
 
 
 def _text_or_default(value, default: str) -> str:
@@ -73,6 +110,7 @@ async def upload_inventory_file(
     file: UploadFile = File(...),
     batch_period: Optional[str] = Form(None),
     product_type: Optional[str] = Form(None),
+    column_mapping: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
@@ -86,6 +124,10 @@ async def upload_inventory_file(
     # Batch metadata sent by the supplier outside the file (TR-06).
     batch_period = (batch_period or "").strip() or None
     product_type = (product_type or "").strip() or None
+
+    # Optional user-confirmed column->field mapping that overrides auto-detection
+    # (TR-07). Validated up front so a bad mapping fails before any persistence.
+    manual_mapping = _parse_column_mapping(column_mapping)
     
     # Create uploads directory
     os.makedirs("uploads", exist_ok=True)
@@ -118,6 +160,7 @@ async def upload_inventory_file(
             db,
             batch_period=batch_period,
             product_type=product_type,
+            column_mapping=manual_mapping,
         )
         
         # Update import record
@@ -149,6 +192,7 @@ async def process_inventory_file(
     db: Session,
     batch_period: Optional[str] = None,
     product_type: Optional[str] = None,
+    column_mapping: Optional[dict] = None,
 ):
     """Process an uploaded inventory file and import units.
 
@@ -160,6 +204,9 @@ async def process_inventory_file(
 
     ``batch_period`` and ``product_type`` are the batch metadata captured at
     upload time and stamped onto every created unit (TR-06).
+
+    ``column_mapping`` is an optional user-confirmed column->field mapping that
+    overrides the automatic detection before rows are read (TR-07).
     """
     filename = os.path.basename(file_path)
     try:
@@ -168,6 +215,10 @@ async def process_inventory_file(
         result = parse_workbook(content, filename)
     except Exception as e:
         raise Exception(f"Error reading file: {str(e)}")
+
+    # Apply the user-confirmed mapping (if any) over the auto-detected one.
+    if column_mapping:
+        apply_manual_mapping(result, column_mapping)
 
     if not result.tables:
         raise Exception("No data rows found in file")
@@ -291,47 +342,90 @@ async def process_inventory_file(
         "failed_imports": failed_imports,
     }
 
+# Cap how many invalid rows the preview reports so a wholly-broken file does
+# not produce an unbounded payload.
+_MAX_INVALID_PREVIEW_ROWS = 100
+
+
 @router.post("/preview")
 async def preview_inventory_file(
     file: UploadFile = File(...),
+    column_mapping: Optional[str] = Form(None),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    """Preview the first few rows of an uploaded file for validation"""
-    
+    """Preview an uploaded file for assisted mapping, without persisting anything.
+
+    Returns, per sheet, the raw detected columns and the proposed column->field
+    mapping; a flattened canonical preview; and a list of invalid rows (no
+    identifier or duplicate frame/motor) so the user can fix issues before
+    importing. An optional ``column_mapping`` (same JSON shape as ``/upload``)
+    is applied so the user can preview the effect of a manual mapping (TR-07).
+    """
     if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
         raise HTTPException(
             status_code=400,
             detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported."
         )
-    
+
+    manual_mapping = _parse_column_mapping(column_mapping)
+
     try:
         content = await file.read()
         result = parse_workbook(content, file.filename)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
-    # Per-sheet mapping summary plus a flattened canonical preview.
+    if manual_mapping:
+        apply_manual_mapping(result, manual_mapping)
+
+    # Per-sheet summary: raw columns + proposed mapping (column -> field|null).
     sheets = []
     detected_fields: set[str] = set()
     for table in result.tables:
         detected_fields.update(table.field_map.keys())
+        field_by_column = {col: fld for fld, col in table.field_map.items()}
         sheets.append({
             "sheet": table.sheet,
             "has_header": table.has_header,
+            "columns": table.columns,
+            # Proposed mapping in both directions for convenience.
+            "column_mapping": {col: field_by_column.get(col) for col in table.columns},
             "mapped_fields": table.field_map,
             "rows": len(table.rows),
         })
 
-    preview_data = []
-    for sheet_row in result.iter_rows():
-        if len(preview_data) >= 10:
-            break
-        if "frame" not in sheet_row.field_map and "motor" not in sheet_row.field_map:
-            continue
+    # Single pass over every row: build the bounded preview and flag invalid rows.
+    preview_data: list[dict] = []
+    invalid_rows: list[dict] = []
+    invalid_count = 0
+    seen_identifiers: set[str] = set()
+    for index, sheet_row in enumerate(result.iter_rows(), start=1):
         canonical = sheet_row.canonical()
-        if not (canonical.get("frame") or canonical.get("motor")):
+        frame = (canonical.get("frame") or "").strip()
+        motor = (canonical.get("motor") or "").strip()
+
+        reasons: list[str] = []
+        if not frame and not motor:
+            reasons.append("No identifier (frame/chassis or motor/engine) in row")
+        else:
+            for ident in (frame, motor):
+                if ident and ident in seen_identifiers:
+                    reasons.append(f"Duplicate identifier '{ident}' within the file")
+            seen_identifiers.update(i for i in (frame, motor) if i)
+
+        if reasons:
+            invalid_count += 1
+            if len(invalid_rows) < _MAX_INVALID_PREVIEW_ROWS:
+                invalid_rows.append({
+                    "sheet": sheet_row.sheet,
+                    "row": index,
+                    "reasons": reasons,
+                    "data": {k: str(v) for k, v in canonical.items()},
+                })
             continue
-        preview_data.append({"sheet": sheet_row.sheet, **canonical})
+
+        if len(preview_data) < 10:
+            preview_data.append({"sheet": sheet_row.sheet, **canonical})
 
     has_identifier = bool(detected_fields & {"frame", "motor"})
     return {
@@ -339,6 +433,8 @@ async def preview_inventory_file(
         "sheets": sheets,
         "detected_fields": sorted(detected_fields),
         "preview_data": preview_data,
+        "invalid_rows": invalid_rows,
+        "invalid_rows_count": invalid_count,
         "issues": [
             {"level": i.level, "message": i.message, "sheet": i.sheet}
             for i in result.issues

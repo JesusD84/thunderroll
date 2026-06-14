@@ -161,6 +161,66 @@ class WorkbookParseResult:
                 )
 
 
+def _ffill_column(rows: list[dict[str, Any]], col: str) -> None:
+    """Forward-fill blank cells of ``col`` across already-materialized rows.
+
+    Used after a manual mapping points a forward-fill field (e.g. ``model``) at a
+    column that the automatic detection had not recognized, so merged cells in
+    that column still propagate to every unit.
+    """
+    last: Any = None
+    for row in rows:
+        value = row.get(col)
+        if _is_blank(value):
+            if last is not None:
+                row[col] = last
+        else:
+            last = value
+
+
+def apply_manual_mapping(
+    result: "WorkbookParseResult", column_to_field: dict[str, str]
+) -> list[ParseIssue]:
+    """Override the auto-detected mapping with a user-confirmed one (TR-07).
+
+    ``column_to_field`` maps a (normalized) column name to a canonical field. It
+    is applied per sheet, only for columns that exist in that sheet, and a column
+    is assigned to exactly one field (any prior field pointing at that column is
+    cleared). Entries with an unknown canonical field are ignored. Forward-fill
+    fields are re-filled so a newly mapped ``model`` column propagates its merged
+    cells.
+    """
+    cleaned = {col: fld for col, fld in column_to_field.items() if fld in CANONICAL_FIELDS}
+    issues: list[ParseIssue] = []
+    if not cleaned:
+        return issues
+
+    for table in result.tables:
+        applied = False
+        for col, fld in cleaned.items():
+            if col not in table.columns:
+                continue
+            for existing_field in [f for f, c in table.field_map.items() if c == col]:
+                del table.field_map[existing_field]
+            table.field_map[fld] = col
+            applied = True
+            issues.append(
+                ParseIssue(
+                    level="info",
+                    message=f"Manual mapping: column '{col}' -> field '{fld}'.",
+                    sheet=table.sheet,
+                )
+            )
+        if applied:
+            for fld in FORWARD_FILL_FIELDS:
+                col = table.field_map.get(fld)
+                if col is not None:
+                    _ffill_column(table.rows, col)
+
+    result.issues.extend(issues)
+    return issues
+
+
 def excel_engine_for(filename: str) -> str:
     """Return the explicit pandas engine for an Excel filename.
 
