@@ -95,6 +95,23 @@ class Transfer(Base):
     origin_location = relationship("Location", foreign_keys=[origin_location_id], back_populates="transfers_from")
     destination_location = relationship("Location", foreign_keys=[destination_location_id], back_populates="transfers_to")
 
+class ModelEquivalence(Base):
+    """Manufacturer model name -> internal (client) model name.
+
+    Suppliers label units with their own internal names (``X3``, ``xiaodou``,
+    ``diaoyu``, ``TY-D530``). During import these are translated to the client's
+    internal model when an equivalence exists; otherwise the manufacturer name is
+    kept as-is so the import never blocks (TR-05).
+    """
+    __tablename__ = "model_equivalences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    manufacturer_model = Column(String(150), unique=True, nullable=False, index=True)
+    internal_model = Column(String(150), nullable=False)
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 class Import(Base):
     __tablename__ = "imports"
 

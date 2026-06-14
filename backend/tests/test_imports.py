@@ -317,6 +317,67 @@ async def test_upload_duplicate_rows_are_reported_not_fatal(
 
 
 @pytest.mark.asyncio
+async def test_upload_applies_model_equivalence(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """TR-05: a mapped manufacturer model is stored as the internal model."""
+    from app.services import model_equivalence_service as me_service
+
+    me_service.upsert_equivalence(db_session, "X3-TR05", "Triciclo Interno X3")
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "Model"],
+            ["EQ-FRAME-001", "EQ-MOTOR-001", "X3-TR05"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "equiv.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["successful_imports"] == 1
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "EQ-FRAME-001").first()
+    assert unit.model == "Triciclo Interno X3"
+
+
+@pytest.mark.asyncio
+async def test_upload_keeps_manufacturer_model_when_unmapped(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """TR-05: with no equivalence the manufacturer model is kept as-is."""
+    content = _make_xlsx([
+        ("Sheet1", [
+            ["Frame", "Motor", "Model"],
+            ["EQ-FRAME-002", "EQ-MOTOR-002", "UNMAPPED-TR05"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "noequiv.xlsx", content)
+    assert resp.status_code == 200, resp.text
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "EQ-FRAME-002").first()
+    assert unit.model == "UNMAPPED-TR05"
+
+
+@pytest.mark.asyncio
+async def test_upload_applies_equivalence_to_sheet_name_model(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """TR-05: model taken from the sheet name is also resolved via equivalence."""
+    from app.services import model_equivalence_service as me_service
+
+    me_service.upsert_equivalence(db_session, "diaoyu-TR05", "Triciclo Interno Diaoyu")
+    content = _make_xlsx([
+        ("diaoyu-TR05", [
+            ["Frame", "Motor"],
+            ["EQ-FRAME-003", "EQ-MOTOR-003"],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "sheetmodel.xlsx", content)
+    assert resp.status_code == 200, resp.text
+
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "EQ-FRAME-003").first()
+    assert unit.model == "Triciclo Interno Diaoyu"
+
+
+@pytest.mark.asyncio
 async def test_preview_reports_detected_fields(
     client, auth_headers, test_users, test_locations
 ):

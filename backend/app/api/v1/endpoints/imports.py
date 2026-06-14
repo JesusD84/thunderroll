@@ -12,6 +12,7 @@ from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, TransferStatus
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.import_parser import excel_engine_for, parse_workbook
+from app.services.model_equivalence_service import resolve_internal_model
 
 router = APIRouter()
 
@@ -190,7 +191,13 @@ async def process_inventory_file(file_path: str, import_id: int, db: Session):
             engine_number = motor or None
             # Model falls back to the sheet name (suppliers often put the model
             # there) and then to a placeholder; brand is never supplied.
-            model_name = _text_or_default(canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL)
+            manufacturer_model = _text_or_default(
+                canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL
+            )
+            # Translate the manufacturer model to the client's internal model when
+            # an equivalence exists; otherwise keep the manufacturer name as-is so
+            # the import never blocks (TR-05).
+            model_name = resolve_internal_model(db, manufacturer_model) or manufacturer_model
             color_name = _text_or_default(canonical.get("color"), DEFAULT_COLOR)
             brand_name = DEFAULT_BRAND
 

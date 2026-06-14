@@ -149,6 +149,30 @@ class Transfer(TransferBase):
     transfer_units: Optional[List[TransferUnit]] = None
     model_config = ConfigDict(from_attributes=True)
 
+# Model Equivalence Schemas (manufacturer model -> internal model)
+class ModelEquivalenceBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    manufacturer_model: str
+    internal_model: str
+    notes: Optional[str] = None
+
+class ModelEquivalenceCreate(ModelEquivalenceBase):
+    pass
+
+class ModelEquivalenceUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    manufacturer_model: Optional[str] = None
+    internal_model: Optional[str] = None
+    notes: Optional[str] = None
+
+class ModelEquivalence(ModelEquivalenceBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
 # File Upload Schema
 class FileUploadResponse(BaseModel):
     filename: str
