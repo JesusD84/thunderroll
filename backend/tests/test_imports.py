@@ -696,3 +696,68 @@ async def test_upload_rejects_malformed_column_mapping(
         data={"column_mapping": json.dumps({"Frame": "bogus"})},
     )
     assert bad_field.status_code == 400
+
+
+# --- TR-09: end-to-end import of the real supplier samples + error cases ------
+
+from pathlib import Path  # noqa: E402
+
+_SAMPLES_DIR = Path(__file__).parent / "fixtures" / "samples"
+_SAMPLE_MODEL_XLSX = "2025057车 Frame number and motor number.xlsx"
+_SAMPLE_ELECTRIC_BIKE_XLSX = "frame number and motor number for electric bike.xlsx"
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_unsupported_file_type(
+    client, auth_headers, test_users, test_locations
+):
+    """A non-spreadsheet file is rejected with 400 before any processing."""
+    resp = await _upload(client, auth_headers, "notes.txt", b"hello world")
+    assert resp.status_code == 400
+    assert "Invalid file type" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_upload_real_sample_without_identifier_column_fails(
+    client, auth_headers, test_users, test_locations
+):
+    """The header-less sample has no mappable identifier and is reported, not silent."""
+    content = (_SAMPLES_DIR / _SAMPLE_ELECTRIC_BIKE_XLSX).read_bytes()
+    resp = await _upload(client, auth_headers, _SAMPLE_ELECTRIC_BIKE_XLSX, content)
+    assert resp.status_code == 500
+    assert "No identifier columns found" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_upload_real_sample_imports_units_and_dedups_shared_motor(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """End-to-end on the clean English sample.
+
+    The file has 120 unique frames but a placeholder motor ("HUIYOU20250816")
+    repeated on 20 rows. Because the importer de-duplicates on either identifier,
+    19 of those collide and are reported per-row, leaving 101 units imported.
+    This pins the real-data behavior so a future dedup change is a conscious one.
+    """
+    content = (_SAMPLES_DIR / _SAMPLE_MODEL_XLSX).read_bytes()
+    resp = await _upload(client, auth_headers, _SAMPLE_MODEL_XLSX, content)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["total_records"] == 120
+    assert body["successful_imports"] == 101
+    assert body["failed_imports"] == 19
+
+    import_id = body["import_id"]
+    errors_resp = await client.get(
+        f"/api/v1/imports/{import_id}/errors", headers=auth_headers
+    )
+    assert errors_resp.status_code == 200
+    errors = errors_resp.json()
+    assert len(errors) == 19
+    assert all("HUIYOU20250816" in e["error_message"] for e in errors)
+
+    # The first row imports cleanly with its model preserved.
+    unit = db_session.query(Unit).filter(Unit.chassis_number == "HXY202512001").first()
+    assert unit is not None
+    assert unit.engine_number == "20260102061514"
+    assert unit.model == "X3"
