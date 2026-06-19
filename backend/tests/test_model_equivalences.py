@@ -108,3 +108,30 @@ async def test_unmapped_endpoint_returns_list(client, auth_headers, test_users, 
     resp = await client.get("/api/v1/model-equivalences/unmapped", headers=auth_headers)
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+# --- Client mapping seeder (real data) ---------------------------------------
+
+
+def test_seed_client_model_equivalences_is_idempotent_and_resolves(db_session):
+    """The client-provided mapping seeds and resolves the labels that match samples."""
+    from app.database.seed_equivalences import (
+        CLIENT_MODEL_EQUIVALENCES,
+        seed_client_model_equivalences,
+    )
+
+    # Seeding twice must not create duplicates (idempotent upsert).
+    seed_client_model_equivalences(db_session)
+    count = seed_client_model_equivalences(db_session)
+    assert count == len(CLIENT_MODEL_EQUIVALENCES) == 8
+
+    seeded = {
+        e.manufacturer_model: e.internal_model
+        for e in db_session.query(ModelEquivalence).all()
+    }
+    for manufacturer, internal in CLIENT_MODEL_EQUIVALENCES.items():
+        assert seeded[manufacturer] == internal
+
+    # Labels that match the real sample files resolve (case/space-insensitive).
+    assert service.resolve_internal_model(db_session, "X3") == "571"
+    assert service.resolve_internal_model(db_session, "ak-160") == "TR-TON"
