@@ -10,25 +10,27 @@ production database:
 Notes on the source data:
 - ``AK-160`` is stored without the stray space the client wrote ("AK- 160") so
   it matches the real supplier label.
-- Several real supplier labels seen in the sample files use a different spelling
-  than this mapping (``xiaodou`` vs ``XIADOU``, ``diaoyu`` vs ``DIAOYOU``,
-  ``TY-D530`` vs ``TY-530``) and therefore will NOT auto-resolve until the client
-  confirms they are the same product. Those are intentionally left as provided.
+- The keys for ``xiaodou`` and ``diaoyu`` use the spelling the suppliers actually
+  ship in the sample files (the client wrote them "XIADOU"/"DIAOYOU"); we trust
+  the samples since that is the data received directly from the supplier.
+- Still pending client confirmation (left out until answered):
+  - ``TY-530`` (mapping) vs ``TY-D530`` (sample): are they the same product?
+  - ``TY-TJ571`` and ``ZHAIBANG`` (seen in samples): do they have an internal
+    name, or are they used as-is?
+  - ``MC-316`` / ``MC-118`` / ``Q-02`` (in the mapping but not yet seen in any
+    sample): waiting for a supplier sample to test against.
 """
 
 from app.database.database import SessionLocal
 from app.services.model_equivalence_service import upsert_equivalence
 
-# Manufacturer model (as the supplier labels it) -> client's internal model.
+# Manufacturer model (as the supplier labels it in the sample files) -> client's
+# internal model. Keys follow the supplier's real spelling so imports auto-resolve.
 CLIENT_MODEL_EQUIVALENCES: dict[str, str] = {
-    "XIADOU": "TR 571 PLUS",
+    "xiaodou": "TR 571 PLUS",
     "X3": "571",
-    "DIAOYOU": "TR 571 PRO",
-    "TY-530": "TR 530",
-    "MC-316": "CHOPPER",
-    "MC-118": "BICI CHICA",
+    "diaoyu": "TR 571 PRO",
     "AK-160": "TR-TON",
-    "Q-02": "MOTOR SILLA DE RUEDAS",
 }
 
 
