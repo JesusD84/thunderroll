@@ -198,6 +198,10 @@ public
 tmp/
 temp/
 
+# The generic Python `lib/` rule above also matches the frontend source dir;
+# keep frontend/lib tracked.
+!frontend/lib/
+
 # ================================
 # ENVIRONMENT VARIABLES
 # ================================
