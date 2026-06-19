@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Navigation from '@/components/Navigation';
 import SessionProvider from '@/components/providers/SessionProvider';
+import { Toaster } from '@/components/ui/sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({
           <div className="pt-16">
             {children}
           </div>
+          <Toaster />
         </SessionProvider>
       </body>
     </html>
