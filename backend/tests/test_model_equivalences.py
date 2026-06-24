@@ -123,7 +123,7 @@ def test_seed_client_model_equivalences_is_idempotent_and_resolves(db_session):
     # Seeding twice must not create duplicates (idempotent upsert).
     seed_client_model_equivalences(db_session)
     count = seed_client_model_equivalences(db_session)
-    assert count == len(CLIENT_MODEL_EQUIVALENCES) == 4
+    assert count == len(CLIENT_MODEL_EQUIVALENCES) == 8
 
     seeded = {
         e.manufacturer_model: e.internal_model
@@ -138,3 +138,5 @@ def test_seed_client_model_equivalences_is_idempotent_and_resolves(db_session):
     assert service.resolve_internal_model(db_session, "ak-160") == "TR-TON"
     assert service.resolve_internal_model(db_session, "xiaodou") == "TR 571 PLUS"
     assert service.resolve_internal_model(db_session, "diaoyu") == "TR 571 PRO"
+    # Client confirmed TY-D530 (sample spelling) is the same product as TY-530.
+    assert service.resolve_internal_model(db_session, "TY-D530") == "TR 530"
