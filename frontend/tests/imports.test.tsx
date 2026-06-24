@@ -27,124 +27,117 @@ beforeEach(() => {
   mockStatus = 'authenticated';
 });
 
-function createFile(name: string, type: string): File {
+function createFile(name: string, type = ''): File {
   return new File(['test content'], name, { type });
 }
 
+const previewResponse = {
+  filename: 'inventario.xlsx',
+  sheets: [
+    {
+      sheet: 'Hoja1',
+      has_header: true,
+      columns: ['NO', 'Color', 'VIN', 'Motor'],
+      column_mapping: { NO: 'model', Color: 'color', VIN: 'frame', Motor: 'motor' },
+      mapped_fields: { model: 'NO', color: 'Color', frame: 'VIN', motor: 'Motor' },
+      rows: 2,
+    },
+  ],
+  detected_fields: ['frame', 'motor', 'color', 'model'],
+  preview_data: [
+    { sheet: 'Hoja1', frame: 'HXY202507500001', motor: '20250823035825', color: 'rojo', model: 'X3' },
+    { sheet: 'Hoja1', frame: 'HXY202507500002', motor: '20250823035826', color: 'negro', model: 'TY-D530' },
+  ],
+  invalid_rows: [{ sheet: 'Hoja1', row: 4, reasons: ['Falta número de motor'], data: {} }],
+  invalid_rows_count: 1,
+  issues: [],
+  validation: { is_valid: true, message: 'File is ready for import' },
+};
+
+const mockFetch = vi.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
+
+function mockJson(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+  const { ok = true, status = 200 } = init;
+  return Promise.resolve({
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    text: () => Promise.resolve(JSON.stringify(body)),
+  });
+}
+
 // ============================================================
-// ImportsPage
+// ImportsPage (real upload form -> POST /preview)
 // ============================================================
 describe('ImportsPage', () => {
   const user = userEvent.setup({ pointerEventsCheck: 0 });
 
-  it('renders page with header and form', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('renders the header and real upload form fields', () => {
     render(<ImportsPage />);
     expect(screen.getByText('Importar Inventario')).toBeInTheDocument();
-    expect(screen.getByText('Importa unidades desde archivos Excel del proveedor')).toBeInTheDocument();
-    expect(screen.getByLabelText('Código de Lote *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Factura Proveedor *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Archivo Excel')).toBeInTheDocument();
+    expect(screen.getByLabelText('Periodo de lote')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tipo de producto')).toBeInTheDocument();
+    expect(screen.getByLabelText('Archivo')).toBeInTheDocument();
   });
 
-  it('renders instructions card with required columns', () => {
+  it('accepts xlsx, xls and csv files', () => {
     render(<ImportsPage />);
-    expect(screen.getByText('Instrucciones')).toBeInTheDocument();
-    expect(screen.getByText('Columnas Requeridas')).toBeInTheDocument();
-    expect(screen.getByText('Formato de Datos')).toBeInTheDocument();
-    expect(screen.getByText('Descargar Plantilla')).toBeInTheDocument();
+    const fileInput = screen.getByLabelText('Archivo') as HTMLInputElement;
+    expect(fileInput.accept).toBe('.xlsx,.xls,.csv');
   });
 
-  it('shows filename after file selection', async () => {
+  it('enables the preview button only after a file is selected', async () => {
     render(<ImportsPage />);
-    const fileInput = screen.getByLabelText('Archivo Excel');
-    const file = createFile('inventario.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    await user.upload(fileInput, file);
-    expect(screen.getByText('Archivo seleccionado: inventario.xlsx')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vista previa' })).toBeDisabled();
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    expect(screen.getByText('Archivo seleccionado: inv.xlsx')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vista previa' })).not.toBeDisabled();
   });
 
-  it('preview button is disabled when fields are empty', () => {
+  it('does not require batch metadata to preview', async () => {
     render(<ImportsPage />);
-    const previewBtn = screen.getByRole('button', { name: 'Vista Previa' });
-    expect(previewBtn).toBeDisabled();
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.csv'));
+    expect(screen.getByRole('button', { name: 'Vista previa' })).not.toBeDisabled();
   });
 
-  it('preview button is disabled when only file is selected', async () => {
+  it('calls POST /preview and shows the summary with identifiers preserved', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
     render(<ImportsPage />);
-    const fileInput = screen.getByLabelText('Archivo Excel');
-    await user.upload(fileInput, createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    const previewBtn = screen.getByRole('button', { name: 'Vista Previa' });
-    expect(previewBtn).toBeDisabled();
-  });
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
 
-  it('preview button enabled when all required fields are filled', async () => {
-    render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    const fileInput = screen.getByLabelText('Archivo Excel');
-    await user.upload(fileInput, createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    const previewBtn = screen.getByRole('button', { name: 'Vista Previa' });
-    expect(previewBtn).not.toBeDisabled();
-  });
-
-  it('shows preview table after processing', async () => {
-    render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    await user.upload(screen.getByLabelText('Archivo Excel'), createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    await user.click(screen.getByRole('button', { name: 'Vista Previa' }));
     await waitFor(() => {
-      expect(screen.getByText('Vista Previa de Importación')).toBeInTheDocument();
-    }, { timeout: 3000 });
-    expect(screen.getByText('Honda PCX')).toBeInTheDocument();
-    expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
+      expect(screen.getByText('File is ready for import')).toBeInTheDocument();
+    });
+    // Long chassis/engine numbers must survive verbatim (no scientific notation).
+    expect(screen.getByText('HXY202507500001')).toBeInTheDocument();
+    expect(screen.getByText('20250823035826')).toBeInTheDocument();
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/v1/imports/preview');
   });
 
-  it('shows error badges for rows with errors in preview', async () => {
+  it('shows an error alert when the backend rejects the file', async () => {
+    mockFetch.mockReturnValue(
+      mockJson(
+        { detail: 'Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.' },
+        { ok: false, status: 400 },
+      ),
+    );
     render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    await user.upload(screen.getByLabelText('Archivo Excel'), createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    await user.click(screen.getByRole('button', { name: 'Vista Previa' }));
-    await waitFor(() => {
-      const errorBadges = screen.getAllByText('Error');
-      expect(errorBadges.length).toBe(1);
-    }, { timeout: 3000 });
-    const okBadges = screen.getAllByText('OK');
-    expect(okBadges.length).toBe(2);
-  });
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
 
-  it('shows import button after preview with unit count', async () => {
-    render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    await user.upload(screen.getByLabelText('Archivo Excel'), createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    await user.click(screen.getByRole('button', { name: 'Vista Previa' }));
     await waitFor(() => {
-      expect(screen.getByText('Importar (3 unidades)')).toBeInTheDocument();
-    }, { timeout: 3000 });
-  });
-
-  it('import button is disabled when errors exist', async () => {
-    render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    await user.upload(screen.getByLabelText('Archivo Excel'), createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    await user.click(screen.getByRole('button', { name: 'Vista Previa' }));
-    await waitFor(() => {
-      const importBtn = screen.getByRole('button', { name: /Importar/ });
-      expect(importBtn).toBeDisabled();
-    }, { timeout: 3000 });
-  });
-
-  it('shows error alert with error details', async () => {
-    render(<ImportsPage />);
-    await user.type(screen.getByLabelText('Código de Lote *'), 'BATCH_001');
-    await user.type(screen.getByLabelText('Factura Proveedor *'), 'INV-001');
-    await user.upload(screen.getByLabelText('Archivo Excel'), createFile('test.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
-    await user.click(screen.getByRole('button', { name: 'Vista Previa' }));
-    await waitFor(() => {
-      expect(screen.getByText('Errores encontrados:')).toBeInTheDocument();
-      expect(screen.getByText('Fila 4: Número de motor faltante')).toBeInTheDocument();
-    }, { timeout: 3000 });
+      expect(screen.getByText('No se pudo procesar el archivo')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.'),
+    ).toBeInTheDocument();
   });
 });
