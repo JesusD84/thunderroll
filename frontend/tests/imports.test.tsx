@@ -37,8 +37,8 @@ const previewResponse = {
     {
       sheet: 'Hoja1',
       has_header: true,
-      columns: ['NO', 'Color', 'VIN', 'Motor'],
-      column_mapping: { NO: 'model', Color: 'color', VIN: 'frame', Motor: 'motor' },
+      columns: ['NO', 'Color', 'VIN', 'Motor', 'Notas'],
+      column_mapping: { NO: 'model', Color: 'color', VIN: 'frame', Motor: 'motor', Notas: null },
       mapped_fields: { model: 'NO', color: 'Color', frame: 'VIN', motor: 'Motor' },
       rows: 2,
     },
@@ -50,7 +50,7 @@ const previewResponse = {
   ],
   invalid_rows: [{ sheet: 'Hoja1', row: 4, reasons: ['Falta número de motor'], data: {} }],
   invalid_rows_count: 1,
-  issues: [],
+  issues: [{ level: 'warning', message: 'Hoja vacía omitida', sheet: 'Hoja2' }],
   validation: { is_valid: true, message: 'File is ready for import' },
 };
 
@@ -120,6 +120,47 @@ describe('ImportsPage', () => {
 
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('/api/v1/imports/preview');
+  });
+
+  it('renders per-sheet columns with the proposed mapping', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+    // raw columns and their detected canonical field / unmapped state
+    expect(screen.getByText('VIN')).toBeInTheDocument();
+    expect(screen.getByText('Notas')).toBeInTheDocument();
+    expect(screen.getByText('Sin mapear')).toBeInTheDocument();
+    // sheet tab label
+    expect(screen.getByRole('tab', { name: 'Hoja1' })).toBeInTheDocument();
+  });
+
+  it('renders parser issues', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Hoja vacía omitida/)).toBeInTheDocument();
+    });
+    expect(screen.getByText('Avisos (1)')).toBeInTheDocument();
+  });
+
+  it('lists invalid rows with their reasons without blocking', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Filas con problemas (1)')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Falta número de motor')).toBeInTheDocument();
   });
 
   it('shows an error alert when the backend rejects the file', async () => {

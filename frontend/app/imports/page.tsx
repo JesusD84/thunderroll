@@ -15,10 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Upload, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Upload, AlertTriangle, Info } from 'lucide-react';
+import { PreviewResult } from '@/components/imports/PreviewResult';
 import { previewImport, type ImportPreviewResponse } from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
@@ -195,65 +194,11 @@ export default function ImportsPage() {
           </Card>
         </div>
 
-        {/* Resumen de la vista previa (el detalle por hoja llega en FR-03) */}
+        {/* Vista previa detallada del archivo */}
         {preview && (
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle>Vista previa de {preview.filename}</CardTitle>
-              <CardDescription>
-                {preview.preview_data.length} filas en vista previa · {preview.invalid_rows_count} con problemas
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert variant={preview.validation.is_valid ? 'default' : 'destructive'}>
-                {preview.validation.is_valid ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-                <AlertTitle>
-                  {preview.validation.is_valid ? 'Archivo listo' : 'Revisa el archivo'}
-                </AlertTitle>
-                <AlertDescription>{preview.validation.message}</AlertDescription>
-              </Alert>
-
-              {preview.detected_fields.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-gray-600">Campos detectados:</span>
-                  {preview.detected_fields.map((field) => (
-                    <Badge key={field} variant="secondary">
-                      {field}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {preview.preview_data.length > 0 && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hoja</TableHead>
-                      <TableHead>Chasis</TableHead>
-                      <TableHead>Motor</TableHead>
-                      <TableHead>Color</TableHead>
-                      <TableHead>Modelo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.preview_data.map((row, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{row.sheet}</TableCell>
-                        <TableCell className="font-mono text-sm">{row.frame || '-'}</TableCell>
-                        <TableCell className="font-mono text-sm">{row.motor || '-'}</TableCell>
-                        <TableCell className="capitalize">{row.color || '-'}</TableCell>
-                        <TableCell>{row.model || '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <section className="mt-8">
+            <PreviewResult preview={preview} />
+          </section>
         )}
       </main>
     </div>
