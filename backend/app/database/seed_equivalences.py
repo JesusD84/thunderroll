@@ -7,18 +7,20 @@ production database:
 
     python -m app.database.seed_equivalences
 
-Notes on the source data:
+Notes on the source data (all confirmed with the client, jun-2026):
 - ``AK-160`` is stored without the stray space the client wrote ("AK- 160") so
   it matches the real supplier label.
-- The keys for ``xiaodou`` and ``diaoyu`` use the spelling the suppliers actually
-  ship in the sample files (the client wrote them "XIADOU"/"DIAOYOU"); we trust
-  the samples since that is the data received directly from the supplier.
-- Still pending client confirmation (left out until answered):
-  - ``TY-530`` (mapping) vs ``TY-D530`` (sample): are they the same product?
-  - ``TY-TJ571`` and ``ZHAIBANG`` (seen in samples): do they have an internal
-    name, or are they used as-is?
-  - ``MC-316`` / ``MC-118`` / ``Q-02`` (in the mapping but not yet seen in any
-    sample): waiting for a supplier sample to test against.
+- ``xiaodou`` and ``diaoyu`` use the spelling the suppliers actually ship in the
+  sample files (the client wrote them "XIADOU"/"DIAOYOU"); we trust the samples
+  since that is the data received directly from the supplier.
+- ``TY-D530`` (sample spelling) -> ``TR 530``: the client confirmed it is the
+  same product as the "TY-530" in their original table.
+- ``MC-316`` / ``MC-118`` / ``Q-02`` are real internal models; on that occasion
+  the supplier did not send chassis/motor numbers (the units were registered with
+  the client's own internal numbers), so they may not appear in a supplier file,
+  but the equivalence is kept as authoritative.
+- ``TY-TJ571`` and ``ZHAIBANG`` are intentionally NOT mapped: the client said
+  they are not needed (those files were only reference samples).
 """
 
 from app.database.database import SessionLocal
@@ -30,7 +32,11 @@ CLIENT_MODEL_EQUIVALENCES: dict[str, str] = {
     "xiaodou": "TR 571 PLUS",
     "X3": "571",
     "diaoyu": "TR 571 PRO",
+    "TY-D530": "TR 530",
     "AK-160": "TR-TON",
+    "MC-316": "CHOPPER",
+    "MC-118": "BICI CHICA",
+    "Q-02": "MOTOR SILLA DE RUEDAS",
 }
 
 
