@@ -233,4 +233,102 @@ describe('ImportsPage', () => {
       screen.getByText('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.'),
     ).toBeInTheDocument();
   });
+
+  const uploadResponse = {
+    import_id: 7,
+    message: '2 unidades importadas, 1 fallida.',
+    total_records: 3,
+    successful_imports: 2,
+    failed_imports: 1,
+  };
+
+  it('uploads with metadata + column_mapping and shows the result screen', async () => {
+    mockFetch
+      .mockReturnValueOnce(mockJson(previewResponse))
+      .mockReturnValueOnce(mockJson(uploadResponse));
+    render(<ImportsPage />);
+
+    // Batch metadata
+    await user.type(screen.getByLabelText('Periodo de lote'), '2026-ABRIL');
+    await user.click(screen.getByRole('combobox', { name: 'Tipo de producto' }));
+    await user.click(screen.getByRole('option', { name: 'Triciclo' }));
+
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Importar al inventario' }));
+    await waitFor(() => {
+      expect(screen.getByText('Importación completada')).toBeInTheDocument();
+    });
+
+    // Result counts and message are visible.
+    expect(screen.getByText('Importadas')).toBeInTheDocument();
+    expect(screen.getByText('2 unidades importadas, 1 fallida.', { exact: false })).toBeInTheDocument();
+
+    // The upload request carried metadata + column_mapping.
+    const uploadCall = mockFetch.mock.calls[1];
+    expect(uploadCall[0]).toContain('/api/v1/imports/upload');
+    const body = uploadCall[1].body as FormData;
+    expect(body.get('batch_period')).toBe('2026-ABRIL');
+    expect(body.get('product_type')).toBe('triciclo');
+    const mapping = JSON.parse(body.get('column_mapping') as string);
+    expect(mapping.VIN).toBe('frame');
+  });
+
+  it('loads import errors on demand from the result screen', async () => {
+    const errorsResponse = [
+      {
+        id: 1,
+        import_id: 7,
+        row_number: 4,
+        error_message: 'Identificador duplicado',
+        raw_data: null,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ];
+    mockFetch
+      .mockReturnValueOnce(mockJson(previewResponse))
+      .mockReturnValueOnce(mockJson(uploadResponse))
+      .mockReturnValueOnce(mockJson(errorsResponse));
+    render(<ImportsPage />);
+
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Importar al inventario' }));
+    await waitFor(() => {
+      expect(screen.getByText('Importación completada')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Ver errores' }));
+    await waitFor(() => {
+      expect(screen.getByText('Identificador duplicado')).toBeInTheDocument();
+    });
+    expect(mockFetch.mock.calls[2][0]).toContain('/api/v1/imports/7/errors');
+  });
+
+  it('shows an error when the import fails', async () => {
+    mockFetch
+      .mockReturnValueOnce(mockJson(previewResponse))
+      .mockReturnValueOnce(mockJson({ detail: 'Error processing file: boom' }, { ok: false, status: 500 }));
+    render(<ImportsPage />);
+
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Importar al inventario' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Error processing file: boom')).toBeInTheDocument();
+    });
+    // No result screen on failure.
+    expect(screen.queryByText('Importación completada')).not.toBeInTheDocument();
+  });
 });
