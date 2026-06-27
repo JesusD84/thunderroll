@@ -13,6 +13,7 @@ import {
   Truck, 
   FileText, 
   Settings, 
+  Repeat,
   LogOut,
   Menu,
   X
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Unidades', href: '/units', icon: Package },
   { name: 'Importar', href: '/imports', icon: Upload },
+  { name: 'Equivalencias', href: '/model-equivalences', icon: Repeat },
   { name: 'Transferencias', href: '/transfers', icon: Truck },
   { name: 'Reportes', href: '/reports', icon: FileText },
   { name: 'Configuración', href: '/settings', icon: Settings },

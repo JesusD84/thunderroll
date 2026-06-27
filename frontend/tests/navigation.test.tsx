@@ -38,6 +38,7 @@ describe('Navigation', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Unidades')).toBeInTheDocument();
     expect(screen.getByText('Importar')).toBeInTheDocument();
+    expect(screen.getByText('Equivalencias')).toBeInTheDocument();
     expect(screen.getByText('Transferencias')).toBeInTheDocument();
     expect(screen.getByText('Reportes')).toBeInTheDocument();
     expect(screen.getByText('Configuración')).toBeInTheDocument();
