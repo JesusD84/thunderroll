@@ -52,6 +52,60 @@ export interface ImportPreviewResponse {
   validation: Validation;
 }
 
+/** A per-column user choice: a canonical field, or 'ignore' (leave unmapped). */
+export type ColumnSelection = CanonicalField | 'ignore';
+
+/**
+ * Flatten the per-sheet proposed mapping into a single column -> field map.
+ * The backend applies `column_mapping` globally by column name, so we collapse
+ * sheets the same way; a column detected in any sheet wins over a null in another.
+ */
+export function proposedFieldByColumn(
+  preview: ImportPreviewResponse,
+): Record<string, CanonicalField | null> {
+  const map: Record<string, CanonicalField | null> = {};
+  for (const sheet of preview.sheets) {
+    for (const column of sheet.columns) {
+      const field = sheet.column_mapping[column] ?? null;
+      if (map[column] == null) map[column] = field;
+    }
+  }
+  return map;
+}
+
+/** The effective selection for a column: user override, else detected, else 'ignore'. */
+export function effectiveSelection(
+  preview: ImportPreviewResponse,
+  overrides: Record<string, ColumnSelection>,
+  column: string,
+): ColumnSelection {
+  return overrides[column] ?? proposedFieldByColumn(preview)[column] ?? 'ignore';
+}
+
+/**
+ * Build the `column_mapping` payload from the preview and the user's overrides.
+ * Columns whose effective selection is 'ignore' are omitted (the backend only
+ * accepts canonical fields). Detected columns are pinned so the mapping is
+ * idempotent.
+ */
+export function buildColumnMapping(
+  preview: ImportPreviewResponse,
+  overrides: Record<string, ColumnSelection>,
+): ColumnMapping {
+  const proposed = proposedFieldByColumn(preview);
+  const columns = new Set<string>();
+  preview.sheets.forEach((sheet) => sheet.columns.forEach((c) => columns.add(c)));
+
+  const mapping: ColumnMapping = {};
+  for (const column of columns) {
+    const selection = overrides[column] ?? proposed[column] ?? 'ignore';
+    if (selection !== 'ignore') {
+      mapping[column] = selection;
+    }
+  }
+  return mapping;
+}
+
 export interface UploadResult {
   import_id: number;
   message: string;

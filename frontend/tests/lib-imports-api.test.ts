@@ -12,6 +12,10 @@ import {
   createModelEquivalence,
   updateModelEquivalence,
   deleteModelEquivalence,
+  buildColumnMapping,
+  effectiveSelection,
+  proposedFieldByColumn,
+  type ImportPreviewResponse,
 } from '@/lib/imports';
 
 const mockFetch = vi.fn();
@@ -226,5 +230,67 @@ describe('model-equivalences client', () => {
     mockFetch.mockReturnValue(mockResponse(''));
     await deleteModelEquivalence(1, 'tok');
     expect(lastCall().init.method).toBe('DELETE');
+  });
+});
+
+describe('assisted mapping helpers', () => {
+  const preview: ImportPreviewResponse = {
+    filename: 'f.xlsx',
+    sheets: [
+      {
+        sheet: 'S1',
+        has_header: true,
+        columns: ['VIN', 'Motor', 'NO', 'Notas'],
+        column_mapping: { VIN: 'frame', Motor: 'motor', NO: 'model', Notas: null },
+        mapped_fields: { frame: 'VIN', motor: 'Motor', model: 'NO' },
+        rows: 1,
+      },
+      {
+        sheet: 'S2',
+        has_header: true,
+        columns: ['VIN', 'Color'],
+        column_mapping: { VIN: 'frame', Color: 'color' },
+        mapped_fields: { frame: 'VIN', color: 'Color' },
+        rows: 1,
+      },
+    ],
+    detected_fields: ['frame', 'motor', 'color', 'model'],
+    preview_data: [],
+    invalid_rows: [],
+    invalid_rows_count: 0,
+    issues: [],
+    validation: { is_valid: true, message: 'ok' },
+  };
+
+  it('proposedFieldByColumn flattens sheets, detected wins over null', () => {
+    const map = proposedFieldByColumn(preview);
+    expect(map.VIN).toBe('frame');
+    expect(map.Color).toBe('color');
+    expect(map.Notas).toBeNull();
+  });
+
+  it('effectiveSelection prefers override, then detected, then ignore', () => {
+    expect(effectiveSelection(preview, {}, 'VIN')).toBe('frame');
+    expect(effectiveSelection(preview, {}, 'Notas')).toBe('ignore');
+    expect(effectiveSelection(preview, { Notas: 'model' }, 'Notas')).toBe('model');
+    expect(effectiveSelection(preview, { VIN: 'ignore' }, 'VIN')).toBe('ignore');
+  });
+
+  it('buildColumnMapping pins detected fields and applies overrides', () => {
+    const mapping = buildColumnMapping(preview, { Notas: 'model' });
+    expect(mapping).toEqual({
+      VIN: 'frame',
+      Motor: 'motor',
+      NO: 'model',
+      Notas: 'model',
+      Color: 'color',
+    });
+  });
+
+  it('buildColumnMapping omits columns set to ignore', () => {
+    const mapping = buildColumnMapping(preview, { Color: 'ignore', Notas: 'ignore' });
+    expect(mapping.Color).toBeUndefined();
+    expect(mapping.Notas).toBeUndefined();
+    expect(mapping.VIN).toBe('frame');
   });
 });

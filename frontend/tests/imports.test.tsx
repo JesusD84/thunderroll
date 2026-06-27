@@ -163,6 +163,58 @@ describe('ImportsPage', () => {
     expect(screen.getByText('Falta número de motor')).toBeInTheDocument();
   });
 
+  it('lets the user remap a column and re-previews with column_mapping', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+
+    // The unmapped "Notas" column exposes a Select; map it to "Modelo".
+    await user.click(screen.getByRole('combobox', { name: 'Campo para Notas' }));
+    await user.click(screen.getByRole('option', { name: 'Modelo' }));
+
+    await user.click(screen.getByRole('button', { name: 'Re-previsualizar' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    // The second request carries the column_mapping with the override applied.
+    const body = mockFetch.mock.calls[1][1].body as FormData;
+    const mapping = JSON.parse(body.get('column_mapping') as string);
+    expect(mapping.Notas).toBe('model');
+    // Auto-detected columns are pinned too (idempotent mapping).
+    expect(mapping.VIN).toBe('frame');
+    expect(mapping.Motor).toBe('motor');
+  });
+
+  it('omits a column from column_mapping when set back to "Sin mapear"', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+
+    // Color is auto-detected; set it to "Sin mapear" so it is dropped from the payload.
+    await user.click(screen.getByRole('combobox', { name: 'Campo para Color' }));
+    await user.click(screen.getByRole('option', { name: 'Sin mapear' }));
+    await user.click(screen.getByRole('button', { name: 'Re-previsualizar' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+    const body = mockFetch.mock.calls[1][1].body as FormData;
+    const mapping = JSON.parse(body.get('column_mapping') as string);
+    expect(mapping.Color).toBeUndefined();
+  });
+
   it('shows an error alert when the backend rejects the file', async () => {
     mockFetch.mockReturnValue(
       mockJson(
