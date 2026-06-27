@@ -18,12 +18,17 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, AlertTriangle, Info } from 'lucide-react';
 import { PreviewResult } from '@/components/imports/PreviewResult';
+import { ImportResult } from '@/components/imports/ImportResult';
 import {
   previewImport,
+  uploadImport,
+  getImportErrors,
   buildColumnMapping,
   type ColumnMapping,
   type ColumnSelection,
+  type ImportError,
   type ImportPreviewResponse,
+  type UploadResult,
 } from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
@@ -46,11 +51,17 @@ export default function ImportsPage() {
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, ColumnSelection>>({});
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<UploadResult | null>(null);
+  const [importErrors, setImportErrors] = useState<ImportError[] | null>(null);
+  const [loadingErrors, setLoadingErrors] = useState(false);
 
   const resetResult = () => {
     setPreview(null);
     setError(null);
     setOverrides({});
+    setResult(null);
+    setImportErrors(null);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +100,54 @@ export default function ImportsPage() {
   const handleApplyMapping = () => {
     if (!preview) return;
     runPreview(buildColumnMapping(preview, overrides));
+  };
+
+  const handleImport = async () => {
+    if (!file || !preview) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const res = await uploadImport(
+        file,
+        {
+          batch_period: batchPeriod.trim() || null,
+          product_type: productType === NONE ? null : productType,
+          columnMapping: buildColumnMapping(preview, overrides),
+        },
+        token,
+      );
+      setResult(res);
+      setImportErrors(null);
+      toast.success('Importación completada', { description: res.message });
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo importar el archivo. Inténtalo de nuevo.';
+      setError(message);
+      toast.error('Error al importar', { description: message });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleLoadErrors = async () => {
+    if (!result) return;
+
+    setLoadingErrors(true);
+    try {
+      const errors = await getImportErrors(result.import_id, token);
+      setImportErrors(errors);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'No se pudieron cargar los errores.';
+      toast.error('Error al cargar los errores', { description: message });
+      setImportErrors([]);
+    } finally {
+      setLoadingErrors(false);
+    }
   };
 
   const handleReset = () => {
@@ -213,9 +272,22 @@ export default function ImportsPage() {
           </Card>
         </div>
 
-        {/* Vista previa detallada del archivo con mapeo asistido */}
-        {preview && (
+        {/* Pantalla de resultado tras importar */}
+        {result && (
           <section className="mt-8">
+            <ImportResult
+              result={result}
+              errors={importErrors}
+              loadingErrors={loadingErrors}
+              onLoadErrors={handleLoadErrors}
+              onReset={handleReset}
+            />
+          </section>
+        )}
+
+        {/* Vista previa detallada del archivo con mapeo asistido */}
+        {preview && !result && (
+          <section className="mt-8 space-y-6">
             <PreviewResult
               preview={preview}
               overrides={overrides}
@@ -223,6 +295,11 @@ export default function ImportsPage() {
               onApplyMapping={handleApplyMapping}
               applying={loading}
             />
+            <div className="flex justify-end">
+              <Button onClick={handleImport} disabled={uploading || loading} size="lg">
+                {uploading ? 'Importando...' : 'Importar al inventario'}
+              </Button>
+            </div>
           </section>
         )}
       </main>
