@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -161,11 +162,16 @@ export default function ImportsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">Importar Inventario</h1>
-          <p className="text-gray-600">
-            Sube el archivo del proveedor para validarlo antes de importar
-          </p>
+        <div className="mx-auto flex max-w-7xl items-start justify-between px-4 py-6 sm:px-6 lg:px-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Importar Inventario</h1>
+            <p className="text-gray-600">
+              Sube el archivo del proveedor para validarlo antes de importar
+            </p>
+          </div>
+          <Link href="/imports/history">
+            <Button variant="outline">Ver historial</Button>
+          </Link>
         </div>
       </div>
 
