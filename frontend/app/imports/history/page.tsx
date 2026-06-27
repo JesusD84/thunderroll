@@ -15,8 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/states';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Inbox, Trash2 } from 'lucide-react';
 import { listImports, deleteImport, type ImportRecord } from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
@@ -109,27 +108,20 @@ export default function ImportsHistoryPage() {
             <CardDescription>Las más recientes primero</CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            {error && <ErrorState message={error} onRetry={load} className="mb-4" />}
 
             {imports === null ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
+              <LoadingState rows={3} label="Cargando importaciones..." />
             ) : imports.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                <p>No hay importaciones todavía.</p>
-                <Link href="/imports" className="mt-2 inline-block text-blue-600 hover:underline">
-                  Importar un archivo
-                </Link>
-              </div>
+              <EmptyState
+                icon={Inbox}
+                title="No hay importaciones todavía."
+                action={
+                  <Link href="/imports" className="text-blue-600 hover:underline">
+                    Importar un archivo
+                  </Link>
+                }
+              />
             ) : (
               <Table>
                 <TableHeader>
