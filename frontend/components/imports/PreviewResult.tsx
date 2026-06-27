@@ -16,10 +16,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
-import type { CanonicalField, ImportPreviewResponse } from '@/lib/imports';
+import {
+  CANONICAL_FIELDS,
+  effectiveSelection,
+  type CanonicalField,
+  type ColumnSelection,
+  type ImportPreviewResponse,
+} from '@/lib/imports';
 
 const FIELD_LABELS: Record<CanonicalField, string> = {
   frame: 'Chasis',
@@ -28,11 +42,23 @@ const FIELD_LABELS: Record<CanonicalField, string> = {
   model: 'Modelo',
 };
 
-function fieldLabel(field: CanonicalField | null): string {
-  return field ? FIELD_LABELS[field] : field ?? '';
+const IGNORE = 'ignore';
+
+interface PreviewResultProps {
+  preview: ImportPreviewResponse;
+  overrides?: Record<string, ColumnSelection>;
+  onColumnChange?: (column: string, value: ColumnSelection) => void;
+  onApplyMapping?: () => void;
+  applying?: boolean;
 }
 
-export function PreviewResult({ preview }: { preview: ImportPreviewResponse }) {
+export function PreviewResult({
+  preview,
+  overrides = {},
+  onColumnChange,
+  onApplyMapping,
+  applying = false,
+}: PreviewResultProps) {
   const {
     filename,
     sheets,
@@ -43,6 +69,8 @@ export function PreviewResult({ preview }: { preview: ImportPreviewResponse }) {
     issues,
     validation,
   } = preview;
+
+  const editable = Boolean(onColumnChange && onApplyMapping);
 
   return (
     <div className="space-y-6">
@@ -109,7 +137,11 @@ export function PreviewResult({ preview }: { preview: ImportPreviewResponse }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Hojas detectadas</CardTitle>
-            <CardDescription>Columnas y mapeo propuesto para cada hoja</CardDescription>
+            <CardDescription>
+              {editable
+                ? 'Ajusta el campo de cada columna y vuelve a previsualizar'
+                : 'Columnas y mapeo propuesto para cada hoja'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={sheets[0].sheet}>
@@ -130,20 +162,43 @@ export function PreviewResult({ preview }: { preview: ImportPreviewResponse }) {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Columna</TableHead>
-                        <TableHead>Campo detectado</TableHead>
+                        <TableHead>Campo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {sheet.columns.map((column) => {
-                        const field = sheet.column_mapping[column] ?? null;
+                        const selection = effectiveSelection(preview, overrides, column);
                         return (
                           <TableRow key={column}>
                             <TableCell className="font-medium">{column}</TableCell>
                             <TableCell>
-                              {field ? (
-                                <Badge variant="default">{fieldLabel(field)}</Badge>
-                              ) : (
+                              {editable ? (
+                                <Select
+                                  value={selection}
+                                  onValueChange={(value) =>
+                                    onColumnChange?.(column, value as ColumnSelection)
+                                  }
+                                  disabled={applying}
+                                >
+                                  <SelectTrigger
+                                    aria-label={`Campo para ${column}`}
+                                    className="w-44"
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CANONICAL_FIELDS.map((f) => (
+                                      <SelectItem key={f} value={f}>
+                                        {FIELD_LABELS[f]}
+                                      </SelectItem>
+                                    ))}
+                                    <SelectItem value={IGNORE}>Sin mapear</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : selection === IGNORE ? (
                                 <Badge variant="outline">Sin mapear</Badge>
+                              ) : (
+                                <Badge variant="default">{FIELD_LABELS[selection]}</Badge>
                               )}
                             </TableCell>
                           </TableRow>
@@ -154,6 +209,14 @@ export function PreviewResult({ preview }: { preview: ImportPreviewResponse }) {
                 </TabsContent>
               ))}
             </Tabs>
+
+            {editable && (
+              <div className="mt-4 flex items-center justify-end">
+                <Button onClick={onApplyMapping} disabled={applying}>
+                  {applying ? 'Re-previsualizando...' : 'Re-previsualizar'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

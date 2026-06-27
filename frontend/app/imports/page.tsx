@@ -18,7 +18,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, AlertTriangle, Info } from 'lucide-react';
 import { PreviewResult } from '@/components/imports/PreviewResult';
-import { previewImport, type ImportPreviewResponse } from '@/lib/imports';
+import {
+  previewImport,
+  buildColumnMapping,
+  type ColumnMapping,
+  type ColumnSelection,
+  type ImportPreviewResponse,
+} from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
 const PRODUCT_TYPES = [
@@ -39,10 +45,12 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, ColumnSelection>>({});
 
   const resetResult = () => {
     setPreview(null);
     setError(null);
+    setOverrides({});
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,14 +58,14 @@ export default function ImportsPage() {
     resetResult();
   };
 
-  const handlePreview = async () => {
+  const runPreview = async (mapping: ColumnMapping | null) => {
     if (!file) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const result = await previewImport(file, null, token);
+      const result = await previewImport(file, mapping, token);
       setPreview(result);
     } catch (err) {
       const message =
@@ -70,6 +78,17 @@ export default function ImportsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePreview = () => runPreview(null);
+
+  const handleColumnChange = (column: string, value: ColumnSelection) => {
+    setOverrides((prev) => ({ ...prev, [column]: value }));
+  };
+
+  const handleApplyMapping = () => {
+    if (!preview) return;
+    runPreview(buildColumnMapping(preview, overrides));
   };
 
   const handleReset = () => {
@@ -194,10 +213,16 @@ export default function ImportsPage() {
           </Card>
         </div>
 
-        {/* Vista previa detallada del archivo */}
+        {/* Vista previa detallada del archivo con mapeo asistido */}
         {preview && (
           <section className="mt-8">
-            <PreviewResult preview={preview} />
+            <PreviewResult
+              preview={preview}
+              overrides={overrides}
+              onColumnChange={handleColumnChange}
+              onApplyMapping={handleApplyMapping}
+              applying={loading}
+            />
           </section>
         )}
       </main>
