@@ -16,8 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/states';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +36,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { AlertTriangle, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Repeat, Plus, Pencil, Trash2 } from 'lucide-react';
 import {
   listModelEquivalences,
   listUnmappedModels,
@@ -191,13 +190,7 @@ export default function ModelEquivalencesPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {error && <ErrorState message={error} onRetry={load} />}
 
         {unmapped.length > 0 && (
           <Card>
@@ -240,20 +233,19 @@ export default function ModelEquivalencesPage() {
           </CardHeader>
           <CardContent>
             {equivalences === null ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
+              <LoadingState rows={3} label="Cargando equivalencias..." />
             ) : equivalences.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                <p>No hay equivalencias todavía.</p>
-                {canManage && (
-                  <Button variant="link" onClick={() => openCreate()}>
-                    Crear la primera
-                  </Button>
-                )}
-              </div>
+              <EmptyState
+                icon={Repeat}
+                title="No hay equivalencias todavía."
+                action={
+                  canManage ? (
+                    <Button variant="link" onClick={() => openCreate()}>
+                      Crear la primera
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <Table>
                 <TableHeader>
@@ -367,12 +359,7 @@ export default function ModelEquivalencesPage() {
                 />
               </div>
 
-              {formError && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>{formError}</AlertDescription>
-                </Alert>
-              )}
+              {formError && <ErrorState message={formError} />}
             </div>
 
             <DialogFooter>

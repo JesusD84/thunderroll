@@ -14,9 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ErrorState, LoadingState } from '@/components/ui/states';
+import { ArrowLeft } from 'lucide-react';
 import {
   getImport,
   getImportErrors,
@@ -107,19 +106,10 @@ export default function ImportDetailPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {error && <ErrorState message={error} onRetry={load} />}
 
         {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
+          <LoadingState rows={2} className="[&>*]:h-40" label="Cargando importación..." />
         ) : record ? (
           <>
             <Card>
