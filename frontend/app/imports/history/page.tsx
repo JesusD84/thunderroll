@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Inbox, Trash2 } from 'lucide-react';
 import { listImports, deleteImport, type ImportRecord } from '@/lib/imports';
+import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 const STATUS: Record<string, { label: string; className: string }> = {
@@ -44,10 +44,7 @@ function formatDate(value: string | null): string {
 }
 
 export default function ImportsHistoryPage() {
-  const { data: session } = useSession();
-  const token = (session as { accessToken?: string } | null)?.accessToken;
-  const role = ((session?.user as { role?: string } | undefined)?.role ?? '').toLowerCase();
-  const isAdmin = role === 'admin';
+  const { token, deleteImport: canDelete } = useAuth();
 
   const [imports, setImports] = useState<ImportRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +161,7 @@ export default function ImportsHistoryPage() {
                                 Detalle
                               </Button>
                             </Link>
-                            {isAdmin && (
+                            {canDelete && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button

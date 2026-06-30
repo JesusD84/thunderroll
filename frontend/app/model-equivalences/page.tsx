@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +44,7 @@ import {
   deleteModelEquivalence,
   type ModelEquivalence,
 } from '@/lib/imports';
+import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 interface DialogState {
@@ -66,11 +66,7 @@ const EMPTY_DIALOG: DialogState = {
 };
 
 export default function ModelEquivalencesPage() {
-  const { data: session } = useSession();
-  const token = (session as { accessToken?: string } | null)?.accessToken;
-  const role = ((session?.user as { role?: string } | undefined)?.role ?? '').toLowerCase();
-  const isAdmin = role === 'admin';
-  const canManage = isAdmin || role === 'manager';
+  const { token, deleteEquivalence: canDelete, manageEquivalences: canManage } = useAuth();
 
   const [equivalences, setEquivalences] = useState<ModelEquivalence[] | null>(null);
   const [unmapped, setUnmapped] = useState<string[]>([]);
@@ -275,7 +271,7 @@ export default function ModelEquivalencesPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            {isAdmin && (
+                            {canDelete && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
