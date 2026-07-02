@@ -30,9 +30,14 @@ app = FastAPI(
 
 # CORS middleware
 allowed_origins = ["http://localhost:3000", "http://frontend:3000"]
+# Single origin (backwards compat)
 frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
     allowed_origins.append(frontend_url)
+# Comma-separated list for multiple Vercel/preview URLs
+extra_origins = os.getenv("ALLOWED_ORIGINS", "")
+if extra_origins:
+    allowed_origins.extend(o.strip() for o in extra_origins.split(",") if o.strip())
 
 app.add_middleware(
     CORSMiddleware,
