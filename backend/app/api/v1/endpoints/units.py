@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.database import get_db
@@ -14,12 +14,14 @@ router = APIRouter()
 
 @router.get("/", response_model=List[Unit])
 def get_units(
+    response: Response,
     filters: UnitFilters = Depends(),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
+    response.headers["X-Total-Count"] = str(UnitService.count_units(db, filters))
     return UnitService.get_units(db, filters, skip, limit)
 
 @router.post("/", response_model=Unit)

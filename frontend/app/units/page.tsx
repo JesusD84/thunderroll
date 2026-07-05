@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
+import { ErrorState, LoadingState, EmptyState } from '@/components/ui/states';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const PAGE_SIZE = 20;
 
 interface Unit {
   id: number;
@@ -78,57 +80,81 @@ function UnitsPageContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [units, setUnits] = useState<Unit[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [locationFilter, setLocationFilter] = useState('all');
+  const [page, setPage] = useState(1);
+
+  // Debounce the free-text search so we don't fire a request on every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearchTerm(searchInput), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  // Any filter change should reset back to the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, locationFilter]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token) return;
+    const token = (session as any)?.accessToken;
+    if (!token) return;
 
-      try {
-        const [unitsRes, locationsRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/units/`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
-          fetch(`${API_URL}/api/v1/locations/`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
-        ]);
-
-        if (unitsRes.ok) {
-          const unitsData = await unitsRes.json();
-          setUnits(unitsData);
-        }
-        if (locationsRes.ok) {
-          const locationsData = await locationsRes.json();
-          setLocations(locationsData);
-        }
-      } catch (err) {
-        console.error('Error fetching units:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetch(`${API_URL}/api/v1/locations/`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setLocations)
+      .catch((err) => console.error('Error fetching locations:', err));
   }, [session]);
 
-  const filteredUnits = units.filter(unit => {
-    const matchesSearch = !searchTerm || 
-      unit.engine_number?.includes(searchTerm) ||
-      unit.chassis_number?.includes(searchTerm) ||
-      unit.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      unit.model?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || unit.status === statusFilter;
-    const matchesLocation = locationFilter === 'all' || String(unit.current_location_id) === locationFilter;
-    
-    return matchesSearch && matchesStatus && matchesLocation;
-  });
+  const fetchUnits = async () => {
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        skip: String((page - 1) * PAGE_SIZE),
+        limit: String(PAGE_SIZE),
+      });
+      if (searchTerm) params.set('search', searchTerm);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (locationFilter !== 'all') params.set('location_id', locationFilter);
+
+      const res = await fetch(`${API_URL}/api/v1/units/?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error('No se pudieron cargar las unidades');
+      }
+
+      const data = await res.json();
+      setUnits(data);
+      setTotalCount(Number(res.headers.get('X-Total-Count') ?? data.length));
+    } catch (err) {
+      console.error('Error fetching units:', err);
+      setError('No se pudieron cargar las unidades. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, page, searchTerm, statusFilter, locationFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,8 +188,8 @@ function UnitsPageContent() {
               <div>
                 <Input
                   placeholder="Buscar por # motor, chasis, marca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="w-full"
                 />
               </div>
@@ -193,7 +219,7 @@ function UnitsPageContent() {
               </Select>
 
               <Button variant="outline" onClick={() => {
-                setSearchTerm('');
+                setSearchInput('');
                 setStatusFilter('all');
                 setLocationFilter('all');
               }}>
@@ -207,13 +233,21 @@ function UnitsPageContent() {
         {/* Tabla de Unidades */}
         <Card>
           <CardHeader>
-            <CardTitle>Unidades ({filteredUnits.length})</CardTitle>
+            <CardTitle>Unidades ({totalCount})</CardTitle>
             <CardDescription>Lista de todas las unidades en el sistema</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">Cargando unidades...</div>
+              <LoadingState rows={5} label="Cargando unidades..." />
+            ) : error ? (
+              <ErrorState message={error} onRetry={fetchUnits} />
+            ) : units.length === 0 ? (
+              <EmptyState
+                title="No se encontraron unidades"
+                description="Ajusta los filtros o el término de búsqueda."
+              />
             ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -228,7 +262,7 @@ function UnitsPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUnits.map((unit) => (
+                  {units.map((unit) => (
                     <TableRow key={unit.id}>
                       <TableCell className="font-mono text-sm">{unit.id}</TableCell>
                       <TableCell>
@@ -263,6 +297,35 @@ function UnitsPageContent() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-gray-500">
+                  Mostrando {rangeStart}-{rangeEnd} de {totalCount}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    Página {page} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+              </>
             )}
           </CardContent>
         </Card>

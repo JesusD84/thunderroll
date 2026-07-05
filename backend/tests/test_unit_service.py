@@ -26,6 +26,19 @@ def test_get_units_delegates(mock_repo):
     assert result == []
 
 
+@patch("app.services.unit_service.UnitRepository")
+def test_count_units_delegates(mock_repo):
+    """Delegates to UnitRepository.count_units."""
+    mock_db = MagicMock()
+    filters = UnitFilters()
+    mock_repo.count_units.return_value = 42
+
+    result = UnitService.count_units(mock_db, filters)
+
+    mock_repo.count_units.assert_called_once_with(mock_db, filters)
+    assert result == 42
+
+
 # ---------------------------------------------------------------------------
 # create_unit
 # ---------------------------------------------------------------------------

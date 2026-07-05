@@ -12,9 +12,9 @@ from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 # ---------------------------------------------------------------------------
 
 def test_get_units_no_filters():
-    """Returns paginated units without filters."""
+    """Returns paginated units, ordered newest-first, without filters."""
     mock_db = MagicMock()
-    mock_db.query.return_value.options.return_value.offset.return_value.limit.return_value.all.return_value = []
+    mock_db.query.return_value.options.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
     filters = UnitFilters()
 
     result = UnitRepository.get_units(mock_db, filters, skip=0, limit=10)
@@ -24,7 +24,7 @@ def test_get_units_no_filters():
 def test_get_units_with_status_filter():
     """Applies status filter."""
     mock_db = MagicMock()
-    mock_db.query.return_value.options.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = []
+    mock_db.query.return_value.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
     filters = UnitFilters(status=UnitStatus.AVAILABLE)
 
     result = UnitRepository.get_units(mock_db, filters, skip=0, limit=10)
@@ -34,11 +34,35 @@ def test_get_units_with_status_filter():
 def test_get_units_with_search_filter():
     """Applies search filter across multiple columns."""
     mock_db = MagicMock()
-    mock_db.query.return_value.options.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = []
+    mock_db.query.return_value.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
     filters = UnitFilters(search="thunder")
 
     result = UnitRepository.get_units(mock_db, filters, skip=0, limit=10)
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# count_units
+# ---------------------------------------------------------------------------
+
+def test_count_units_no_filters():
+    """Counts all units without filters."""
+    mock_db = MagicMock()
+    mock_db.query.return_value.count.return_value = 5
+    filters = UnitFilters()
+
+    result = UnitRepository.count_units(mock_db, filters)
+    assert result == 5
+
+
+def test_count_units_with_filters():
+    """Applies the same filters as get_units before counting."""
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.count.return_value = 2
+    filters = UnitFilters(search="thunder")
+
+    result = UnitRepository.count_units(mock_db, filters)
+    assert result == 2
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,10 @@ class UnitService:
         return UnitRepository.get_units(db, filters, skip, limit)
 
     @staticmethod
+    def count_units(db: Session, filters: UnitFilters) -> int:
+        return UnitRepository.count_units(db, filters)
+
+    @staticmethod
     def create_unit(db: Session, unit_data: UnitCreate) -> Unit:
         if not LocationRepository.get_location(db, unit_data.current_location_id):
             raise HTTPException(status_code=404, detail="Location not found")
