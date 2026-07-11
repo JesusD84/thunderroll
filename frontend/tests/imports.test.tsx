@@ -81,7 +81,7 @@ describe('ImportsPage', () => {
     render(<ImportsPage />);
     expect(screen.getByText('Importar Inventario')).toBeInTheDocument();
     expect(screen.getByLabelText('Periodo de lote')).toBeInTheDocument();
-    expect(screen.getByLabelText('Tipo de producto')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Tipo de producto')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Archivo')).toBeInTheDocument();
   });
 
@@ -250,8 +250,6 @@ describe('ImportsPage', () => {
 
     // Batch metadata
     await user.type(screen.getByLabelText('Periodo de lote'), '2026-ABRIL');
-    await user.click(screen.getByRole('combobox', { name: 'Tipo de producto' }));
-    await user.click(screen.getByRole('option', { name: 'Triciclo' }));
 
     await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
     await user.click(screen.getByRole('button', { name: 'Vista previa' }));
@@ -273,7 +271,9 @@ describe('ImportsPage', () => {
     expect(uploadCall[0]).toContain('/api/v1/imports/upload');
     const body = uploadCall[1].body as FormData;
     expect(body.get('batch_period')).toBe('2026-ABRIL');
-    expect(body.get('product_type')).toBe('triciclo');
+    // Tipo de producto ya no se captura en el form (oculto, no solicitado por
+    // el cliente); el backend/DB conservan el campo por si se reactiva.
+    expect(body.get('product_type')).toBeNull();
     const mapping = JSON.parse(body.get('column_mapping') as string);
     expect(mapping.VIN).toBe('frame');
   });
