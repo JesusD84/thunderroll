@@ -56,8 +56,41 @@ const mockLocations = [
   { id: 2, name: 'Sucursal Norte' },
 ];
 
-function mockOk(data: any) {
-  return Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+function mockOk(data: any, totalCount?: number) {
+  return Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve(data),
+    headers: { get: (name: string) => (name === 'X-Total-Count' ? String(totalCount ?? data.length) : null) },
+  });
+}
+
+function filterMockUnits(url: string) {
+  const params = new URL(url, 'http://localhost').searchParams;
+  const search = params.get('search')?.toLowerCase();
+  const status = params.get('status');
+  const locationId = params.get('location_id');
+
+  return mockUnits.filter((u) => {
+    const matchesSearch = !search ||
+      u.engine_number?.toLowerCase().includes(search) ||
+      u.chassis_number?.toLowerCase().includes(search) ||
+      u.brand.toLowerCase().includes(search) ||
+      u.model.toLowerCase().includes(search);
+    const matchesStatus = !status || u.status === status;
+    const matchesLocation = !locationId || String(u.current_location_id) === locationId;
+    return matchesSearch && matchesStatus && matchesLocation;
+  });
+}
+
+// Routes fetch calls by URL so units/locations requests can be answered
+// independently of the order the component happens to fire them in.
+function mockUnitsAndLocations() {
+  mockFetch.mockImplementation((url: string) => {
+    if (url.includes('/locations')) {
+      return mockOk(mockLocations);
+    }
+    return mockOk(filterMockUnits(url));
+  });
 }
 
 beforeEach(() => {
@@ -79,9 +112,7 @@ describe('UnitsPage', () => {
   });
 
   it('renders units in table after loading', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Honda PCX')).toBeInTheDocument();
@@ -92,9 +123,7 @@ describe('UnitsPage', () => {
   });
 
   it('renders status badges with correct labels', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Disponible')).toBeInTheDocument();
@@ -104,9 +133,7 @@ describe('UnitsPage', () => {
   });
 
   it('shows engine and chassis numbers', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('ENG001')).toBeInTheDocument();
@@ -115,9 +142,7 @@ describe('UnitsPage', () => {
   });
 
   it('shows dash for missing engine/chassis numbers', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Italika FT150')).toBeInTheDocument();
@@ -127,9 +152,7 @@ describe('UnitsPage', () => {
   });
 
   it('filters units by search term', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Honda PCX')).toBeInTheDocument();
@@ -139,14 +162,12 @@ describe('UnitsPage', () => {
     await waitFor(() => {
       expect(screen.queryByText('Honda PCX')).not.toBeInTheDocument();
       expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
     expect(screen.getByText('Unidades (1)')).toBeInTheDocument();
   });
 
   it('filters units by engine number', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Honda PCX')).toBeInTheDocument();
@@ -156,13 +177,11 @@ describe('UnitsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Honda PCX')).toBeInTheDocument();
       expect(screen.queryByText('Yamaha NMAX')).not.toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   it('clears all filters on clear button click', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Honda PCX')).toBeInTheDocument();
@@ -171,17 +190,15 @@ describe('UnitsPage', () => {
     await userEvent.type(searchInput, 'nonexistent');
     await waitFor(() => {
       expect(screen.getByText('Unidades (0)')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
     await userEvent.click(screen.getByText('Limpiar Filtros'));
     await waitFor(() => {
       expect(screen.getByText('Unidades (3)')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   it('renders link to create new unit', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Agregar Unidad')).toBeInTheDocument();
@@ -191,9 +208,7 @@ describe('UnitsPage', () => {
   });
 
   it('renders detail links for each unit', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       const detailButtons = screen.getAllByText('Ver Detalle');
@@ -210,12 +225,15 @@ describe('UnitsPage', () => {
   });
 
   it('handles non-ok response gracefully', async () => {
-    mockFetch
-      .mockResolvedValueOnce(Promise.resolve({
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/locations')) {
+        return mockOk(mockLocations);
+      }
+      return Promise.resolve({
         ok: false, status: 500,
         json: () => Promise.resolve({ detail: 'err' }),
-      }))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+      });
+    });
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Unidades (0)')).toBeInTheDocument();
@@ -232,9 +250,7 @@ describe('UnitsPage', () => {
 
   it('pre-fills status filter from search params', async () => {
     mockSearchParams = new URLSearchParams({ status: 'SOLD' });
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
@@ -243,9 +259,7 @@ describe('UnitsPage', () => {
   });
 
   it('shows location names in table', async () => {
-    mockFetch
-      .mockResolvedValueOnce(mockOk(mockUnits))
-      .mockResolvedValueOnce(mockOk(mockLocations));
+    mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
       expect(screen.getAllByText('Bodega Central').length).toBe(2);
