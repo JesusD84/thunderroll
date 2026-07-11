@@ -9,13 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, AlertTriangle, Info } from 'lucide-react';
 import { PreviewResult } from '@/components/imports/PreviewResult';
@@ -33,21 +26,12 @@ import {
 } from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
-const PRODUCT_TYPES = [
-  { value: 'triciclo', label: 'Triciclo' },
-  { value: 'bicicleta_electrica', label: 'Bicicleta eléctrica' },
-  { value: 'scooter', label: 'Scooter / Moto eléctrica' },
-];
-
-const NONE = 'none';
-
 export default function ImportsPage() {
   const { data: session } = useSession();
   const token = (session as { accessToken?: string } | null)?.accessToken;
 
   const [file, setFile] = useState<File | null>(null);
   const [batchPeriod, setBatchPeriod] = useState('');
-  const [productType, setProductType] = useState<string>(NONE);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +98,10 @@ export default function ImportsPage() {
         file,
         {
           batch_period: batchPeriod.trim() || null,
-          product_type: productType === NONE ? null : productType,
+          // Product type capture is disabled for now (not requested/used
+          // downstream); the backend field and DB column stay in place in
+          // case it's needed again.
+          product_type: null,
           columnMapping: buildColumnMapping(preview, overrides),
         },
         token,
@@ -154,7 +141,6 @@ export default function ImportsPage() {
   const handleReset = () => {
     setFile(null);
     setBatchPeriod('');
-    setProductType(NONE);
     resetResult();
   };
 
@@ -197,23 +183,6 @@ export default function ImportsPage() {
                   onChange={(e) => setBatchPeriod(e.target.value)}
                   placeholder="ej. 2026-ABRIL"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product_type">Tipo de producto</Label>
-                <Select value={productType} onValueChange={setProductType}>
-                  <SelectTrigger id="product_type">
-                    <SelectValue placeholder="Sin especificar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Sin especificar</SelectItem>
-                    {PRODUCT_TYPES.map((pt) => (
-                      <SelectItem key={pt.value} value={pt.value}>
-                        {pt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="space-y-2">
