@@ -7,9 +7,7 @@ from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 class UnitRepository:
 
     @staticmethod
-    def get_units(db: Session, filters: UnitFilters, skip: int, limit: int) -> list[Unit]:
-        query = db.query(Unit).options(selectinload(Unit.current_location))
-
+    def _apply_filters(query, filters: UnitFilters):
         if filters.status:
             query = query.filter(Unit.status == filters.status)
 
@@ -25,7 +23,19 @@ class UnitRepository:
                 Unit.brand.ilike(search_term)
             )
 
-        return query.offset(skip).limit(limit).all()
+        return query
+
+    @staticmethod
+    def get_units(db: Session, filters: UnitFilters, skip: int, limit: int) -> list[Unit]:
+        query = db.query(Unit).options(selectinload(Unit.current_location))
+        query = UnitRepository._apply_filters(query, filters)
+        return query.order_by(Unit.id.desc()).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def count_units(db: Session, filters: UnitFilters) -> int:
+        query = db.query(Unit)
+        query = UnitRepository._apply_filters(query, filters)
+        return query.count()
 
     @staticmethod
     def get_unit(db: Session, unit_id: int) -> Unit | None:
