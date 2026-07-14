@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.models import Transfer, TransferStatus
@@ -9,7 +9,7 @@ class TransferRepository:
 
     @staticmethod
     def get_transfers(db: Session, filters: TransferFilters, skip: int, limit: int) -> list[Transfer]:
-        query = db.query(Transfer)
+        query = db.query(Transfer).options(selectinload(Transfer.dispatched_by))
 
         if filters.unit_id:
             query = query.filter(Transfer.unit_id == filters.unit_id)
@@ -28,11 +28,19 @@ class TransferRepository:
 
     @staticmethod
     def get_transfer(db: Session, transfer_id: int) -> Transfer | None:
-        return db.query(Transfer).filter(Transfer.id == transfer_id).first()
+        return (
+            db.query(Transfer)
+            .options(selectinload(Transfer.dispatched_by))
+            .filter(Transfer.id == transfer_id)
+            .first()
+        )
 
     @staticmethod
     def create_transfer(db: Session, transfer_data: TransferCreate) -> Transfer:
-        db_transfer = Transfer(**transfer_data.model_dump())
+        payload = transfer_data.model_dump()
+        if payload.get("dispatched_at") is None:
+            payload.pop("dispatched_at", None)
+        db_transfer = Transfer(**payload)
         db.add(db_transfer)
         db.commit()
         db.refresh(db_transfer)
@@ -81,7 +89,7 @@ class TransferRepository:
             origin_location_id=origin_location_id,
             destination_location_id=destination_location_id,
             status=status,
-            dispatched_at=dispatched_at,
+            dispatched_at=dispatched_at or datetime.now(UTC),
             received_at=received_at,
         )
         db.add(db_transfer)

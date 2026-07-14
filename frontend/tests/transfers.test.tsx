@@ -26,17 +26,17 @@ global.fetch = mockFetch;
 
 const mockTransfers = [
   {
-    id: 1, unit_id: 10, dispatched_by_id: 1, received_by_id: null,
+    id: 1, unit_id: 10, dispatched_by_id: 1, dispatched_by_name: 'Test Admin', received_by_id: null,
     origin_location_id: 1, destination_location_id: 2,
     status: 'IN_TRANSIT', dispatched_at: '2025-05-01T00:00:00Z', received_at: null,
   },
   {
-    id: 2, unit_id: 11, dispatched_by_id: 1, received_by_id: 2,
+    id: 2, unit_id: 11, dispatched_by_id: 1, dispatched_by_name: 'Test Admin', received_by_id: 2,
     origin_location_id: 2, destination_location_id: 3,
     status: 'RECEIVED', dispatched_at: '2025-04-15T00:00:00Z', received_at: '2025-04-16T00:00:00Z',
   },
   {
-    id: 3, unit_id: 12, dispatched_by_id: null, received_by_id: null,
+    id: 3, unit_id: 12, dispatched_by_id: null, dispatched_by_name: null, received_by_id: null,
     origin_location_id: 1, destination_location_id: 2,
     status: 'PENDING', dispatched_at: null, received_at: null,
   },
@@ -105,6 +105,30 @@ describe('TransfersPage', () => {
     expect(screen.getAllByText('Bodega Central').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Sucursal Norte').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Sucursal Sur')).toBeInTheDocument();
+  });
+
+  it('shows dispatched_by_name in the Creado Por column', async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockOk(mockTransfers))
+      .mockResolvedValueOnce(mockOk(mockLocations));
+    render(<TransfersPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Unidad #10')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('Test Admin').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows dash in Creado Por when dispatched_by_name is missing', async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockOk(mockTransfers))
+      .mockResolvedValueOnce(mockOk(mockLocations));
+    render(<TransfersPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Unidad #12')).toBeInTheDocument();
+    });
+    const row = screen.getByText('Unidad #12').closest('tr');
+    expect(row).not.toBeNull();
+    expect(row!.textContent).toContain('-');
   });
 
   it('filters transfers by status', async () => {

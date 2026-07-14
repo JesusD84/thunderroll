@@ -88,6 +88,26 @@ def test_create_transfer_unit_not_found(mock_loc, mock_user, mock_unit, mock_tra
 @patch("app.services.transfer_service.UnitRepository")
 @patch("app.services.transfer_service.UserRepository")
 @patch("app.services.transfer_service.LocationRepository")
+def test_create_transfer_defaults_dispatched_at(mock_loc, mock_user, mock_unit, mock_transfer):
+    """Regression: dispatched_at must be populated even when not provided
+    by the caller, so 'Fecha' never renders empty in the frontend grid.
+    """
+    mock_db = MagicMock()
+    transfer_data = TransferCreate(unit_id=1, destination_location_id=2)
+    mock_unit.get_unit.return_value = Unit(id=1, current_location_id=1)
+    mock_loc.get_location.return_value = Location(id=2)
+    mock_transfer.create_transfer.side_effect = lambda db, payload: payload
+
+    TransferService.create_transfer(mock_db, transfer_data)
+
+    sent_payload = mock_transfer.create_transfer.call_args[0][1]
+    assert sent_payload.dispatched_at is not None
+
+
+@patch("app.services.transfer_service.TransferRepository")
+@patch("app.services.transfer_service.UnitRepository")
+@patch("app.services.transfer_service.UserRepository")
+@patch("app.services.transfer_service.LocationRepository")
 def test_create_transfer_same_origin_destination(mock_loc, mock_user, mock_unit, mock_transfer):
     """Raises 400 when origin and destination are the same."""
     mock_db = MagicMock()

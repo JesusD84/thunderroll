@@ -99,6 +99,12 @@ class Transfer(Base):
     origin_location = relationship("Location", foreign_keys=[origin_location_id], back_populates="transfers_from")
     destination_location = relationship("Location", foreign_keys=[destination_location_id], back_populates="transfers_to")
 
+    @property
+    def dispatched_by_name(self) -> str | None:
+        if not self.dispatched_by:
+            return None
+        return f"{self.dispatched_by.first_name} {self.dispatched_by.last_name}".strip()
+
 class ModelEquivalence(Base):
     """Manufacturer model name -> internal (client) model name.
 

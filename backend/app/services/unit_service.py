@@ -95,11 +95,15 @@ class UnitService:
 
         if "status" in update_data and update_data["status"] != old_status:
             transfer_status = TransferStatus.RECEIVED if update_data["status"] == UnitStatus.SOLD else TransferStatus.PENDING
+            current_location_id = update_data.get("current_location_id", old_location_id)
             TransferService.create_unit_transfer_record(
                 db=db,
                 unit_id=unit.id,
                 user_id=user_id,
+                origin_location_id=current_location_id,
+                destination_location_id=current_location_id,
                 status=transfer_status,
+                dispatched_at=datetime.now(UTC),
                 received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None,
             )
 

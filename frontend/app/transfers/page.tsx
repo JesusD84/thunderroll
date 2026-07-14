@@ -32,6 +32,7 @@ interface Transfer {
   id: number;
   unit_id: number;
   dispatched_by_id: number | null;
+  dispatched_by_name: string | null;
   received_by_id: number | null;
   origin_location_id: number | null;
   destination_location_id: number | null;
@@ -354,7 +355,7 @@ export default function TransfersPage() {
                       <TableCell className="text-sm">
                         {formatDate(transfer.received_at)}
                       </TableCell>
-                      <TableCell className="text-sm">-</TableCell>
+                      <TableCell className="text-sm">{transfer.dispatched_by_name || '-'}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {(transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT') && (
