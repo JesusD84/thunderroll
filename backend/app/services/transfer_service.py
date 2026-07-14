@@ -28,6 +28,8 @@ class TransferService:
     def create_transfer(db: Session, transfer_data: TransferCreate) -> Transfer:
         TransferService._validate_relations(db, transfer_data)
         payload = transfer_data.model_copy(deep=True)
+        if payload.dispatched_at is None:
+            payload.dispatched_at = datetime.now(UTC)
         if payload.status == TransferStatus.RECEIVED and payload.received_at is None:
             payload.received_at = datetime.now(UTC)
 

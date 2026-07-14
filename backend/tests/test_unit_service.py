@@ -173,6 +173,30 @@ def test_update_unit_status_to_sold_creates_transfer(mock_loc_repo, mock_unit_re
     mock_transfer_svc.create_unit_transfer_record.assert_called_once()
 
 
+@patch("app.services.unit_service.TransferService")
+@patch("app.services.unit_service.UnitRepository")
+@patch("app.services.unit_service.LocationRepository")
+def test_update_unit_status_change_transfer_has_dispatched_at_and_location(
+    mock_loc_repo, mock_unit_repo, mock_transfer_svc
+):
+    """Regression: a status-only change must still populate dispatched_at
+    and origin/destination location on the generated transfer record, so
+    'Fecha' and 'Ruta' never render empty in the frontend grid.
+    """
+    mock_db = MagicMock()
+    unit = Unit(id=1, model="TR", current_location_id=5, status=UnitStatus.AVAILABLE)
+    mock_unit_repo.get_unit.return_value = unit
+    mock_unit_repo.update_unit.return_value = unit
+
+    update_data = UnitUpdate(status=UnitStatus.SOLD)
+    UnitService.update_unit(mock_db, 1, update_data, user_id=1)
+
+    _, kwargs = mock_transfer_svc.create_unit_transfer_record.call_args
+    assert kwargs["dispatched_at"] is not None
+    assert kwargs["origin_location_id"] == 5
+    assert kwargs["destination_location_id"] == 5
+
+
 @patch("app.services.unit_service.UnitRepository")
 def test_update_unit_not_found(mock_repo):
     """Raises 404 when unit does not exist."""
