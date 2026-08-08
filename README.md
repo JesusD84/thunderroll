@@ -1,6 +1,6 @@
-# Thunderroll - Sistema de Trazabilidad de Inventario
+# Thunderoll - Sistema de Trazabilidad de Inventario
 
-Sistema de trazabilidad de inventario para Thunderroll (scooters/motos en Guadalajara). Permite seguir cada unidad desde su llegada a bodega hasta su venta, con importación masiva desde Excel, transferencias entre ubicaciones, reportes y control de acceso por roles.
+Sistema de trazabilidad de inventario para Thunderoll (scooters/motos en Guadalajara). Permite seguir cada unidad desde su llegada a bodega hasta su venta, con importación masiva desde Excel, transferencias entre ubicaciones, reportes y control de acceso por roles.
 
 ## Stack
 
@@ -25,10 +25,9 @@ Sistema de trazabilidad de inventario para Thunderroll (scooters/motos en Guadal
 
 | Rol | Descripción |
 |---|---|
-| `ADMIN` | Acceso total |
-| `MANAGER` | Gestión de inventario, transferencias y reportes |
-| `OPERATOR` | Operación de unidades y transferencias |
-| `VIEWER` | Solo lectura |
+| `ADMIN` | Acceso total, incluida la gestión de usuarios |
+| `MANAGER` | Gestión de inventario, transferencias, imports, equivalencias y reportes; puede crear cuentas `OPERATOR` |
+| `OPERATOR` (Operativo) | Ver unidades (solo lectura) y despachar/recibir transferencias, incluyendo marcar unidades como vendidas. Sin acceso a imports, equivalencias, reportes ni gestión de usuarios |
 
 ## Inicio rápido (Docker Compose)
 
@@ -41,9 +40,9 @@ Requisitos: **Docker** y **Docker Compose**.
 ```bash
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=noreply@thunderroll.com
+SMTP_USER=noreply@thunderoll.com
 SMTP_PASSWORD=changeme
-SMTP_FROM=noreply@thunderroll.com
+SMTP_FROM=noreply@thunderoll.com
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -64,12 +63,13 @@ docker compose up --build
 
 ### 4. Credenciales demo
 
+Al arrancar con la base vacía, `create_demo_data()` siembra únicamente una cuenta admin bootstrap:
+
 ```
-admin@thunderrol.com    / admin123     (ADMIN)
-manager@thunderrol.com  / manager123   (MANAGER)
-operator@thunderrol.com / operator123  (OPERATOR)
-viewer@thunderrol.com   / viewer123    (VIEWER)
+admin@thunderoll.com / admin123 (ADMIN)
 ```
+
+Las cuentas `MANAGER` y `OPERATOR` no se crean automáticamente — se crean desde esa cuenta admin en **Configuración → Usuarios → Nuevo Usuario**.
 
 ## Desarrollo local sin Docker
 
@@ -86,15 +86,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Variables de entorno del backend (en `backend/.env` o exportadas):
 
 ```bash
-DATABASE_URL=postgresql://thunderrol:thunderrol123@localhost:5432/thunderrol
+DATABASE_URL=postgresql://thunderoll:thunderoll123@localhost:5432/thunderoll
 SECRET_KEY=tu-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=noreply@thunderroll.com
+SMTP_USER=noreply@thunderoll.com
 SMTP_PASSWORD=changeme
-SMTP_FROM=noreply@thunderroll.com
+SMTP_FROM=noreply@thunderoll.com
 FRONTEND_URL=http://localhost:3000
 ```
 

@@ -586,19 +586,19 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <h4 className="font-medium">Administrador</h4>
-                <p className="text-sm text-gray-600">Email: admin@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Email: admin@thunderoll.com</p>
                 <p className="text-sm text-gray-600">Password: admin123</p>
               </div>
               
               <div className="space-y-2">
                 <h4 className="font-medium">Manager</h4>
-                <p className="text-sm text-gray-600">Email: manager@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Email: manager@thunderoll.com</p>
                 <p className="text-sm text-gray-600">Password: manager123</p>
               </div>
               
               <div className="space-y-2">
                 <h4 className="font-medium">Operativo</h4>
-                <p className="text-sm text-gray-600">Email: operator@thunderrol.com</p>
+                <p className="text-sm text-gray-600">Email: operator@thunderoll.com</p>
                 <p className="text-sm text-gray-600">Password: operator123</p>
               </div>
             </div>

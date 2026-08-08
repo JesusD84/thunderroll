@@ -12,7 +12,7 @@ from app.models.schemas import TokenData
 from app.core.security import Security
 import os
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-thunderrol-2024")
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-thunderoll-2024")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = 15

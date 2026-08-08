@@ -1,4 +1,4 @@
-# Frontend Test Plan — Thunderroll
+# Frontend Test Plan — Thunderoll
 
 ## Stack
 

@@ -49,7 +49,7 @@ def test_create_unit_success(mock_loc_repo, mock_unit_repo):
     """Creates a unit when location exists and no duplicates."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderrol", color="Red",
+        model="TR", brand="Thunderoll", color="Red",
         current_location_id=1, engine_number="ENG1",
     )
     mock_loc_repo.get_location.return_value = Location(id=1, name="Bodega")
@@ -67,7 +67,7 @@ def test_create_unit_location_not_found(mock_loc_repo, mock_unit_repo):
     """Raises 404 when location does not exist."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderrol", color="Red",
+        model="TR", brand="Thunderoll", color="Red",
         current_location_id=999,
     )
     mock_loc_repo.get_location.return_value = None
@@ -83,7 +83,7 @@ def test_create_unit_duplicate_engine(mock_loc_repo, mock_unit_repo):
     """Raises 400 when engine/chassis already exists."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderrol", color="Red",
+        model="TR", brand="Thunderoll", color="Red",
         current_location_id=1, engine_number="ENG1",
     )
     mock_loc_repo.get_location.return_value = Location(id=1, name="Bodega")

@@ -37,7 +37,7 @@ describe('LoginPage', () => {
   it('does not expose demo credentials to unauthenticated visitors', () => {
     render(<LoginPage />);
     expect(screen.queryByText('Credenciales Demo:')).not.toBeInTheDocument();
-    expect(screen.queryByText(/admin@thunderrol.com/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin@thunderoll.com/)).not.toBeInTheDocument();
   });
 
   it('calls signIn on submit', async () => {

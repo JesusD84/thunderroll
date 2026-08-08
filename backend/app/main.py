@@ -22,8 +22,8 @@ async def lifespan(app: FastAPI):
     pass
 
 app = FastAPI(
-    title="Thunderrol Inventory API",
-    description="API for Thunderrol inventory management system",
+    title="Thunderoll Inventory API",
+    description="API for Thunderoll inventory management system",
     version="1.0.0",
     lifespan=lifespan
 )

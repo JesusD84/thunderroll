@@ -7,8 +7,8 @@ router.include_router(v1_router, prefix="/api/v1")
 
 @router.get("/")
 def read_root():
-    return {"message": "Thunderrol Inventory API"}
+    return {"message": "Thunderoll Inventory API"}
 
 @router.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "Thunderrol API"}
+    return {"status": "healthy", "service": "Thunderoll API"}

@@ -32,7 +32,7 @@ beforeEach(() => {
 describe('Navigation', () => {
   it('renders brand name', () => {
     render(<Navigation />);
-    expect(screen.getByText('Thunderrol')).toBeInTheDocument();
+    expect(screen.getByText('Thunderoll')).toBeInTheDocument();
   });
 
   it('renders all nav links', () => {

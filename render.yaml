@@ -25,8 +25,8 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        value: noreply@thunderroll.com
+        value: noreply@thunderoll.com
       - key: SMTP_PASSWORD
         value: changeme
       - key: SMTP_FROM
-        value: noreply@thunderroll.com
+        value: noreply@thunderoll.com

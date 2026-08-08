@@ -25,7 +25,7 @@ async def test_create_transfer(client: AsyncClient, auth_headers, test_users, te
     """Can create a transfer for an existing unit."""
     unit_data = {
         "model": "TR-Trans",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Red",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-TRANSFER-001",
@@ -51,7 +51,7 @@ async def test_create_transfer_populates_dispatched_at(client: AsyncClient, auth
     """
     unit_data = {
         "model": "TR-DispAt",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Purple",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DISPAT-001",
@@ -80,7 +80,7 @@ async def test_status_change_creates_transfer_with_location_and_date(
     """
     unit_data = {
         "model": "TR-StatusChg",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Orange",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-STATUSCHG-001",
@@ -110,7 +110,7 @@ async def test_transfer_includes_dispatched_by_name(client: AsyncClient, auth_he
     """
     unit_data = {
         "model": "TR-DispBy",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Pink",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DISPBY-001",
@@ -136,7 +136,7 @@ async def test_get_transfer_by_id(client: AsyncClient, auth_headers, test_users,
     """Can fetch a transfer by ID."""
     unit_data = {
         "model": "TR-GetT",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Blue",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-GETT-001",
@@ -167,7 +167,7 @@ async def test_update_transfer(client: AsyncClient, auth_headers, test_users, te
     """Can update a transfer status."""
     unit_data = {
         "model": "TR-UpdT",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Green",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-UPDT-001",
@@ -191,7 +191,7 @@ async def test_delete_transfer(client: AsyncClient, auth_headers, test_users, te
     """Admin can delete a transfer."""
     unit_data = {
         "model": "TR-DelT",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Black",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DELT-001",

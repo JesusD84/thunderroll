@@ -9,8 +9,8 @@ import { Toaster } from '@/components/ui/sonner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Thunderrol - Sistema de Trazabilidad',
-  description: 'Sistema de trazabilidad de inventario para Thunderrol',
+  title: 'Thunderoll - Sistema de Trazabilidad',
+  description: 'Sistema de trazabilidad de inventario para Thunderoll',
 };
 
 export default function RootLayout({
