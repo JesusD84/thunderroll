@@ -7,7 +7,7 @@ function Hello({ name }: { name: string }) {
 
 describe('Infra smoke test', () => {
   it('renders a component', () => {
-    render(<Hello name="Thunderrol" />);
-    expect(screen.getByText('Hello, Thunderrol!')).toBeInTheDocument();
+    render(<Hello name="Thunderoll" />);
+    expect(screen.getByText('Hello, Thunderoll!')).toBeInTheDocument();
   });
 });

@@ -11,6 +11,6 @@ services:
 
 volumes:
   frontend_node_modules:
-    name: thunderrol_frontend_node_modules
+    name: thunderoll_frontend_node_modules
   frontend_next:
-    name: thunderrol_frontend_next
+    name: thunderoll_frontend_next

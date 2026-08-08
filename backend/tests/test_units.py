@@ -25,7 +25,7 @@ async def test_create_unit(client: AsyncClient, auth_headers, test_users, test_l
     """Admin can create a unit."""
     unit_data = {
         "model": "TR-2025",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Red",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-TEST-001",
@@ -42,7 +42,7 @@ async def test_create_unit_duplicate_engine(client: AsyncClient, auth_headers, t
     """Creating a unit with duplicate engine returns 400."""
     unit_data = {
         "model": "TR",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Blue",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DUP-001",
@@ -57,7 +57,7 @@ async def test_get_unit_by_id(client: AsyncClient, auth_headers, test_users, tes
     """Can fetch a unit by ID."""
     unit_data = {
         "model": "TR-Get",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Green",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-GET-001",
@@ -82,7 +82,7 @@ async def test_update_unit(client: AsyncClient, auth_headers, test_users, test_l
     """Can update a unit's fields."""
     unit_data = {
         "model": "TR-Update",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Black",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-UPDATE-001",
@@ -101,7 +101,7 @@ async def test_delete_unit(client: AsyncClient, auth_headers, test_users, test_l
     """Admin can delete a unit."""
     unit_data = {
         "model": "TR-Delete",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "White",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DEL-001",
@@ -131,7 +131,7 @@ async def test_get_unit_transfers(client: AsyncClient, auth_headers, test_users,
     """Can fetch transfers for a unit."""
     unit_data = {
         "model": "TR-Transfers",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Gray",
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-TRANS-001",

@@ -47,7 +47,7 @@ describe('UC-1: Authentication', () => {
     const LoginPage = (await import('@/app/login/page')).default;
     render(<LoginPage />);
     expect(screen.getByText('Credenciales Demo:')).toBeInTheDocument();
-    expect(screen.getByText(/admin@thunderrol.com/)).toBeInTheDocument();
+    expect(screen.getByText(/admin@thunderoll.com/)).toBeInTheDocument();
   });
 
   it('UC-1.3: unauthenticated user sees login page', async () => {

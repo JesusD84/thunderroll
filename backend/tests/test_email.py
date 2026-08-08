@@ -48,7 +48,7 @@ async def test_send_password_reset_email(mock_fastmail_cls):
     call_args = mock_fm.send_message.call_args[0][0]
     assert call_args.recipients == ["user@example.com"]
     assert "abc123token" in call_args.body
-    assert "Thunderrol" in call_args.subject
+    assert "Thunderoll" in call_args.subject
 
 
 @patch("app.services.email.FastMail")

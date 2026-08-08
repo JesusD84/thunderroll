@@ -47,7 +47,7 @@ async def test_malformed_token(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_create_unit_missing_required_fields(client: AsyncClient, auth_headers, test_users, test_locations):
     """Creating unit without required fields returns 422."""
-    unit_data = {"brand": "Thunderrol"}
+    unit_data = {"brand": "Thunderoll"}
     response = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
     assert response.status_code == 422
 
@@ -57,7 +57,7 @@ async def test_create_unit_invalid_location(client: AsyncClient, auth_headers, t
     """Creating unit with non-existent location returns 404."""
     unit_data = {
         "model": "TR",
-        "brand": "Thunderrol",
+        "brand": "Thunderoll",
         "color": "Red",
         "current_location_id": 9999,
         "engine_number": "ENG-EDGE-001",

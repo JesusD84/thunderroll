@@ -37,7 +37,7 @@ describe('LoginPage', () => {
   it('shows demo credentials', () => {
     render(<LoginPage />);
     expect(screen.getByText('Credenciales Demo:')).toBeInTheDocument();
-    expect(screen.getByText(/admin@thunderrol.com/)).toBeInTheDocument();
+    expect(screen.getByText(/admin@thunderoll.com/)).toBeInTheDocument();
   });
 
   it('calls signIn on submit', async () => {

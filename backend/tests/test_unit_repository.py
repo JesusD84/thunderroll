@@ -72,7 +72,7 @@ def test_count_units_with_filters():
 def test_get_unit_found():
     """Returns unit with location eager-loaded."""
     mock_db = MagicMock()
-    mock_unit = Unit(id=1, model="TR", brand="Thunderrol")
+    mock_unit = Unit(id=1, model="TR", brand="Thunderoll")
     mock_db.query.return_value.options.return_value.filter.return_value.one_or_none.return_value = mock_unit
 
     result = UnitRepository.get_unit(mock_db, 1)
@@ -117,7 +117,7 @@ def test_create_unit_success():
     """Creates a unit and returns it with eager-loaded relations."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderrol", color="Red",
+        model="TR", brand="Thunderoll", color="Red",
         current_location_id=1, engine_number="ENG1",
     )
     mock_unit = Unit(id=1, model="TR")
@@ -134,7 +134,7 @@ def test_create_unit_missing_location():
     """Raises ValueError when current_location_id is None."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderrol", color="Red",
+        model="TR", brand="Thunderoll", color="Red",
         current_location_id=1, engine_number="ENG1",
     )
     unit_data.current_location_id = None

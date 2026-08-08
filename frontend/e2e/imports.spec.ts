@@ -12,7 +12,7 @@ const SAMPLE_FILES = [
 ];
 
 const mockSession = {
-  user: { id: '1', email: 'admin@thunderrol.com', name: 'Admin User', role: 'admin' },
+  user: { id: '1', email: 'admin@thunderoll.com', name: 'Admin User', role: 'admin' },
   accessToken: 'mock-jwt-token',
   expires: new Date(Date.now() + 86400000).toISOString(),
 };

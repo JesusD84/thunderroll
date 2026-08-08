@@ -1,4 +1,4 @@
-# CI/CD Plan — Thunderroll
+# CI/CD Plan — Thunderoll
 
 ## Arquitectura
 

@@ -20,7 +20,7 @@ def create_demo_data():
 
         print("Creating bootstrap admin user...")
         db.add(User(
-            email="admin@thunderrol.com",
+            email="admin@thunderoll.com",
             username="admin",
             first_name="Admin",
             last_name="Usuario",

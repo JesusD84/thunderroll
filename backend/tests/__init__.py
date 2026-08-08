@@ -1,2 +1,2 @@
 
-"""Tests for Thunderrol API."""
+"""Tests for Thunderoll API."""

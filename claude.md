@@ -1,8 +1,8 @@
-# CLAUDE.md — Thunderroll
+# CLAUDE.md — Thunderoll
 
 ## Qué es este proyecto
 
-Sistema de trazabilidad de inventario para **Thunderrol**, empresa de scooters/motos en Guadalajara. Rastrea unidades desde importación hasta venta, pasando por bodega, taller, tránsito y sucursales.
+Sistema de trazabilidad de inventario para **Thunderoll**, empresa de scooters/motos en Guadalajara. Rastrea unidades desde importación hasta venta, pasando por bodega, taller, tránsito y sucursales.
 
 ---
 
@@ -200,10 +200,10 @@ Todos los endpoints de negocio van bajo `/api/v1/` (ej: `/api/v1/auth/login`, `/
 
 | Usuario | Password | Rol |
 |---------|----------|-----|
-| admin@thunderrol.com / admin | admin123 | ADMIN |
-| manager@thunderrol.com / manager | manager123 | MANAGER |
-| operator@thunderrol.com / operator | operator123 | OPERATOR |
-| viewer@thunderrol.com / viewer | viewer123 | VIEWER |
+| admin@thunderoll.com / admin | admin123 | ADMIN |
+| manager@thunderoll.com / manager | manager123 | MANAGER |
+| operator@thunderoll.com / operator | operator123 | OPERATOR |
+| viewer@thunderoll.com / viewer | viewer123 | VIEWER |
 
 ---
 

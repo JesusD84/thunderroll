@@ -46,14 +46,14 @@ async def test_get_inventory_report_with_filters(client: AsyncClient, auth_heade
     """Test inventory report with filters."""
     response = await client.get(
         "/api/v1/reports/inventory",
-        params={"brand": "Thunderrol", "status": "AVAILABLE"},
+        params={"brand": "Thunderoll", "status": "AVAILABLE"},
         headers=auth_headers,
     )
     assert response.status_code == 200
 
     data = response.json()
     for unit in data["units"]:
-        assert unit["brand"] == "Thunderrol"
+        assert unit["brand"] == "Thunderoll"
         assert unit["status"] == "AVAILABLE"
 
 

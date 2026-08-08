@@ -75,13 +75,13 @@ def test_get_inventory_report_no_filters():
 def test_get_inventory_report_with_filters():
     """Applies filters to inventory query."""
     mock_db = MagicMock()
-    unit = Unit(id=1, brand="Thunderrol", model="TR", color="Red",
+    unit = Unit(id=1, brand="Thunderoll", model="TR", color="Red",
                 status=UnitStatus.AVAILABLE, engine_number="E1")
     unit.current_location = Location(id=1, name="Bodega")
     mock_db.query.return_value.options.return_value.filter.return_value.filter.return_value.all.return_value = [unit]
 
     result = ReportService.get_inventory_report(
-        mock_db, brand="Thunderrol", status=UnitStatus.AVAILABLE
+        mock_db, brand="Thunderoll", status=UnitStatus.AVAILABLE
     )
 
     assert result["total_units"] == 1

@@ -4,10 +4,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "thunderrol-api"
+name = "thunderoll-api"
 version = "1.0.0"
-description = "Thunderrol Inventory Traceability System API"
-authors = [{name = "Thunderrol Team", email = "dev@thunderrol.com"}]
+description = "Thunderoll Inventory Traceability System API"
+authors = [{name = "Thunderoll Team", email = "dev@thunderoll.com"}]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.104.0",
