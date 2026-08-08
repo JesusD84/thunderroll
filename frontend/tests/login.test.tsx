@@ -34,10 +34,10 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /Iniciar Sesión/ })).toBeInTheDocument();
   });
 
-  it('shows demo credentials', () => {
+  it('does not expose demo credentials to unauthenticated visitors', () => {
     render(<LoginPage />);
-    expect(screen.getByText('Credenciales Demo:')).toBeInTheDocument();
-    expect(screen.getByText(/admin@thunderrol.com/)).toBeInTheDocument();
+    expect(screen.queryByText('Credenciales Demo:')).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin@thunderrol.com/)).not.toBeInTheDocument();
   });
 
   it('calls signIn on submit', async () => {

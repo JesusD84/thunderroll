@@ -43,11 +43,11 @@ describe('UC-1: Authentication', () => {
     expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
   });
 
-  it('UC-1.2: demo credentials visible on login page', async () => {
+  it('UC-1.2: demo credentials are not exposed on the public login page', async () => {
     const LoginPage = (await import('@/app/login/page')).default;
     render(<LoginPage />);
-    expect(screen.getByText('Credenciales Demo:')).toBeInTheDocument();
-    expect(screen.getByText(/admin@thunderrol.com/)).toBeInTheDocument();
+    expect(screen.queryByText('Credenciales Demo:')).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin@thunderrol.com/)).not.toBeInTheDocument();
   });
 
   it('UC-1.3: unauthenticated user sees login page', async () => {

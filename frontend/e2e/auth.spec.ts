@@ -36,9 +36,9 @@ test.describe('Auth', () => {
     await expect(page.locator('#password')).toBeVisible();
   });
 
-  test('shows demo credentials', async ({ page }) => {
+  test('does not show demo credentials on the public login page', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByText('Credenciales Demo:')).toBeVisible();
+    await expect(page.getByText('Credenciales Demo:')).not.toBeVisible();
   });
 
   test('protected route redirects to login', async ({ page }) => {
