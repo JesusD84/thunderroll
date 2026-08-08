@@ -46,6 +46,8 @@ import {
 } from '@/lib/imports';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 interface DialogState {
   open: boolean;
@@ -66,7 +68,15 @@ const EMPTY_DIALOG: DialogState = {
 };
 
 export default function ModelEquivalencesPage() {
-  const { token, deleteEquivalence: canDelete, manageEquivalences: canManage } = useAuth();
+  const { token, deleteEquivalence: canDelete, manageEquivalences: canManage, viewEquivalences } = useAuth();
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session && !viewEquivalences) {
+      router.replace('/');
+    }
+  }, [session, viewEquivalences, router]);
 
   const [equivalences, setEquivalences] = useState<ModelEquivalence[] | null>(null);
   const [unmapped, setUnmapped] = useState<string[]>([]);

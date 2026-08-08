@@ -1,9 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +30,15 @@ import { ApiError } from '@/lib/api';
 
 export default function ImportsPage() {
   const { data: session } = useSession();
+  const { viewImports } = useAuth();
+  const router = useRouter();
   const token = (session as { accessToken?: string } | null)?.accessToken;
+
+  useEffect(() => {
+    if (session && !viewImports) {
+      router.replace('/');
+    }
+  }, [session, viewImports, router]);
 
   const [file, setFile] = useState<File | null>(null);
   const [batchPeriod, setBatchPeriod] = useState('');

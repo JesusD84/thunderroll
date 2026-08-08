@@ -28,7 +28,7 @@ def get_units(
 def create_unit(
     unit: UnitCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     return UnitService.create_unit(db, unit)
 
@@ -52,7 +52,7 @@ def update_unit(
     unit_id: int,
     unit_update: UnitUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     return UnitService.update_unit(db, unit_id, unit_update, current_user.id)
 

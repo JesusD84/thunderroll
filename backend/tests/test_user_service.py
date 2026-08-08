@@ -9,20 +9,21 @@ from app.schemas.user import UserCreate, UserUpdate
 
 
 # ---------------------------------------------------------------------------
-# register_user
+# create_user
 # ---------------------------------------------------------------------------
 
 @patch("app.services.user_service.UserRepository")
 @patch("app.services.user_service.get_password_hash")
-def test_register_user_success(mock_hash, mock_repo):
-    """Registers a new user when email and username are unique."""
+def test_create_user_success(mock_hash, mock_repo):
+    """Creates a new user when email and username are unique."""
     mock_db = MagicMock()
+    creator = User(id=1, username="admin", role=UserRole.ADMIN)
     user_data = UserCreate(
         email="new@test.com",
         username="newuser",
         first_name="New",
         last_name="User",
-        role=UserRole.VIEWER,
+        role=UserRole.OPERATOR,
         password="password123",
     )
 
@@ -32,7 +33,7 @@ def test_register_user_success(mock_hash, mock_repo):
     mock_user = User(id=2, username="newuser", email="new@test.com")
     mock_repo.create_user.return_value = mock_user
 
-    result = UserService.register_user(mock_db, user_data)
+    result = UserService.create_user(mock_db, user_data, creator)
 
     mock_repo.get_user_by_email.assert_called_once_with(mock_db, email="new@test.com")
     mock_repo.get_user_by_username.assert_called_once_with(mock_db, username="newuser")
@@ -42,36 +43,38 @@ def test_register_user_success(mock_hash, mock_repo):
 
 
 @patch("app.services.user_service.UserRepository")
-def test_register_user_duplicate_email(mock_repo):
+def test_create_user_duplicate_email(mock_repo):
     """Raises 400 when email is already registered."""
     mock_db = MagicMock()
+    creator = User(id=1, username="admin", role=UserRole.ADMIN)
     user_data = UserCreate(
         email="existing@test.com",
         username="newuser",
         first_name="New",
         last_name="User",
-        role=UserRole.VIEWER,
+        role=UserRole.OPERATOR,
         password="password123",
     )
 
     mock_repo.get_user_by_email.return_value = User(id=1, email="existing@test.com")
 
     with pytest.raises(HTTPException) as exc:
-        UserService.register_user(mock_db, user_data)
+        UserService.create_user(mock_db, user_data, creator)
     assert exc.value.status_code == 400
     assert "Email already registered" in exc.value.detail
 
 
 @patch("app.services.user_service.UserRepository")
-def test_register_user_duplicate_username(mock_repo):
+def test_create_user_duplicate_username(mock_repo):
     """Raises 400 when username is already taken."""
     mock_db = MagicMock()
+    creator = User(id=1, username="admin", role=UserRole.ADMIN)
     user_data = UserCreate(
         email="new@test.com",
         username="existinguser",
         first_name="New",
         last_name="User",
-        role=UserRole.VIEWER,
+        role=UserRole.OPERATOR,
         password="password123",
     )
 
@@ -79,9 +82,52 @@ def test_register_user_duplicate_username(mock_repo):
     mock_repo.get_user_by_username.return_value = User(id=1, username="existinguser")
 
     with pytest.raises(HTTPException) as exc:
-        UserService.register_user(mock_db, user_data)
+        UserService.create_user(mock_db, user_data, creator)
     assert exc.value.status_code == 400
     assert "Username already registered" in exc.value.detail
+
+
+@patch("app.services.user_service.UserRepository")
+def test_create_user_manager_can_create_operator(mock_repo):
+    """A Manager can create an Operator account."""
+    mock_db = MagicMock()
+    creator = User(id=1, username="manager", role=UserRole.MANAGER)
+    user_data = UserCreate(
+        email="new@test.com",
+        username="newoperator",
+        first_name="New",
+        last_name="Operator",
+        role=UserRole.OPERATOR,
+        password="password123",
+    )
+    mock_repo.get_user_by_email.return_value = None
+    mock_repo.get_user_by_username.return_value = None
+    mock_user = User(id=2, username="newoperator", role=UserRole.OPERATOR)
+    mock_repo.create_user.return_value = mock_user
+
+    result = UserService.create_user(mock_db, user_data, creator)
+
+    assert result is mock_user
+
+
+@patch("app.services.user_service.UserRepository")
+def test_create_user_manager_cannot_create_manager(mock_repo):
+    """A Manager cannot grant Manager or Admin roles."""
+    mock_db = MagicMock()
+    creator = User(id=1, username="manager", role=UserRole.MANAGER)
+    user_data = UserCreate(
+        email="new@test.com",
+        username="newmanager",
+        first_name="New",
+        last_name="Manager",
+        role=UserRole.MANAGER,
+        password="password123",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        UserService.create_user(mock_db, user_data, creator)
+    assert exc.value.status_code == 403
+    mock_repo.create_user.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

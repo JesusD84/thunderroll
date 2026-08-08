@@ -8,7 +8,7 @@ import type { ModelEquivalence } from '@/lib/imports';
 let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
 }));

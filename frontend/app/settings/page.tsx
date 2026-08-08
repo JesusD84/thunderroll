@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -33,8 +35,19 @@ interface User {
   updated_at: string | null;
 }
 
+const emptyNewUser = {
+  email: '',
+  username: '',
+  first_name: '',
+  last_name: '',
+  password: '',
+  role: 'operator',
+};
+
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const { manageUsers, isAdmin } = useAuth();
+  const router = useRouter();
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +58,16 @@ export default function SettingsPage() {
   const [editForm, setEditForm] = useState({ name: '', address: '' });
   const [editSaving, setEditSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [showNewUser, setShowNewUser] = useState(false);
+  const [newUser, setNewUser] = useState(emptyNewUser);
+  const [userSaving, setUserSaving] = useState(false);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session && !manageUsers) {
+      router.replace('/');
+    }
+  }, [session, manageUsers, router]);
 
   const mapDeleteLocationErrorToSpanish = (detail: string): string => {
     const match = detail.match(/^Cannot delete: there (?:is|are) (\d+) units? at this location$/);
@@ -164,18 +187,49 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    setUserSaving(true);
+    setUserError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/user/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newUser,
+          role: isAdmin ? newUser.role : 'operator',
+        }),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        setUsers(prev => [...prev, created]);
+        setShowNewUser(false);
+        setNewUser(emptyNewUser);
+      } else {
+        const err = await res.json();
+        setUserError(typeof err.detail === 'string' ? err.detail : 'Error creando usuario');
+      }
+    } catch {
+      setUserError('Error de conexión');
+    } finally {
+      setUserSaving(false);
+    }
+  };
+
   const roleColors: Record<string, string> = {
     'admin': 'bg-red-100 text-red-800',
     'manager': 'bg-blue-100 text-blue-800',
     'operator': 'bg-green-100 text-green-800',
-    'viewer': 'bg-purple-100 text-purple-800',
   };
 
   const roleLabels: Record<string, string> = {
     'admin': 'ADMIN',
     'manager': 'MANAGER',
-    'operator': 'OPERADOR',
-    'viewer': 'VIEWER',
+    'operator': 'OPERATIVO',
   };
 
   const formatDate = (dateStr: string) => {
@@ -360,10 +414,118 @@ export default function SettingsPage() {
 
         {/* Usuarios */}
         {activeTab === 'users' && (
-          <Card>
+          <div>
+            {showNewUser && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Nuevo Usuario</CardTitle>
+                  <CardDescription>
+                    {isAdmin
+                      ? 'Crea un usuario con cualquier rol'
+                      : 'Los managers solo pueden crear usuarios con rol Operativo'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCreateUser} className="space-y-4">
+                    {userError && (
+                      <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{userError}</div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="user_first_name">Nombre *</Label>
+                        <Input
+                          id="user_first_name"
+                          value={newUser.first_name}
+                          onChange={(e) => setNewUser(prev => ({ ...prev, first_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="user_last_name">Apellido *</Label>
+                        <Input
+                          id="user_last_name"
+                          value={newUser.last_name}
+                          onChange={(e) => setNewUser(prev => ({ ...prev, last_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="user_email">Email *</Label>
+                        <Input
+                          id="user_email"
+                          type="email"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="user_username">Usuario *</Label>
+                        <Input
+                          id="user_username"
+                          value={newUser.username}
+                          onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="user_password">Contraseña *</Label>
+                        <Input
+                          id="user_password"
+                          type="password"
+                          minLength={8}
+                          value={newUser.password}
+                          onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="user_role">Rol *</Label>
+                        {isAdmin ? (
+                          <Select
+                            value={newUser.role}
+                            onValueChange={(value) => setNewUser(prev => ({ ...prev, role: value }))}
+                          >
+                            <SelectTrigger id="user_role">
+                              <SelectValue placeholder="Selecciona rol" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="manager">Manager</SelectItem>
+                              <SelectItem value="operator">Operativo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input value="Operativo" disabled />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => { setShowNewUser(false); setUserError(null); }}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={userSaving}>
+                        {userSaving ? 'Creando...' : 'Crear Usuario'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
             <CardHeader>
-              <CardTitle>Usuarios del Sistema</CardTitle>
-              <CardDescription>Lista de usuarios con acceso al sistema</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Usuarios del Sistema</CardTitle>
+                  <CardDescription>Lista de usuarios con acceso al sistema</CardDescription>
+                </div>
+                <Button onClick={() => setShowNewUser(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Usuario
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -410,7 +572,8 @@ export default function SettingsPage() {
                 </Table>
               )}
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         )}
 
         {/* Credenciales Demo */}
@@ -434,15 +597,9 @@ export default function SettingsPage() {
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium">Operador</h4>
+                <h4 className="font-medium">Operativo</h4>
                 <p className="text-sm text-gray-600">Email: operator@thunderrol.com</p>
                 <p className="text-sm text-gray-600">Password: operator123</p>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium">Viewer</h4>
-                <p className="text-sm text-gray-600">Email: viewer@thunderrol.com</p>
-                <p className="text-sm text-gray-600">Password: viewer123</p>
               </div>
             </div>
           </CardContent>

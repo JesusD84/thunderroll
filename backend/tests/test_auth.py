@@ -43,7 +43,7 @@ async def test_login_inactive_user(client: AsyncClient, db_session, test_locatio
         username="inactive",
         email="inactive@test.com",
         hashed_password=Security.get_password_hash("testpass123"),
-        role=UserRole.VIEWER,
+        role=UserRole.OPERATOR,
         is_active=False,
     )
     db_session.add(inactive)
