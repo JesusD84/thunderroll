@@ -25,10 +25,9 @@ Sistema de trazabilidad de inventario para Thunderoll (scooters/motos en Guadala
 
 | Rol | Descripción |
 |---|---|
-| `ADMIN` | Acceso total |
-| `MANAGER` | Gestión de inventario, transferencias y reportes |
-| `OPERATOR` | Operación de unidades y transferencias |
-| `VIEWER` | Solo lectura |
+| `ADMIN` | Acceso total, incluida la gestión de usuarios |
+| `MANAGER` | Gestión de inventario, transferencias, imports, equivalencias y reportes; puede crear cuentas `OPERATOR` |
+| `OPERATOR` (Operativo) | Ver unidades (solo lectura) y despachar/recibir transferencias, incluyendo marcar unidades como vendidas. Sin acceso a imports, equivalencias, reportes ni gestión de usuarios |
 
 ## Inicio rápido (Docker Compose)
 
@@ -64,12 +63,13 @@ docker compose up --build
 
 ### 4. Credenciales demo
 
+Al arrancar con la base vacía, `create_demo_data()` siembra únicamente una cuenta admin bootstrap:
+
 ```
-admin@thunderoll.com    / admin123     (ADMIN)
-manager@thunderoll.com  / manager123   (MANAGER)
-operator@thunderoll.com / operator123  (OPERATOR)
-viewer@thunderoll.com   / viewer123    (VIEWER)
+admin@thunderoll.com / admin123 (ADMIN)
 ```
+
+Las cuentas `MANAGER` y `OPERATOR` no se crean automáticamente — se crean desde esa cuenta admin en **Configuración → Usuarios → Nuevo Usuario**.
 
 ## Desarrollo local sin Docker
 

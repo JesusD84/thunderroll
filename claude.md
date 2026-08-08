@@ -44,7 +44,7 @@ thunderroll/
 │   │   │   └── security.py             # CryptContext para bcrypt
 │   │   ├── database/
 │   │   │   ├── database.py             # Engine, SessionLocal, Base, get_db
-│   │   │   └── seed.py                 # Demo data (corre en startup)
+│   │   │   └── seed.py                 # Bootstrap: crea la cuenta admin si la DB está vacía (corre en startup)
 │   │   ├── models/
 │   │   │   ├── models.py               # SQLAlchemy models (User, Location, Unit, Transfer, Import, ImportError)
 │   │   │   └── schemas.py              # Pydantic schemas (Token, Unit, Transfer, etc.)
@@ -97,7 +97,7 @@ thunderroll/
 ## Modelos de datos clave
 
 ### Enums (valores reales en `models.py`)
-- **UserRole**: `admin`, `manager`, `operator`, `viewer`
+- **UserRole**: `admin`, `manager`, `operator` (mostrado como "Operativo" en la UI; sin acceso a imports/equivalencias/reportes/usuarios, solo lectura de units + despachar/recibir transferencias)
 - **UnitStatus**: `WAREHOUSE_UNIDENTIFIED`, `AVAILABLE`, `SOLD`, `IN_TRANSIT`
 - **TransferStatus**: `PENDING`, `IN_TRANSIT`, `RECEIVED`, `CANCELLED`
 
@@ -198,12 +198,11 @@ Todos los endpoints de negocio van bajo `/api/v1/` (ej: `/api/v1/auth/login`, `/
 
 ## Credenciales demo (seed)
 
+`create_demo_data()` solo siembra una cuenta bootstrap cuando la tabla `users` está vacía — MANAGER y OPERATOR ya no se auto-crean, se dan de alta desde esa cuenta en Configuración → Usuarios.
+
 | Usuario | Password | Rol |
 |---------|----------|-----|
 | admin@thunderoll.com / admin | admin123 | ADMIN |
-| manager@thunderoll.com / manager | manager123 | MANAGER |
-| operator@thunderoll.com / operator | operator123 | OPERATOR |
-| viewer@thunderoll.com / viewer | viewer123 | VIEWER |
 
 ---
 
