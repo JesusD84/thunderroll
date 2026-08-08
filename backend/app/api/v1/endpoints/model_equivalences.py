@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models import schemas
 from app.models.models import UserRole, User
-from app.services.auth_service import get_current_active_user, require_role
+from app.services.auth_service import require_role
 from app.services import model_equivalence_service as service
 
 router = APIRouter()
@@ -19,7 +19,7 @@ def list_equivalences(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     return service.get_equivalences(db, skip=skip, limit=limit)
 
@@ -27,7 +27,7 @@ def list_equivalences(
 @router.get("/unmapped", response_model=List[str])
 def list_unmapped_models(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Models currently in inventory that still have no equivalence."""
     return service.list_unmapped_models(db)
@@ -46,7 +46,7 @@ def create_equivalence(
 def get_equivalence(
     equivalence_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     return service.get_equivalence(db, equivalence_id)
 

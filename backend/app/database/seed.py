@@ -56,14 +56,6 @@ def create_demo_data():
                 role=UserRole.OPERATOR,
                 hashed_password=get_password_hash("operator123")
             ),
-            User(
-                email="viewer@thunderrol.com",
-                username="viewer",
-                first_name="Viewer",
-                last_name="Usuario",
-                role=UserRole.VIEWER,
-                hashed_password=get_password_hash("viewer123")
-            )
         ]
         
         for user in users:

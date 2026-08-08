@@ -30,6 +30,8 @@ import { ArrowLeft, Inbox, Trash2 } from 'lucide-react';
 import { listImports, deleteImport, type ImportRecord } from '@/lib/imports';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 const STATUS: Record<string, { label: string; className: string }> = {
   completed: { label: 'Completado', className: 'bg-green-100 text-green-800' },
@@ -44,7 +46,15 @@ function formatDate(value: string | null): string {
 }
 
 export default function ImportsHistoryPage() {
-  const { token, deleteImport: canDelete } = useAuth();
+  const { token, deleteImport: canDelete, viewImports } = useAuth();
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session && !viewImports) {
+      router.replace('/');
+    }
+  }, [session, viewImports, router]);
 
   const [imports, setImports] = useState<ImportRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);

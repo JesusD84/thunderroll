@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { ErrorState, LoadingState, EmptyState } from '@/components/ui/states';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const PAGE_SIZE = 20;
@@ -78,6 +79,7 @@ const colorLabels: Record<string, string> = {
 
 function UnitsPageContent() {
   const { data: session } = useSession();
+  const { manageUnits } = useAuth();
   const searchParams = useSearchParams();
   const [units, setUnits] = useState<Unit[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -166,12 +168,14 @@ function UnitsPageContent() {
               <h1 className="text-3xl font-bold text-gray-900">Gestión de Unidades</h1>
               <p className="text-gray-600">Administra el inventario de motos y scooters</p>
             </div>
-            <Link href="/units/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar Unidad
-              </Button>
-            </Link>
+            {manageUnits && (
+              <Link href="/units/new">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Unidad
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

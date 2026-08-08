@@ -11,6 +11,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -21,7 +22,14 @@ interface Location {
 
 export default function NewUnitPage() {
   const { data: session } = useSession();
+  const { manageUnits } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (session && !manageUnits) {
+      router.replace('/units');
+    }
+  }, [session, manageUnits, router]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [formData, setFormData] = useState({
     brand: '',

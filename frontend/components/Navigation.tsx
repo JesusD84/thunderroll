@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
-import { 
-  Home, 
-  Package, 
-  Upload, 
-  Truck, 
-  FileText, 
-  Settings, 
+import { useAuth } from '@/lib/auth';
+import {
+  Home,
+  Package,
+  Upload,
+  Truck,
+  FileText,
+  Settings,
   Repeat,
   LogOut,
   Menu,
@@ -20,13 +21,13 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Unidades', href: '/units', icon: Package },
-  { name: 'Importar', href: '/imports', icon: Upload },
-  { name: 'Equivalencias', href: '/model-equivalences', icon: Repeat },
-  { name: 'Transferencias', href: '/transfers', icon: Truck },
-  { name: 'Reportes', href: '/reports', icon: FileText },
-  { name: 'Configuración', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/', icon: Home, show: () => true },
+  { name: 'Unidades', href: '/units', icon: Package, show: () => true },
+  { name: 'Importar', href: '/imports', icon: Upload, show: (p: ReturnType<typeof useAuth>) => p.viewImports },
+  { name: 'Equivalencias', href: '/model-equivalences', icon: Repeat, show: (p: ReturnType<typeof useAuth>) => p.viewEquivalences },
+  { name: 'Transferencias', href: '/transfers', icon: Truck, show: () => true },
+  { name: 'Reportes', href: '/reports', icon: FileText, show: (p: ReturnType<typeof useAuth>) => p.viewReports },
+  { name: 'Configuración', href: '/settings', icon: Settings, show: (p: ReturnType<typeof useAuth>) => p.manageUsers },
 ];
 
 export default function Navigation() {
@@ -34,6 +35,8 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useSession() || {};
+  const permissions = useAuth();
+  const visibleNavigation = navigation.filter((item) => item.show(permissions));
 
   // Redirigir a login si no está autenticado
   useEffect(() => {
@@ -71,7 +74,7 @@ export default function Navigation() {
               
               {/* Desktop Navigation */}
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                {navigation.map((item) => {
+                {visibleNavigation.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
                   
@@ -128,7 +131,7 @@ export default function Navigation() {
         {mobileMenuOpen && (
           <div className="sm:hidden">
             <div className="pt-2 pb-3 space-y-1">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 

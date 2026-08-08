@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Download, FileText, Package, Truck, DollarSign, Loader2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -15,6 +17,15 @@ type ReportTab = 'inventory' | 'transfers' | 'sales';
 
 export default function ReportsPage() {
   const { data: session } = useSession();
+  const { viewReports } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session && !viewReports) {
+      router.replace('/');
+    }
+  }, [session, viewReports, router]);
+
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);

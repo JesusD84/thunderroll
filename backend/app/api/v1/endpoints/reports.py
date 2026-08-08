@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models import models
-from app.models.models import UnitStatus
-from app.services.auth_service import get_current_active_user
+from app.models.models import UnitStatus, UserRole
+from app.services.auth_service import require_role
 from app.services.report import ReportService
 
 router = APIRouter()
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/dashboard")
 def get_dashboard_stats(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Get dashboard statistics."""
     return ReportService.get_dashboard_stats(db)
@@ -33,7 +33,7 @@ def get_inventory_report(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Generate inventory report with filters."""
     return ReportService.get_inventory_report(
@@ -57,7 +57,7 @@ def get_transfers_report(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Generate transfers report with filters."""
     return ReportService.get_transfers_report(
@@ -77,7 +77,7 @@ def get_sales_report(
     date_to: Optional[datetime] = None,
     location_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Generate sales report."""
     return ReportService.get_sales_report(
@@ -95,7 +95,7 @@ def export_inventory_excel(
     location_id: Optional[int] = None,
     status: Optional[UnitStatus] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Export inventory report to Excel."""
     return ReportService.export_inventory_excel(
@@ -112,7 +112,7 @@ def export_transfers_excel(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Export transfers report to Excel."""
     return ReportService.export_transfers_excel(
@@ -128,7 +128,7 @@ def export_sales_excel(
     date_to: Optional[datetime] = None,
     location_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
     """Export sales report to Excel."""
     return ReportService.export_sales_excel(

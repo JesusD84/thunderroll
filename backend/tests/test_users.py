@@ -3,6 +3,10 @@
 import pytest
 from httpx import AsyncClient
 
+from app.core.security import Security
+from app.models.models import User, UserRole
+from tests.conftest import TestingSessionLocal
+
 
 @pytest.mark.asyncio
 async def test_list_users_as_admin(client: AsyncClient, auth_headers, test_users, test_locations):
@@ -15,8 +19,8 @@ async def test_list_users_as_admin(client: AsyncClient, auth_headers, test_users
 
 
 @pytest.mark.asyncio
-async def test_list_users_requires_admin(client: AsyncClient, test_users, test_locations):
-    """Non-admin user cannot list users."""
+async def test_list_users_requires_admin_or_manager(client: AsyncClient, test_users, test_locations):
+    """Operator cannot list users."""
     login_data = {"username": "inventario", "password": "testpass123"}
     login_resp = await client.post("/api/v1/auth/login", data=login_data)
     token = login_resp.json()["access_token"]
@@ -27,53 +31,119 @@ async def test_list_users_requires_admin(client: AsyncClient, test_users, test_l
 
 
 @pytest.mark.asyncio
-async def test_register_user(client: AsyncClient, test_locations):
-    """Anyone can register a new user."""
+async def test_create_user_requires_auth(client: AsyncClient, test_locations):
+    """Creating a user without a token is rejected (registration is not public)."""
     user_data = {
         "email": "newuser@test.com",
         "username": "newuser",
         "first_name": "New",
         "last_name": "User",
-        "role": "viewer",
+        "role": "operator",
         "password": "password123",
     }
-    response = await client.post("/api/v1/user/register", json=user_data)
-    assert response.status_code == 200
+    response = await client.post("/api/v1/user/", json=user_data)
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_create_user_as_admin(client: AsyncClient, auth_headers, test_locations):
+    """Admin can create a user with any role."""
+    user_data = {
+        "email": "newuser@test.com",
+        "username": "newuser",
+        "first_name": "New",
+        "last_name": "User",
+        "role": "manager",
+        "password": "password123",
+    }
+    response = await client.post("/api/v1/user/", json=user_data, headers=auth_headers)
+    assert response.status_code == 201
     data = response.json()
     assert data["email"] == "newuser@test.com"
-    assert data["username"] == "newuser"
+    assert data["role"] == "manager"
     assert "password" not in data
     assert "hashed_password" not in data
 
 
 @pytest.mark.asyncio
-async def test_register_user_duplicate_email(client: AsyncClient, test_users, test_locations):
-    """Registering with an existing email returns 400."""
+async def test_create_user_as_manager_limited_to_operator(client: AsyncClient, test_users, test_locations):
+    """Manager can create an Operator account but not a Manager/Admin one."""
+    manager = User(
+        first_name="Test",
+        last_name="Manager",
+        username="manager_creator",
+        email="manager_creator@test.com",
+        hashed_password=Security.get_password_hash("testpass123"),
+        role=UserRole.MANAGER,
+    )
+    db = TestingSessionLocal()
+    db.add(manager)
+    db.commit()
+    db.close()
+
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        data={"username": "manager_creator", "password": "testpass123"},
+    )
+    headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+
+    ok_response = await client.post(
+        "/api/v1/user/",
+        json={
+            "email": "newoperator@test.com",
+            "username": "newoperator",
+            "first_name": "New",
+            "last_name": "Operator",
+            "role": "operator",
+            "password": "password123",
+        },
+        headers=headers,
+    )
+    assert ok_response.status_code == 201
+
+    forbidden_response = await client.post(
+        "/api/v1/user/",
+        json={
+            "email": "newmanager@test.com",
+            "username": "newmanager",
+            "first_name": "New",
+            "last_name": "Manager",
+            "role": "manager",
+            "password": "password123",
+        },
+        headers=headers,
+    )
+    assert forbidden_response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(client: AsyncClient, auth_headers, test_users, test_locations):
+    """Creating a user with an existing email returns 400."""
     user_data = {
         "email": "admin@test.com",
         "username": "another",
         "first_name": "Dup",
         "last_name": "Email",
-        "role": "viewer",
+        "role": "operator",
         "password": "password123",
     }
-    response = await client.post("/api/v1/user/register", json=user_data)
+    response = await client.post("/api/v1/user/", json=user_data, headers=auth_headers)
     assert response.status_code == 400
     assert "Email already registered" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_register_user_duplicate_username(client: AsyncClient, test_users, test_locations):
-    """Registering with an existing username returns 400."""
+async def test_create_user_duplicate_username(client: AsyncClient, auth_headers, test_users, test_locations):
+    """Creating a user with an existing username returns 400."""
     user_data = {
         "email": "unique@test.com",
         "username": "admin",
         "first_name": "Dup",
         "last_name": "Username",
-        "role": "viewer",
+        "role": "operator",
         "password": "password123",
     }
-    response = await client.post("/api/v1/user/register", json=user_data)
+    response = await client.post("/api/v1/user/", json=user_data, headers=auth_headers)
     assert response.status_code == 400
     assert "Username already registered" in response.json()["detail"]
 

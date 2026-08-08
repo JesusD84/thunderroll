@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 
-export type Role = 'admin' | 'manager' | 'operator' | 'viewer';
+export type Role = 'admin' | 'manager' | 'operator';
 
 /** Lowercase a possibly-missing role value, returning '' when absent. */
 export function normalizeRole(value: unknown): string {
@@ -10,30 +10,39 @@ export function normalizeRole(value: unknown): string {
 }
 
 /**
- * Centralized, permission-based gating for the imports module.
+ * Centralized, permission-based gating for the whole app.
  * Mirrors the backend `require_role` rules so the UI hides actions the
- * API would reject:
- * - manage equivalences (create/update): ADMIN or MANAGER
- * - delete equivalence / delete import: ADMIN only
- * - upload/preview imports: any authenticated operator role
+ * API would reject. Operator ("Operativo") is intentionally the most
+ * restricted role: it can only dispatch/receive transfers (check units
+ * in/out) and view available units across locations — no imports, no
+ * equivalences, no reports, no unit CRUD, no user management.
  */
 export interface Permissions {
   manageEquivalences: boolean;
   deleteEquivalence: boolean;
+  viewEquivalences: boolean;
   deleteImport: boolean;
   uploadImport: boolean;
+  viewImports: boolean;
+  viewReports: boolean;
+  manageUnits: boolean;
+  manageUsers: boolean;
 }
 
 export function getPermissions(role: unknown): Permissions {
   const r = normalizeRole(role);
   const isAdmin = r === 'admin';
   const isManager = r === 'manager';
-  const isOperator = r === 'operator';
   return {
     manageEquivalences: isAdmin || isManager,
     deleteEquivalence: isAdmin,
+    viewEquivalences: isAdmin || isManager,
     deleteImport: isAdmin,
-    uploadImport: isAdmin || isManager || isOperator,
+    uploadImport: isAdmin || isManager,
+    viewImports: isAdmin || isManager,
+    viewReports: isAdmin || isManager,
+    manageUnits: isAdmin || isManager,
+    manageUsers: isAdmin || isManager,
   };
 }
 

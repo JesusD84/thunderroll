@@ -289,7 +289,7 @@ def test_require_role_allowed():
 
 def test_require_role_denied():
     """Raises HTTPException when role is not allowed."""
-    user = User(username="viewer", role=UserRole.VIEWER)
+    user = User(username="operator", role=UserRole.OPERATOR)
     checker = require_role([UserRole.ADMIN])
     with pytest.raises(HTTPException) as exc:
         checker(user)

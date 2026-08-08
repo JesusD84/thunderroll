@@ -8,11 +8,11 @@ import NewUnitPage from '@/app/units/new/page';
 // --- Mocks ---
 const mockPush = vi.fn();
 let mockSearchParams = new URLSearchParams();
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
   useSearchParams: () => mockSearchParams,
   useParams: () => ({ id: '1' }),
 }));
@@ -96,7 +96,7 @@ function mockUnitsAndLocations() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSearchParams = new URLSearchParams();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -205,6 +205,16 @@ describe('UnitsPage', () => {
     });
     const link = screen.getByText('Agregar Unidad').closest('a');
     expect(link).toHaveAttribute('href', '/units/new');
+  });
+
+  it('hides create-unit link for operator role', async () => {
+    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockUnitsAndLocations();
+    render(<UnitsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Gestión de Unidades')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Agregar Unidad')).not.toBeInTheDocument();
   });
 
   it('renders detail links for each unit', async () => {

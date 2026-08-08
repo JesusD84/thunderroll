@@ -5,11 +5,11 @@ import userEvent from '@testing-library/user-event';
 import SettingsPage from '@/app/settings/page';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
 }));
@@ -36,7 +36,7 @@ const mockLocations = [
 const mockUsers = [
   { id: 1, email: 'admin@test.com', username: 'admin', first_name: 'Admin', last_name: 'User', role: 'admin', is_active: true, created_at: '2025-01-01T00:00:00Z', updated_at: null },
   { id: 2, email: 'op@test.com', username: 'operator', first_name: 'Op', last_name: 'User', role: 'operator', is_active: true, created_at: '2025-02-01T00:00:00Z', updated_at: null },
-  { id: 3, email: 'viewer@test.com', username: 'viewer', first_name: 'View', last_name: 'User', role: 'viewer', is_active: false, created_at: '2025-03-01T00:00:00Z', updated_at: null },
+  { id: 3, email: 'mgr@test.com', username: 'manager', first_name: 'Mgr', last_name: 'User', role: 'manager', is_active: false, created_at: '2025-03-01T00:00:00Z', updated_at: null },
 ];
 
 beforeEach(() => {
@@ -100,8 +100,8 @@ describe('SettingsPage', () => {
     });
     await user.click(screen.getByText('Usuarios'));
     expect(screen.getByText('ADMIN')).toBeInTheDocument();
-    expect(screen.getByText('OPERADOR')).toBeInTheDocument();
-    expect(screen.getByText('VIEWER')).toBeInTheDocument();
+    expect(screen.getByText('OPERATIVO')).toBeInTheDocument();
+    expect(screen.getByText('MANAGER')).toBeInTheDocument();
   });
 
   it('shows active/inactive badges in users tab', async () => {

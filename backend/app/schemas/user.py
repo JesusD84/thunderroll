@@ -19,7 +19,7 @@ class UserCreate(UserBase):
     username: str
     first_name: str
     last_name: str
-    role: UserRole = UserRole.VIEWER
+    role: UserRole
     password: str = Field(..., min_length=8, max_length=100)
 
 class UserUpdate(BaseModel):

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -49,7 +50,15 @@ export default function ImportDetailPage() {
   const params = useParams();
   const id = Number(params?.id);
   const { data: session } = useSession();
+  const { viewImports } = useAuth();
+  const router = useRouter();
   const token = (session as { accessToken?: string } | null)?.accessToken;
+
+  useEffect(() => {
+    if (session && !viewImports) {
+      router.replace('/');
+    }
+  }, [session, viewImports, router]);
 
   const [record, setRecord] = useState<ImportRecord | null>(null);
   const [errors, setErrors] = useState<ImportError[]>([]);

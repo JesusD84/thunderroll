@@ -7,6 +7,7 @@ const mockPush = vi.fn();
 const mockSignOut = vi.fn();
 let mockPathname = '/';
 let mockStatus = 'authenticated';
+let mockRole = 'admin';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
@@ -15,7 +16,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-auth/react', () => ({
   useSession: () => ({
-    data: { user: { name: 'Admin User' } },
+    data: { user: { name: 'Admin User', role: mockRole } },
     status: mockStatus,
   }),
   signOut: (...args: any[]) => mockSignOut(...args),
@@ -25,6 +26,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPathname = '/';
   mockStatus = 'authenticated';
+  mockRole = 'admin';
 });
 
 describe('Navigation', () => {
@@ -42,6 +44,18 @@ describe('Navigation', () => {
     expect(screen.getByText('Transferencias')).toBeInTheDocument();
     expect(screen.getByText('Reportes')).toBeInTheDocument();
     expect(screen.getByText('Configuración')).toBeInTheDocument();
+  });
+
+  it('hides imports/equivalences/reports/settings for operator', () => {
+    mockRole = 'operator';
+    render(<Navigation />);
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Unidades')).toBeInTheDocument();
+    expect(screen.getByText('Transferencias')).toBeInTheDocument();
+    expect(screen.queryByText('Importar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Equivalencias')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reportes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Configuración')).not.toBeInTheDocument();
   });
 
   it('shows user name', () => {

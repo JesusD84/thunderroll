@@ -9,7 +9,6 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     OPERATOR = "operator"
-    VIEWER = "viewer"
 
 class UnitStatus(str, enum.Enum):
     WAREHOUSE_UNIDENTIFIED = "WAREHOUSE_UNIDENTIFIED"
@@ -32,7 +31,7 @@ class User(Base):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.VIEWER)
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.OPERATOR)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

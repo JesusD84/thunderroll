@@ -10,7 +10,7 @@ let mockStatus = 'authenticated';
 let mockParams: Record<string, string> = {};
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => mockParams,
 }));

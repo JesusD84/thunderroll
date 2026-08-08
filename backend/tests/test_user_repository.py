@@ -88,7 +88,7 @@ def test_create_user_success():
         username="newuser",
         first_name="New",
         last_name="User",
-        role=UserRole.VIEWER,
+        role=UserRole.OPERATOR,
         password="password123",
     )
 

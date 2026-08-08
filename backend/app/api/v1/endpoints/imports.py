@@ -9,7 +9,7 @@ from typing import List, Optional
 from app.database.database import get_db
 from app.models import models, schemas
 from app.models.models import UserRole, UnitStatus, TransferStatus
-from app.services.auth_service import get_current_active_user, require_role
+from app.services.auth_service import require_role
 from app.services.import_parser import (
     CANONICAL_FIELDS,
     apply_manual_mapping,
@@ -75,7 +75,7 @@ def get_imports(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     imports = db.query(models.Import).order_by(models.Import.import_date.desc()) \
                 .offset(skip).limit(limit).all()
@@ -85,7 +85,7 @@ def get_imports(
 def get_import(
     import_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     import_record = db.query(models.Import).filter(models.Import.id == import_id).first()
     if not import_record:
@@ -98,7 +98,7 @@ def get_import_errors(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     errors = db.query(models.ImportError).filter(models.ImportError.import_id == import_id) \
                .offset(skip).limit(limit).all()
@@ -111,7 +111,7 @@ async def upload_inventory_file(
     product_type: Optional[str] = Form(None),
     column_mapping: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     # Validate file type
     if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
@@ -389,7 +389,7 @@ _MAX_INVALID_PREVIEW_ROWS = 100
 async def preview_inventory_file(
     file: UploadFile = File(...),
     column_mapping: Optional[str] = Form(None),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     """Preview an uploaded file for assisted mapping, without persisting anything.
 

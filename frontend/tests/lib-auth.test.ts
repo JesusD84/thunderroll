@@ -24,12 +24,17 @@ describe('normalizeRole', () => {
 });
 
 describe('getPermissions', () => {
-  it('grants everything relevant to ADMIN', () => {
+  it('grants everything to ADMIN', () => {
     expect(getPermissions('admin')).toEqual({
       manageEquivalences: true,
       deleteEquivalence: true,
+      viewEquivalences: true,
       deleteImport: true,
       uploadImport: true,
+      viewImports: true,
+      viewReports: true,
+      manageUnits: true,
+      manageUsers: true,
     });
   });
 
@@ -37,28 +42,43 @@ describe('getPermissions', () => {
     expect(getPermissions('manager')).toEqual({
       manageEquivalences: true,
       deleteEquivalence: false,
+      viewEquivalences: true,
       deleteImport: false,
       uploadImport: true,
+      viewImports: true,
+      viewReports: true,
+      manageUnits: true,
+      manageUsers: true,
     });
   });
 
-  it('lets OPERATOR only upload', () => {
-    expect(getPermissions('operator')).toEqual({
+  it('restricts OPERATOR to units/transfers only', () => {
+    const operatorPermissions = {
       manageEquivalences: false,
       deleteEquivalence: false,
+      viewEquivalences: false,
       deleteImport: false,
-      uploadImport: true,
-    });
+      uploadImport: false,
+      viewImports: false,
+      viewReports: false,
+      manageUnits: false,
+      manageUsers: false,
+    };
+    expect(getPermissions('operator')).toEqual(operatorPermissions);
   });
 
-  it('grants nothing to VIEWER or unknown roles', () => {
+  it('grants nothing to unknown roles', () => {
     const none = {
       manageEquivalences: false,
       deleteEquivalence: false,
+      viewEquivalences: false,
       deleteImport: false,
       uploadImport: false,
+      viewImports: false,
+      viewReports: false,
+      manageUnits: false,
+      manageUsers: false,
     };
-    expect(getPermissions('viewer')).toEqual(none);
     expect(getPermissions('')).toEqual(none);
     expect(getPermissions(undefined)).toEqual(none);
   });

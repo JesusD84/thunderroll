@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import User
+from app.models.models import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import get_password_hash
@@ -10,7 +10,15 @@ from app.services.auth_service import get_password_hash
 class UserService:
 
     @staticmethod
-    def register_user(db: Session, user_data: UserCreate) -> User:
+    def create_user(db: Session, user_data: UserCreate, creator: User) -> User:
+        # A Manager may only onboard Operator accounts; only an Admin can grant
+        # Admin/Manager roles.
+        if creator.role == UserRole.MANAGER and user_data.role != UserRole.OPERATOR:
+            raise HTTPException(
+                status_code=403,
+                detail="Managers can only create users with the Operator role",
+            )
+
         # Check if email already exists
         db_user = UserRepository.get_user_by_email(db, email=user_data.email)
         if db_user:

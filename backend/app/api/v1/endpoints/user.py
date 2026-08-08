@@ -17,16 +17,17 @@ def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     return db.query(models.User).offset(skip).limit(limit).all()
 
-@router.post("/register", response_model=User)
-def register_user(
+@router.post("/", response_model=User, status_code=201)
+def create_user(
     user: UserCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
-    return UserService.register_user(db, user)
+    return UserService.create_user(db, user, current_user)
 
 
 @router.get("/me", response_model=User)

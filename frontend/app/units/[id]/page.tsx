@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -96,6 +97,7 @@ export default function UnitDetailPage() {
   const params = useParams();
   const unitId = params.id as string;
   const { data: session } = useSession();
+  const { manageUnits } = useAuth();
   
   const [unit, setUnit] = useState<Unit | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -340,22 +342,24 @@ export default function UnitDetailPage() {
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => {
-                setEditing(true);
-                setEditError(null);
-                setEditForm({
-                  brand: unit.brand || '',
-                  model: unit.model || '',
-                  color: unit.color || '',
-                  engine_number: unit.engine_number || '',
-                  chassis_number: unit.chassis_number || '',
-                  current_location_id: unit.current_location_id ? String(unit.current_location_id) : '',
-                  notes: unit.notes || '',
-                });
-              }}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-              </Button>
+              {manageUnits && (
+                <Button variant="outline" onClick={() => {
+                  setEditing(true);
+                  setEditError(null);
+                  setEditForm({
+                    brand: unit.brand || '',
+                    model: unit.model || '',
+                    color: unit.color || '',
+                    engine_number: unit.engine_number || '',
+                    chassis_number: unit.chassis_number || '',
+                    current_location_id: unit.current_location_id ? String(unit.current_location_id) : '',
+                    notes: unit.notes || '',
+                  });
+                }}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              )}
               {unit.status === 'IN_TRANSIT' ? (
                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmArrival}
                   disabled={actionLoading}>
@@ -369,11 +373,13 @@ export default function UnitDetailPage() {
                     <Truck className="mr-2 h-4 w-4" />
                     Transferir
                   </Button>
-                  <Button onClick={() => { setShowSell(true); setActionError(null); }}
-                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Vender
-                  </Button>
+                  {manageUnits && (
+                    <Button onClick={() => { setShowSell(true); setActionError(null); }}
+                      disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Vender
+                    </Button>
+                  )}
                 </>
               )}
             </div>
