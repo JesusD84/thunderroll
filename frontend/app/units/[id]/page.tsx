@@ -373,13 +373,11 @@ export default function UnitDetailPage() {
                     <Truck className="mr-2 h-4 w-4" />
                     Transferir
                   </Button>
-                  {manageUnits && (
-                    <Button onClick={() => { setShowSell(true); setActionError(null); }}
-                      disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      Vender
-                    </Button>
-                  )}
+                  <Button onClick={() => { setShowSell(true); setActionError(null); }}
+                    disabled={unit.status === 'SOLD' || unit.status === 'IN_TRANSIT'}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Vender
+                  </Button>
                 </>
               )}
             </div>
