@@ -116,19 +116,6 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            {/* Credenciales Demo */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Credenciales Demo:</h3>
-              <div className="space-y-2 text-xs text-gray-600">
-                <div><strong>Admin:</strong> admin@thunderoll.com / admin123</div>
-                <div><strong>Manager:</strong> manager@thunderoll.com / manager123</div>
-                <div><strong>Inventario:</strong> inventario@thunderoll.com / inventario123</div>
-                <div><strong>Taller:</strong> taller@thunderoll.com / taller123</div>
-                <div><strong>Ventas:</strong> ventas@thunderoll.com / ventas123</div>
-                <div><strong>Consultor:</strong> consultas@thunderoll.com / consultas123</div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
