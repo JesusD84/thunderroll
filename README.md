@@ -148,7 +148,7 @@ En cada Pull Request hacia `main` corren dos checks:
 
 ### Despliegue continuo
 
-- **Frontend (Vercel)**: deploy automático. Preview por cada PR, producción al mergear a `main` (`thunderroll.vercel.app`).
+- **Frontend (Vercel)**: deploy automático. Preview por cada PR, producción al mergear a `main` (`thunderoll.vercel.app`).
 - **Backend + DB (Render)**: deploy automático al hacer push a `main`, definido en `render.yaml` (servicio web FastAPI + base de datos PostgreSQL).
 
 Más detalle en `CI_CD_PLAN.md`.
@@ -156,7 +156,7 @@ Más detalle en `CI_CD_PLAN.md`.
 ## Estructura del proyecto
 
 ```
-thunderroll/
+thunderoll/
 ├── backend/
 │   ├── app/
 │   │   ├── api/          # Routers y endpoints (v1)
