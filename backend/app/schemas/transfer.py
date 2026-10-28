@@ -19,6 +19,18 @@ class TransferCreate(TransferBase):
     pass
 
 
+class UnitTransferRequest(BaseModel):
+    """Body for the unit-detail-page "Transferir"/"Vender" action.
+
+    `to_location_id` present -> dispatch the unit to that location (IN_TRANSIT).
+    `to_location_id` absent -> sell the unit (SOLD), per
+    TransferService.transfer_unit_with_status_update.
+    """
+    from_location_id: Optional[int] = Field(None, gt=0)
+    to_location_id: Optional[int] = Field(None, gt=0)
+    notes: Optional[str] = None
+
+
 class TransferUpdate(BaseModel):
     unit_id: Optional[int] = Field(None, gt=0)
     dispatched_by_id: Optional[int] = Field(None, gt=0)

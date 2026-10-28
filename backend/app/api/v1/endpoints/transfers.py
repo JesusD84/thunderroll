@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.models import UserRole, User
-from app.schemas.transfer import Transfer, TransferCreate, TransferFilters, TransferUpdate, TransferStats
+from app.schemas.transfer import (
+    Transfer,
+    TransferCreate,
+    TransferFilters,
+    TransferUpdate,
+    TransferStats,
+    UnitTransferRequest,
+)
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.transfer_service import TransferService
 
@@ -37,6 +44,26 @@ def create_transfer(
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
     return TransferService.create_transfer(db, transfer)
+
+
+@router.post("/unit/{unit_id}")
+def transfer_unit(
+    unit_id: int,
+    transfer: UnitTransferRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+):
+    """Dispatch (or sell, when no destination) a single unit from its detail page."""
+    return TransferService.transfer_unit_with_status_update(db, unit_id, transfer, current_user.id)
+
+
+@router.get("/unit/{unit_id}/active", response_model=Transfer)
+def get_active_transfer_for_unit(
+    unit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    return TransferService.get_active_transfer_for_unit(db, unit_id)
 
 
 @router.get("/{transfer_id}", response_model=Transfer)

@@ -134,7 +134,7 @@ export default function UnitDetailPage() {
     if (mRes.ok) setMovements(await mRes.json());
     // Check for active transfer
     try {
-      const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+      const atRes = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
@@ -205,12 +205,10 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/units/${unitId}/transfer`, {
+      const res = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          unit_id: unit.id,
-          movement_type: 'sale',
           from_location_id: unit.current_location_id || null,
           notes: notes || null,
         }),
@@ -258,7 +256,7 @@ export default function UnitDetailPage() {
 
         // Check for active transfer if unit is in transit
         if (unitData.status === 'IN_TRANSIT') {
-          const atRes = await fetch(`${API_URL}/api/v1/units/${unitId}/active-transfer`, {
+          const atRes = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           if (atRes.ok) setActiveTransferId((await atRes.json()).id);
