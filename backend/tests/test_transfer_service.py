@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 from app.services.transfer_service import TransferService
 from app.models.models import Transfer, Unit, Location, User, TransferStatus, UnitStatus
-from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
+from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate, UnitTransferRequest
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +216,79 @@ def test_create_unit_transfer_record(mock_repo):
         mock_db, unit_id=1, user_id=2, status=TransferStatus.PENDING,
     )
     assert result is mock_transfer
+
+
+# ---------------------------------------------------------------------------
+# transfer_unit_with_status_update
+# ---------------------------------------------------------------------------
+# This is what the unit-detail-page "Transferir"/"Vender" actions call.
+# It used to be fed the wrong request schema (see git history) and had zero
+# coverage, which is exactly how that bug went unnoticed.
+
+@patch("app.services.transfer_service.TransferRepository")
+@patch("app.services.transfer_service.UnitRepository")
+def test_transfer_unit_not_found(mock_unit, mock_transfer):
+    """Raises 404 when the unit does not exist."""
+    mock_db = MagicMock()
+    mock_unit.get_unit.return_value = None
+
+    with pytest.raises(HTTPException) as exc:
+        TransferService.transfer_unit_with_status_update(
+            mock_db, 999, UnitTransferRequest(to_location_id=2), user_id=1,
+        )
+    assert exc.value.status_code == 404
+
+
+@patch("app.services.transfer_service.TransferRepository")
+@patch("app.services.transfer_service.UnitRepository")
+def test_transfer_unit_with_destination_sets_in_transit(mock_unit, mock_transfer):
+    """Providing to_location_id dispatches the unit (IN_TRANSIT)."""
+    mock_db = MagicMock()
+    unit = Unit(id=1, current_location_id=1, status=UnitStatus.AVAILABLE)
+    mock_unit.get_unit.return_value = unit
+
+    TransferService.transfer_unit_with_status_update(
+        mock_db, 1, UnitTransferRequest(to_location_id=2), user_id=1,
+    )
+
+    assert unit.status == UnitStatus.IN_TRANSIT
+    kwargs = mock_transfer.create_unit_transfer.call_args.kwargs
+    assert kwargs["status"] == TransferStatus.IN_TRANSIT
+    assert kwargs["origin_location_id"] == 1
+    assert kwargs["destination_location_id"] == 2
+
+
+@patch("app.services.transfer_service.TransferRepository")
+@patch("app.services.transfer_service.UnitRepository")
+def test_transfer_unit_without_destination_sells_it(mock_unit, mock_transfer):
+    """Omitting to_location_id means 'Vender': unit becomes SOLD with a sold_date."""
+    mock_db = MagicMock()
+    unit = Unit(id=1, current_location_id=1, status=UnitStatus.AVAILABLE)
+    mock_unit.get_unit.return_value = unit
+
+    TransferService.transfer_unit_with_status_update(
+        mock_db, 1, UnitTransferRequest(from_location_id=1), user_id=1,
+    )
+
+    assert unit.status == UnitStatus.SOLD
+    assert unit.sold_date is not None
+    kwargs = mock_transfer.create_unit_transfer.call_args.kwargs
+    assert kwargs["status"] == TransferStatus.RECEIVED
+    assert kwargs["destination_location_id"] is None
+
+
+@patch("app.services.transfer_service.TransferRepository")
+@patch("app.services.transfer_service.UnitRepository")
+def test_transfer_unit_same_origin_destination(mock_unit, mock_transfer):
+    """Raises 400 when origin and destination are the same location."""
+    mock_db = MagicMock()
+    mock_unit.get_unit.return_value = Unit(id=1, current_location_id=1)
+
+    with pytest.raises(HTTPException) as exc:
+        TransferService.transfer_unit_with_status_update(
+            mock_db, 1, UnitTransferRequest(from_location_id=1, to_location_id=1), user_id=1,
+        )
+    assert exc.value.status_code == 400
 
 
 # ---------------------------------------------------------------------------
