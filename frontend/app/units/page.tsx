@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,7 +108,7 @@ function UnitsPageContent() {
     const token = (session as any)?.accessToken;
     if (!token) return;
 
-    fetch(`${API_URL}/api/v1/locations/`, {
+    sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
       headers: { 'Authorization': `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
@@ -130,7 +131,7 @@ function UnitsPageContent() {
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (locationFilter !== 'all') params.set('location_id', locationFilter);
 
-      const res = await fetch(`${API_URL}/api/v1/units/?${params.toString()}`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 

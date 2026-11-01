@@ -4,12 +4,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginPage from '@/app/login/page';
 
-const mockPush = vi.fn();
+const mockReplace = vi.fn();
 const mockSignIn = vi.fn();
 let mockStatus = 'unauthenticated';
+let mockQuery = '';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ replace: mockReplace }),
+  useSearchParams: () => new URLSearchParams(mockQuery),
 }));
 
 vi.mock('next-auth/react', () => ({
@@ -23,6 +25,7 @@ vi.mock('next-auth/react', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockStatus = 'unauthenticated';
+  mockQuery = '';
 });
 
 describe('LoginPage', () => {
@@ -66,7 +69,42 @@ describe('LoginPage', () => {
     mockStatus = 'authenticated';
     render(<LoginPage />);
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/');
+      expect(mockReplace).toHaveBeenCalledWith('/');
+    });
+  });
+
+  it('shows the session-expired message when redirected with reason=expired', () => {
+    mockQuery = 'reason=expired&callbackUrl=%2Funits%2F5';
+    render(<LoginPage />);
+    expect(screen.getByText('La sesión ha expirado')).toBeInTheDocument();
+  });
+
+  it('does not show the session-expired message on a normal visit', () => {
+    render(<LoginPage />);
+    expect(screen.queryByText('La sesión ha expirado')).not.toBeInTheDocument();
+  });
+
+  it('returns to callbackUrl after a successful login', async () => {
+    mockQuery = 'reason=expired&callbackUrl=%2Funits%2F5';
+    mockSignIn.mockResolvedValue({ ok: true, error: null });
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@test.com');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'pass123');
+    await userEvent.click(screen.getByRole('button', { name: /Iniciar Sesión/ }));
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/units/5');
+    });
+  });
+
+  it('ignores external callbackUrl values', async () => {
+    mockQuery = 'callbackUrl=https%3A%2F%2Fevil.com';
+    mockSignIn.mockResolvedValue({ ok: true, error: null });
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@test.com');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'pass123');
+    await userEvent.click(screen.getByRole('button', { name: /Iniciar Sesión/ }));
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/');
     });
   });
 
