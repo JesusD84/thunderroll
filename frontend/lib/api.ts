@@ -1,3 +1,5 @@
+import { handleSessionExpired } from '@/lib/session-expiry';
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export class ApiError extends Error {
@@ -17,6 +19,28 @@ export interface ApiFetchOptions extends Omit<RequestInit, 'body' | 'headers'> {
   headers?: HeadersInit;
   body?: BodyInit | null;
   json?: unknown;
+  /** Set where a 401 is an expected answer (e.g. login). */
+  skipSessionExpiry?: boolean;
+}
+
+/**
+ * fetch wrapper for every authenticated request. A 401 means the backend
+ * token is dead: start the sign-out flow and never resolve, so callers do not
+ * render the error while the page navigates to /login. 403 and other statuses
+ * pass through untouched.
+ */
+export async function sessionAwareFetch(
+  input: string,
+  init?: RequestInit,
+  { skipSessionExpiry = false }: { skipSessionExpiry?: boolean } = {},
+): Promise<Response> {
+  const response = await fetch(input, init);
+  if (response.status === 401 && !skipSessionExpiry) {
+    void handleSessionExpired();
+    // Trade-off: callers' `finally` blocks do not run; the page is leaving anyway.
+    return new Promise<Response>(() => {});
+  }
+  return response;
 }
 
 function extractMessage(status: number, statusText: string, data: unknown): string {
@@ -38,7 +62,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
-  const { token, json, headers, body, ...rest } = options;
+  const { token, json, headers, body, skipSessionExpiry, ...rest } = options;
 
   const finalHeaders = new Headers(headers);
   if (token) {
@@ -51,11 +75,11 @@ export async function apiFetch<T = unknown>(
     finalBody = JSON.stringify(json);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    headers: finalHeaders,
-    body: finalBody,
-  });
+  const response = await sessionAwareFetch(
+    `${API_URL}${path}`,
+    { ...rest, headers: finalHeaders, body: finalBody },
+    { skipSessionExpiry },
+  );
 
   const raw = await response.text();
   let data: unknown = undefined;
