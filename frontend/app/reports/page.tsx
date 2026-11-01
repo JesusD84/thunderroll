@@ -1,5 +1,6 @@
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ export default function ReportsPage() {
   const token = (session as any)?.accessToken;
 
   const downloadFile = async (url: string, filename: string) => {
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await sessionAwareFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -47,7 +48,7 @@ export default function ReportsPage() {
   };
 
   const fetchPreview = async (endpoint: string) => {
-    const res = await fetch(`${API_URL}${endpoint}`, {
+    const res = await sessionAwareFetch(`${API_URL}${endpoint}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
