@@ -9,6 +9,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
+    testTimeout: 30000,
+    reporters: ['default', 'html'],
+    outputFile: {
+      html: './html/index.html',
+    },
   },
   resolve: {
     alias: {

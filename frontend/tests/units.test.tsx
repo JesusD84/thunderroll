@@ -115,10 +115,13 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Honda PCX')).toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
     });
-    expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
-    expect(screen.getByText('Italika FT150')).toBeInTheDocument();
+    expect(screen.getByText('PCX')).toBeInTheDocument();
+    expect(screen.getByText('Yamaha')).toBeInTheDocument();
+    expect(screen.getByText('NMAX')).toBeInTheDocument();
+    expect(screen.getByText('Italika')).toBeInTheDocument();
+    expect(screen.getByText('FT150')).toBeInTheDocument();
     expect(screen.getByText('Unidades (3)')).toBeInTheDocument();
   });
 
@@ -145,8 +148,9 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Italika FT150')).toBeInTheDocument();
+      expect(screen.getByText('Italika')).toBeInTheDocument();
     });
+    expect(screen.getByText('FT150')).toBeInTheDocument();
     const dashes = screen.getAllByText('-');
     expect(dashes.length).toBeGreaterThanOrEqual(2);
   });
@@ -155,13 +159,14 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Honda PCX')).toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
     });
     const searchInput = screen.getByPlaceholderText('Buscar por # motor, chasis, marca...');
     await userEvent.type(searchInput, 'Yamaha');
     await waitFor(() => {
-      expect(screen.queryByText('Honda PCX')).not.toBeInTheDocument();
-      expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
+      expect(screen.queryByText('Honda')).not.toBeInTheDocument();
+      expect(screen.getByText('Yamaha')).toBeInTheDocument();
+      expect(screen.getByText('NMAX')).toBeInTheDocument();
     }, { timeout: 3000 });
     expect(screen.getByText('Unidades (1)')).toBeInTheDocument();
   });
@@ -170,13 +175,14 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Honda PCX')).toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
     });
     const searchInput = screen.getByPlaceholderText('Buscar por # motor, chasis, marca...');
     await userEvent.type(searchInput, 'ENG001');
     await waitFor(() => {
-      expect(screen.getByText('Honda PCX')).toBeInTheDocument();
-      expect(screen.queryByText('Yamaha NMAX')).not.toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
+      expect(screen.getByText('PCX')).toBeInTheDocument();
+      expect(screen.queryByText('Yamaha')).not.toBeInTheDocument();
     }, { timeout: 3000 });
   });
 
@@ -184,7 +190,7 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Honda PCX')).toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
     });
     const searchInput = screen.getByPlaceholderText('Buscar por # motor, chasis, marca...');
     await userEvent.type(searchInput, 'nonexistent');
@@ -263,8 +269,9 @@ describe('UnitsPage', () => {
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Yamaha NMAX')).toBeInTheDocument();
-      expect(screen.queryByText('Honda PCX')).not.toBeInTheDocument();
+      expect(screen.getByText('Yamaha')).toBeInTheDocument();
+      expect(screen.getByText('NMAX')).toBeInTheDocument();
+      expect(screen.queryByText('Honda')).not.toBeInTheDocument();
     });
   });
 

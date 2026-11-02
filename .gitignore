@@ -132,6 +132,9 @@ pids
 coverage/
 *.lcov
 
+# Vitest HTML test report
+frontend/html/
+
 # nyc test coverage
 .nyc_output
 
