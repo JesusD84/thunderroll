@@ -80,7 +80,7 @@ Ya aplicada vía API. Reglas activas:
 
 ### 1. Vercel (frontend)
 - Ir a [vercel.com](https://vercel.com) → Login con GitHub
-- Importar repo `JesusD84/thunderroll`
+- Importar repo `JesusD84/thunderoll`
 - Root Directory: `frontend`
 - Framework: Next.js (auto-detectado)
 - Deploy
@@ -104,15 +104,15 @@ DATABASE_URL                 # connection string de Neon (se setea en el dashboa
 SECRET_KEY                   # generado por Render
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
-FRONTEND_URL=https://thunderroll.vercel.app   # habilita CORS para el front
+FRONTEND_URL=https://thunderoll.vercel.app   # habilita CORS para el front
 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM   # placeholders
 ```
 
 ### Frontend (Vercel)
 ```
-NEXT_PUBLIC_API_URL=https://thunderroll-backend.onrender.com   # llamadas del navegador
-BACKEND_URL=https://thunderroll-backend.onrender.com           # login server-side de NextAuth
-NEXTAUTH_URL=https://thunderroll.vercel.app
+NEXT_PUBLIC_API_URL=https://thunderoll-backend.onrender.com   # llamadas del navegador
+BACKEND_URL=https://thunderoll-backend.onrender.com           # login server-side de NextAuth
+NEXTAUTH_URL=https://thunderoll.vercel.app
 NEXTAUTH_SECRET=...                                            # openssl rand -base64 32
 ```
 
@@ -128,9 +128,9 @@ Pasos (una sola vez):
 
 1. Crear cuenta en [neon.tech](https://neon.tech) → New Project (región más cercana, p. ej. `us-east`).
 2. Copiar el **connection string** (formato `postgresql://user:pass@ep-xxx.neon.tech/dbname?sslmode=require`). Mantener `?sslmode=require`.
-3. En Render → servicio `thunderroll-backend` → Environment → editar `DATABASE_URL` con el string de Neon. Guardar (esto dispara un redeploy).
+3. En Render → servicio `thunderoll-backend` → Environment → editar `DATABASE_URL` con el string de Neon. Guardar (esto dispara un redeploy).
 4. Al rearrancar, el backend crea las tablas y siembra los datos demo en Neon automáticamente.
-5. Verificar login en `https://thunderroll.vercel.app` con un usuario demo.
+5. Verificar login en `https://thunderoll.vercel.app` con un usuario demo.
 6. Una vez confirmado, **borrar** la base free vieja en Render.
 
 > En `render.yaml`, `DATABASE_URL` está como `sync: false` (se gestiona en el dashboard, no en el blueprint), y ya **no** existe el bloque `databases:` de Render.

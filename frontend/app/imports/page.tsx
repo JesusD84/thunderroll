@@ -248,7 +248,7 @@ export default function ImportsPage() {
             <CardContent>
               <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
                 <li>Acepta varias hojas y encabezados en español, inglés o chino.</li>
-                <li>Las columnas se detectan automáticamente (chasis, motor, color, modelo).</li>
+                <li>Las columnas se detectan automáticamente (chasis, motor, color, modelo, marca).</li>
                 <li>Podrás revisar y ajustar el mapeo antes de importar.</li>
                 <li>Los números de chasis y motor se conservan tal cual, sin recortes.</li>
                 <li>La vista previa es informativa: las filas con problemas se muestran, pero no bloquean.</li>

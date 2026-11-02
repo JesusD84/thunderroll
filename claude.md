@@ -25,7 +25,7 @@ Sistema de trazabilidad de inventario para **Thunderoll**, empresa de scooters/m
 ## Estructura del proyecto
 
 ```
-thunderroll/
+thunderoll/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
@@ -176,7 +176,7 @@ cd backend && black app/           # formateo
 
 - **CI (GitHub Actions)**: en cada PR hacia `main` corren dos checks, `Backend Tests` (pytest) y `Frontend Tests` (vitest). No tienen filtros de path: ambos corren siempre.
 - **Branch protection en `main`**: requiere PR, que ambos checks pasen, rama actualizada (strict) y conversaciones resueltas. No se permite push directo ni force-push.
-- **CD Frontend (Vercel)**: preview por PR, producción al mergear a `main` (`thunderroll.vercel.app`).
+- **CD Frontend (Vercel)**: preview por PR, producción al mergear a `main` (`thunderoll.vercel.app`).
 - **CD Backend + DB (Render)**: deploy al push a `main` vía `render.yaml` (runtime python; FastAPI + PostgreSQL).
 - **Variables clave en Vercel**: `BACKEND_URL` (login server-side de NextAuth) **y** `NEXT_PUBLIC_API_URL` (llamadas del navegador) — ambas necesarias y distintas. Detalle completo en `CI_CD_PLAN.md`.
 

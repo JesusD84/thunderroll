@@ -1,8 +1,8 @@
 import { apiFetch } from '@/lib/api';
 
-export type CanonicalField = 'frame' | 'motor' | 'color' | 'model';
+export type CanonicalField = 'frame' | 'motor' | 'color' | 'model' | 'brand';
 
-export const CANONICAL_FIELDS: CanonicalField[] = ['frame', 'motor', 'color', 'model'];
+export const CANONICAL_FIELDS: CanonicalField[] = ['frame', 'motor', 'color', 'model', 'brand'];
 
 export type ColumnMapping = Record<string, CanonicalField>;
 
@@ -21,6 +21,7 @@ export interface PreviewRow {
   motor?: string;
   color?: string;
   model?: string;
+  brand?: string;
 }
 
 export interface InvalidRow {

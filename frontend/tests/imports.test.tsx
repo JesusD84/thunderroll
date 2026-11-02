@@ -192,6 +192,28 @@ describe('ImportsPage', () => {
     expect(mapping.Motor).toBe('motor');
   });
 
+  it('offers "Marca" as a field option and sends it as brand', async () => {
+    mockFetch.mockReturnValue(mockJson(previewResponse));
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hojas detectadas')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('combobox', { name: 'Campo para Notas' }));
+    await user.click(screen.getByRole('option', { name: 'Marca' }));
+    await user.click(screen.getByRole('button', { name: 'Re-previsualizar' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+    const body = mockFetch.mock.calls[1][1].body as FormData;
+    const mapping = JSON.parse(body.get('column_mapping') as string);
+    expect(mapping.Notas).toBe('brand');
+  });
+
   it('omits a column from column_mapping when set back to "Sin mapear"', async () => {
     mockFetch.mockReturnValue(mockJson(previewResponse));
     render(<ImportsPage />);

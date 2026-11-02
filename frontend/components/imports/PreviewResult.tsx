@@ -40,6 +40,7 @@ const FIELD_LABELS: Record<CanonicalField, string> = {
   motor: 'Motor',
   color: 'Color',
   model: 'Modelo',
+  brand: 'Marca',
 };
 
 const IGNORE = 'ignore';
@@ -237,6 +238,7 @@ export function PreviewResult({
                   <TableHead>Motor</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Modelo</TableHead>
+                  <TableHead>Marca</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -247,6 +249,7 @@ export function PreviewResult({
                     <TableCell className="font-mono text-sm">{row.motor || '-'}</TableCell>
                     <TableCell className="capitalize">{row.color || '-'}</TableCell>
                     <TableCell>{row.model || '-'}</TableCell>
+                    <TableCell>{row.brand || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

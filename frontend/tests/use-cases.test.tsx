@@ -67,9 +67,11 @@ describe('UC-2: Inventory Management', () => {
     const UnitsPage = (await import('@/app/units/page')).default;
     render(<UnitsPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Honda PCX/)).toBeInTheDocument();
+      expect(screen.getByText('Honda')).toBeInTheDocument();
     }, { timeout: 3000 });
-    expect(screen.getByText(/Yamaha NMAX/)).toBeInTheDocument();
+    expect(screen.getByText('PCX')).toBeInTheDocument();
+    expect(screen.getByText('Yamaha')).toBeInTheDocument();
+    expect(screen.getByText('NMAX')).toBeInTheDocument();
   });
 
   it('UC-2.2: units page shows header and new unit button', async () => {

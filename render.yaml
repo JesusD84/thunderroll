@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: thunderroll-backend
+    name: thunderoll-backend
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -19,7 +19,7 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
       - key: FRONTEND_URL
-        value: https://thunderroll.vercel.app
+        value: https://thunderoll.vercel.app
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

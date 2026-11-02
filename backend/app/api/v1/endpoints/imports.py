@@ -21,8 +21,8 @@ from app.services.model_equivalence_service import resolve_internal_model
 router = APIRouter()
 
 # Persistence defaults for descriptive fields the supplier may omit. The parser
-# resolves frame/motor/color/model; brand is never present in supplier
-# inventories and color/model can be blank, yet Unit requires them NOT NULL.
+# resolves frame/motor/color/model/brand; brand, color and model can be blank
+# (or the column absent), yet Unit requires them NOT NULL.
 DEFAULT_BRAND = "Sin especificar"
 DEFAULT_COLOR = "Sin especificar"
 DEFAULT_MODEL = "Sin especificar"
@@ -269,7 +269,7 @@ async def process_inventory_file(
 
         row_number += 1
         # Model falls back to the sheet name (suppliers often put the model
-        # there) and then to a placeholder; brand is never supplied.
+        # there) and then to a placeholder.
         manufacturer_model = _text_or_default(
             canonical.get("model"), sheet_row.sheet or DEFAULT_MODEL
         )
@@ -284,6 +284,7 @@ async def process_inventory_file(
             "engine_number": motor or None,
             "chassis_number": frame or None,
             "model": model_name,
+            "brand": _text_or_default(canonical.get("brand"), DEFAULT_BRAND),
             "color": _text_or_default(canonical.get("color"), DEFAULT_COLOR),
         })
 
@@ -341,7 +342,7 @@ async def process_inventory_file(
             engine_number=engine_number,
             chassis_number=chassis_number,
             model=c["model"],
-            brand=DEFAULT_BRAND,
+            brand=c["brand"],
             color=c["color"],
             batch_period=batch_period,
             product_type=product_type,

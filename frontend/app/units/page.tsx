@@ -256,7 +256,8 @@ function UnitsPageContent() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID</TableHead>
-                    <TableHead>Marca/Modelo</TableHead>
+                    <TableHead>Marca</TableHead>
+                    <TableHead>Modelo</TableHead>
                     <TableHead>Color</TableHead>
                     <TableHead># Motor</TableHead>
                     <TableHead># Chasis</TableHead>
@@ -269,9 +270,8 @@ function UnitsPageContent() {
                   {units.map((unit) => (
                     <TableRow key={unit.id}>
                       <TableCell className="font-mono text-sm">{unit.id}</TableCell>
-                      <TableCell>
-                        {unit.brand && unit.model ? `${unit.brand} ${unit.model}` : 'No especificado'}
-                      </TableCell>
+                      <TableCell>{unit.brand || '-'}</TableCell>
+                      <TableCell>{unit.model || '-'}</TableCell>
                       <TableCell>
                         <div className="flex items-center">
                           <div className={`w-4 h-4 rounded-full mr-2 ${
