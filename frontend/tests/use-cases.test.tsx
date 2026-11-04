@@ -6,9 +6,11 @@ import { server } from './mocks/server';
 
 let mockSession: any = { user: { name: 'Admin User', role: 'admin' }, accessToken: 'mock-jwt' };
 let mockStatus = 'authenticated';
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
 }));

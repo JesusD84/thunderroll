@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,10 +86,10 @@ export default function SettingsPage() {
 
       try {
         const [locRes, usersRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/locations/`, {
+          sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`${API_URL}/api/v1/user/`, {
+          sessionAwareFetch(`${API_URL}/api/v1/user/`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
@@ -115,7 +116,7 @@ export default function SettingsPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/locations/`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -144,7 +145,7 @@ export default function SettingsPage() {
     setEditSaving(true);
     setLocationError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/locations/${locationId}`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/${locationId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -171,7 +172,7 @@ export default function SettingsPage() {
     setLocationError(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/locations/${locationId}`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/${locationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -195,7 +196,7 @@ export default function SettingsPage() {
     setUserError(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/user/`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

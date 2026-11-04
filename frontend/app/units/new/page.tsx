@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +50,7 @@ export default function NewUnitPage() {
       const token = (session as any)?.accessToken;
       if (!token) return;
       try {
-        const res = await fetch(`${API_URL}/api/v1/locations/`, {
+        const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (res.ok) setLocations(await res.json());
@@ -69,7 +70,7 @@ export default function NewUnitPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/units/`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,8 +82,8 @@ export default function TransfersPage() {
 
       try {
         const [tRes, lRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/transfers/`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_URL}/api/v1/locations/`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          sessionAwareFetch(`${API_URL}/api/v1/transfers/`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          sessionAwareFetch(`${API_URL}/api/v1/locations/`, { headers: { 'Authorization': `Bearer ${token}` } }),
         ]);
         if (tRes.ok) setTransfers(await tRes.json());
         if (lRes.ok) setLocations(await lRes.json());
@@ -104,7 +105,7 @@ export default function TransfersPage() {
       setUnitsLoading(true);
       setSelectedUnitId('');
       try {
-        const res = await fetch(
+        const res = await sessionAwareFetch(
           `${API_URL}/api/v1/units/?status=AVAILABLE&location_id=${fromLocationId}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
@@ -124,7 +125,7 @@ export default function TransfersPage() {
     setCreateLoading(true);
     setCreateError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/transfers/`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +136,7 @@ export default function TransfersPage() {
       });
       if (res.ok) {
         // Refresh list and reset form
-        const listRes = await fetch(`${API_URL}/api/v1/transfers/`, {
+        const listRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (listRes.ok) setTransfers(await listRes.json());
@@ -157,7 +158,7 @@ export default function TransfersPage() {
     setActionLoading(transferId);
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/transfers/${transferId}`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${transferId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'RECEIVED' }),
@@ -165,7 +166,7 @@ export default function TransfersPage() {
 
       if (res.ok) {
         // Refresh transfers list
-        const listRes = await fetch(`${API_URL}/api/v1/transfers/`, {
+        const listRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (listRes.ok) setTransfers(await listRes.json());

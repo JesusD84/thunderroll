@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +70,7 @@ export default function DashboardPage() {
       if (!token) return;
 
       try {
-        const res = await fetch(`${API_URL}/api/v1/reports/dashboard`, {
+        const res = await sessionAwareFetch(`${API_URL}/api/v1/reports/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
