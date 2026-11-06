@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home, show: () => true },
+  { name: 'Dashboard', href: '/', icon: Home, show: (p: ReturnType<typeof useAuth>) => !p.isOperator },
   { name: 'Unidades', href: '/units', icon: Package, show: () => true },
   { name: 'Importar', href: '/imports', icon: Upload, show: (p: ReturnType<typeof useAuth>) => p.viewImports },
   { name: 'Equivalencias', href: '/model-equivalences', icon: Repeat, show: (p: ReturnType<typeof useAuth>) => p.viewEquivalences },

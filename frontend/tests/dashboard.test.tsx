@@ -11,6 +11,11 @@ vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: mockSession }),
 }));
 
+const mockReplace = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
+}));
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
@@ -54,6 +59,15 @@ const mockDashboardData = {
 };
 
 describe('DashboardPage', () => {
+  it('redirects operator to /units without fetching the dashboard', () => {
+    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'token123' };
+    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    render(<DashboardPage />);
+    expect(mockReplace).toHaveBeenCalledWith('/units');
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.queryByText('Cargando dashboard...')).not.toBeInTheDocument();
+  });
+
   it('shows loading state initially', () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<DashboardPage />);
