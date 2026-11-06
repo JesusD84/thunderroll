@@ -49,7 +49,7 @@ describe('Navigation', () => {
   it('hides imports/equivalences/reports/settings for operator', () => {
     mockRole = 'operator';
     render(<Navigation />);
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
     expect(screen.getByText('Unidades')).toBeInTheDocument();
     expect(screen.getByText('Transferencias')).toBeInTheDocument();
     expect(screen.queryByText('Importar')).not.toBeInTheDocument();
