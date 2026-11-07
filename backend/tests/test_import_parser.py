@@ -193,6 +193,9 @@ def test_normalize_label_strips_all_whitespace():
         ("颜色", "color"),
         ("Model", "model"),
         ("型号", "model"),
+        ("Marca", "brand"),
+        ("brand", "brand"),
+        ("品牌", "brand"),
         # Unknown / ambiguous labels resolve to None.
         ("NO", None),
         ("Observaciones", None),

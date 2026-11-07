@@ -57,7 +57,7 @@ _MAX_HEADER_SCAN = 10
 
 # Canonical fields the parser resolves supplier columns into. Mapping these to
 # the persistence model (chassis_number/engine_number/...) happens downstream.
-CANONICAL_FIELDS: tuple[str, ...] = ("frame", "motor", "color", "model")
+CANONICAL_FIELDS: tuple[str, ...] = ("frame", "motor", "color", "model", "brand")
 
 # Substring synonyms per canonical field, stored in normalized form (lowercased,
 # whitespace removed) to match against normalized column labels. Order matters:
@@ -67,6 +67,7 @@ FIELD_SYNONYMS: dict[str, tuple[str, ...]] = {
     "motor": ("motor", "engine", "电机", "发动机"),
     "color": ("color", "colour", "颜色"),
     "model": ("model", "modelo", "型号", "车型"),
+    "brand": ("marca", "brand", "品牌"),
 }
 
 _WHITESPACE = re.compile(r"\s+")

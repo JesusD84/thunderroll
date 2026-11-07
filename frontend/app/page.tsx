@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,9 @@ import {
   Truck
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -59,17 +62,24 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const { isOperator } = useAuth();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Operators have no access to the dashboard (the API returns 403): send them to units.
+  useEffect(() => {
+    if (isOperator) router.replace('/units');
+  }, [isOperator, router]);
+
   useEffect(() => {
     const fetchDashboard = async () => {
       const token = (session as any)?.accessToken;
-      if (!token) return;
+      if (!token || isOperator) return;
 
       try {
-        const res = await fetch(`${API_URL}/api/v1/reports/dashboard`, {
+        const res = await sessionAwareFetch(`${API_URL}/api/v1/reports/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
 
@@ -86,7 +96,11 @@ export default function DashboardPage() {
     };
 
     fetchDashboard();
-  }, [session]);
+  }, [session, isOperator]);
+
+  if (isOperator) {
+    return null;
+  }
 
   if (loading) {
     return (

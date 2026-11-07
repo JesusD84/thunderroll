@@ -186,7 +186,29 @@ async def test_upload_english_headers_creates_units(
     assert unit.engine_number == "EN-MOTOR-001"
     assert unit.color == "Rojo"
     assert unit.model == "X3"
-    assert unit.brand == DEFAULT_BRAND  # supplier files never carry a brand
+    assert unit.brand == DEFAULT_BRAND  # no Marca column in this file
+
+
+@pytest.mark.asyncio
+async def test_upload_marca_column_persists_brand(
+    client, auth_headers, test_users, test_locations, db_session
+):
+    """A Marca column is mapped to brand and persisted on each unit."""
+    content = _make_xlsx([
+        ("Hoja1", [
+            ["Frame No.", "Motor No.", "Color", "Model", "Marca"],
+            ["MR-FRAME-001", "MR-MOTOR-001", "Rojo", "X3", "Thunderoll"],
+            ["MR-FRAME-002", "MR-MOTOR-002", "Negro", "X3", ""],
+        ])
+    ])
+    resp = await _upload(client, auth_headers, "marca.xlsx", content)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["successful_imports"] == 2
+
+    with_brand = db_session.query(Unit).filter(Unit.chassis_number == "MR-FRAME-001").first()
+    assert with_brand.brand == "Thunderoll"
+    without_brand = db_session.query(Unit).filter(Unit.chassis_number == "MR-FRAME-002").first()
+    assert without_brand.brand == DEFAULT_BRAND  # blank Marca cell falls back
 
 
 @pytest.mark.asyncio

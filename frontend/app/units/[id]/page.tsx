@@ -1,6 +1,7 @@
 
 'use client';
 
+import { sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,14 +128,14 @@ export default function UnitDetailPage() {
 
   const refreshData = async (token: string) => {
     const [uRes, mRes] = await Promise.all([
-      fetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-      fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+      sessionAwareFetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
     ]);
     if (uRes.ok) setUnit(await uRes.json());
     if (mRes.ok) setMovements(await mRes.json());
     // Check for active transfer
     try {
-      const atRes = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
+      const atRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
@@ -147,7 +148,7 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/transfers/`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,14 +178,14 @@ export default function UnitDetailPage() {
       let res;
       if (activeTransferId) {
         // Complete the Transfer record
-        res = await fetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
+        res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'RECEIVED' }),
         });
       } else {
         // Legacy: no Transfer record, just update unit status
-        res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+        res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'AVAILABLE' }),
@@ -205,7 +206,7 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/unit/${unitId}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -231,10 +232,10 @@ export default function UnitDetailPage() {
 
       try {
         const [unitRes, movementsRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/units/${unitId}`, {
+          sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          fetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
+          sessionAwareFetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
@@ -249,14 +250,14 @@ export default function UnitDetailPage() {
           setMovements(movementsData);
         }
 
-        const locsRes = await fetch(`${API_URL}/api/v1/locations/`, {
+        const locsRes = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (locsRes.ok) setLocations(await locsRes.json());
 
         // Check for active transfer if unit is in transit
         if (unitData.status === 'IN_TRANSIT') {
-          const atRes = await fetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
+          const atRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
             headers: { 'Authorization': `Bearer ${token}` },
           });
           if (atRes.ok) setActiveTransferId((await atRes.json()).id);
@@ -476,7 +477,7 @@ export default function UnitDetailPage() {
                 const token = (session as any)?.accessToken;
                 if (!token) return;
                 try {
-                  const res = await fetch(`${API_URL}/api/v1/units/${unitId}`, {
+                  const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
