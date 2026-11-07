@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from app.services.unit_service import UnitService
 from app.models.models import Unit, Location, UnitStatus, TransferStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
-from app.models.schemas import TransferCreate
 
 
 # ---------------------------------------------------------------------------
@@ -287,32 +286,3 @@ def test_get_unit_transfers_unit_not_found(mock_repo):
         UnitService.get_unit_transfers(mock_db, 999, skip=0, limit=10)
     assert exc.value.status_code == 404
 
-
-# ---------------------------------------------------------------------------
-# transfer_unit
-# ---------------------------------------------------------------------------
-
-@patch("app.services.unit_service.TransferService")
-def test_transfer_unit_delegates(mock_transfer_svc):
-    """Delegates to TransferService.transfer_unit_with_status_update."""
-    mock_db = MagicMock()
-    transfer_data = TransferCreate(from_location_id=1, to_location_id=2, unit_ids=[1])
-    mock_unit = Unit(id=1)
-    mock_transfer_svc.transfer_unit_with_status_update.return_value = mock_unit
-
-    result = UnitService.transfer_unit(mock_db, 1, transfer_data, user_id=1)
-    assert result is mock_unit
-
-
-# ---------------------------------------------------------------------------
-# get_active_transfer
-# ---------------------------------------------------------------------------
-
-@patch("app.services.unit_service.TransferService")
-def test_get_active_transfer_delegates(mock_transfer_svc):
-    """Delegates to TransferService.get_active_transfer_for_unit."""
-    mock_db = MagicMock()
-    mock_transfer_svc.get_active_transfer_for_unit.return_value = None
-
-    result = UnitService.get_active_transfer(mock_db, 1)
-    assert result is None

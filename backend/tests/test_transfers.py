@@ -215,3 +215,116 @@ async def test_get_transfer_stats(client: AsyncClient, auth_headers, test_users,
     assert response.status_code == 200
     data = response.json()
     assert "total_transfers" in data
+
+
+# ---------------------------------------------------------------------------
+# POST /transfers/unit/{unit_id} and GET /transfers/unit/{unit_id}/active
+#
+# Real HTTP tests, sending exactly what the unit-detail-page "Transferir"/
+# "Vender" actions send. The endpoint used to live at
+# POST /units/{unit_id}/transfer and was validated against the wrong Pydantic
+# model (a dead duplicate class), which made every real request 422. Only
+# service-layer tests existed before, which is why that bug went unnoticed.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_transfer_unit_dispatch(client: AsyncClient, auth_headers, test_users, test_locations):
+    """Dispatching a unit to a new location marks it IN_TRANSIT."""
+    unit_data = {
+        "model": "TR-UnitTransfer",
+        "brand": "Thunderoll",
+        "color": "Blue",
+        "current_location_id": test_locations[0].id,
+        "engine_number": "ENG-UNITTRANSFER-001",
+    }
+    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    unit_id = create_resp.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/transfers/unit/{unit_id}",
+        json={
+            "from_location_id": test_locations[0].id,
+            "to_location_id": test_locations[1].id,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    unit_resp = await client.get(f"/api/v1/units/{unit_id}", headers=auth_headers)
+    assert unit_resp.json()["status"] == "IN_TRANSIT"
+
+
+@pytest.mark.asyncio
+async def test_transfer_unit_sell_without_destination(client: AsyncClient, auth_headers, test_users, test_locations):
+    """Omitting to_location_id is 'Vender': the unit is marked SOLD."""
+    unit_data = {
+        "model": "TR-UnitSell",
+        "brand": "Thunderoll",
+        "color": "Green",
+        "current_location_id": test_locations[0].id,
+        "engine_number": "ENG-UNITSELL-001",
+    }
+    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    unit_id = create_resp.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/transfers/unit/{unit_id}",
+        json={"from_location_id": test_locations[0].id, "notes": "Venta de prueba"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    unit_resp = await client.get(f"/api/v1/units/{unit_id}", headers=auth_headers)
+    assert unit_resp.json()["status"] == "SOLD"
+    assert unit_resp.json()["sold_date"] is not None
+
+
+@pytest.mark.asyncio
+async def test_transfer_unit_not_found(client: AsyncClient, auth_headers, test_users, test_locations):
+    """404 when the unit does not exist."""
+    response = await client.post(
+        "/api/v1/transfers/unit/999999",
+        json={"to_location_id": test_locations[0].id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_unit_active_transfer(client: AsyncClient, auth_headers, test_users, test_locations):
+    """Returns the in-progress transfer for a unit that was just dispatched."""
+    unit_data = {
+        "model": "TR-UnitActive",
+        "brand": "Thunderoll",
+        "color": "Black",
+        "current_location_id": test_locations[0].id,
+        "engine_number": "ENG-UNITACTIVE-001",
+    }
+    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    unit_id = create_resp.json()["id"]
+    await client.post(
+        f"/api/v1/transfers/unit/{unit_id}",
+        json={"from_location_id": test_locations[0].id, "to_location_id": test_locations[1].id},
+        headers=auth_headers,
+    )
+
+    response = await client.get(f"/api/v1/transfers/unit/{unit_id}/active", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["unit_id"] == unit_id
+
+
+@pytest.mark.asyncio
+async def test_get_unit_active_transfer_none(client: AsyncClient, auth_headers, test_users, test_locations):
+    """404 when the unit has no in-progress transfer."""
+    unit_data = {
+        "model": "TR-UnitNoActive",
+        "brand": "Thunderoll",
+        "color": "White",
+        "current_location_id": test_locations[0].id,
+        "engine_number": "ENG-UNITNOACTIVE-001",
+    }
+    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    unit_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/transfers/unit/{unit_id}/active", headers=auth_headers)
+    assert response.status_code == 404

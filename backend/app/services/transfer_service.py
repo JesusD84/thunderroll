@@ -3,12 +3,17 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
-from app.models.schemas import TransferCreate as UnitTransferCreate
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate, TransferStats
+from app.schemas.transfer import (
+    TransferCreate,
+    TransferFilters,
+    TransferUpdate,
+    TransferStats,
+    UnitTransferRequest,
+)
 
 
 class TransferService:
@@ -45,19 +50,15 @@ class TransferService:
     def transfer_unit_with_status_update(
         db: Session,
         unit_id: int,
-        transfer_data: UnitTransferCreate,
+        transfer_data: UnitTransferRequest,
         user_id: int,
     ) -> Unit:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
-        from_location_id = getattr(transfer_data, "from_location_id", None)
-        to_location_id = getattr(transfer_data, "to_location_id", None)
-        unit_ids = getattr(transfer_data, "unit_ids", None)
-
-        if unit_ids is not None and unit_id not in unit_ids:
-            raise HTTPException(status_code=400, detail="unit_id path does not match transfer payload")
+        from_location_id = transfer_data.from_location_id
+        to_location_id = transfer_data.to_location_id
 
         if from_location_id is None:
             from_location_id = unit.current_location_id
