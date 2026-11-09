@@ -229,7 +229,7 @@ async def test_upload_chinese_headers_creates_units(
     unit = db_session.query(Unit).filter(Unit.chassis_number == "ZH-FRAME-001").first()
     assert unit is not None
     assert unit.engine_number == "ZH-MOTOR-001"
-    assert unit.color == "蓝色"
+    assert unit.color == "AZUL"
     assert unit.model == "xiaodou"
 
 
