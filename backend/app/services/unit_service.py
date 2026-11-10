@@ -140,5 +140,34 @@ class UnitService:
         return TransferService.transfer_unit_with_status_update(db, unit_id, transfer_data, user_id)
 
     @staticmethod
+    def sell_unit(db: Session, unit_id: int, user_id: int, notes: str | None = None) -> Unit:
+        """Mark a unit as SOLD and stamp sold_date. Location and transfers are untouched."""
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+
+        if unit.status == UnitStatus.SOLD:
+            raise HTTPException(status_code=400, detail="Unit is already sold")
+
+        if unit.status == UnitStatus.IN_TRANSIT:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot sell unit in transit. The transit should be completed first.",
+            )
+
+        now = datetime.now(UTC)
+        location_id = unit.current_location_id
+
+        unit.status = UnitStatus.SOLD
+        unit.sold_date = now
+        if notes and notes.strip():
+            sale_note = f"Venta: {notes.strip()}"
+            unit.notes = f"{unit.notes}\n{sale_note}" if unit.notes else sale_note
+        db.commit()
+        db.refresh(unit)
+
+        return UnitRepository.get_unit(db, unit.id)
+
+    @staticmethod
     def get_active_transfer(db: Session, unit_id: int) -> Transfer:
         return TransferService.get_active_transfer_for_unit(db, unit_id)
