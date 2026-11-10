@@ -219,15 +219,10 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}/transfer`, {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}/sell`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          unit_id: unit.id,
-          movement_type: 'sale',
-          from_location_id: unit.current_location_id || null,
-          notes: notes || null,
-        }),
+        body: JSON.stringify({ notes: notes?.trim() || null }),
       });
       if (res.ok) {
         await refreshData(token);
