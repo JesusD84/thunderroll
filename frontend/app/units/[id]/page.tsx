@@ -89,6 +89,19 @@ const colorOptions = [
   { value: 'AMARILLO', label: 'Amarillo' },
 ];
 
+// Names the import may store in English (any casing) -> Spanish key.
+const englishColorKeys: Record<string, string> = {
+  black: 'negro', red: 'rojo', blue: 'azul', white: 'blanco', green: 'verde',
+  grey: 'gris', gray: 'gris', yellow: 'amarillo', orange: 'naranja', pink: 'rosa',
+};
+
+// Returns the edit-form option value for a stored color, or '' if none matches.
+function toColorOptionValue(color: string | null | undefined): string {
+  const key = (color ?? '').trim().toLowerCase();
+  const spanishKey = englishColorKeys[key] ?? key;
+  return colorOptions.find(c => c.value.toLowerCase() === spanishKey)?.value ?? '';
+}
+
 interface Location {
   id: number;
   name: string;
@@ -350,7 +363,7 @@ export default function UnitDetailPage() {
                   setEditForm({
                     brand: unit.brand || '',
                     model: unit.model || '',
-                    color: unit.color || '',
+                    color: toColorOptionValue(unit.color),
                     engine_number: unit.engine_number || '',
                     chassis_number: unit.chassis_number || '',
                     current_location_id: unit.current_location_id ? String(unit.current_location_id) : '',
