@@ -63,11 +63,12 @@ docker compose up --build
 
 ### 4. Credenciales demo
 
-Al arrancar con la base vacía, `create_demo_data()` siembra únicamente una cuenta admin bootstrap:
+Al arrancar con la base vacía, `create_demo_data()` siembra únicamente una cuenta admin bootstrap. La contraseña **no** está en el repositorio:
 
-```
-admin@thunderoll.com / admin123 (ADMIN)
-```
+- Si defines `BOOTSTRAP_ADMIN_PASSWORD`, se usa esa.
+- Si no, el seed genera una contraseña aleatoria y la imprime una sola vez en el log de arranque.
+
+Recupérala del log del backend (`docker compose logs backend`) y cámbiala desde **Configuración → Usuarios**.
 
 Las cuentas `MANAGER` y `OPERATOR` no se crean automáticamente — se crean desde esa cuenta admin en **Configuración → Usuarios → Nuevo Usuario**.
 
