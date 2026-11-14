@@ -200,9 +200,7 @@ Todos los endpoints de negocio van bajo `/api/v1/` (ej: `/api/v1/auth/login`, `/
 
 `create_demo_data()` solo siembra una cuenta bootstrap cuando la tabla `users` está vacía — MANAGER y OPERATOR ya no se auto-crean, se dan de alta desde esa cuenta en Configuración → Usuarios.
 
-| Usuario | Password | Rol |
-|---------|----------|-----|
-| admin@thunderoll.com / admin | admin123 | ADMIN |
+La contraseña del admin bootstrap **no está en el repositorio**: usa `BOOTSTRAP_ADMIN_PASSWORD` si está definida; si no, el seed genera una aleatoria y la imprime una sola vez en el log de arranque. Cámbiala desde Configuración → Usuarios.
 
 ---
 
@@ -264,9 +262,10 @@ Cada cambio de estado genera un registro en la tabla `movements` para trazabilid
 ```bash
 # Backend
 DATABASE_URL          # PostgreSQL connection string
-SECRET_KEY            # JWT signing key
+SECRET_KEY            # JWT signing key (obligatoria: sin ella se genera una efímera)
 ALGORITHM             # JWT algorithm (HS256)
 ACCESS_TOKEN_EXPIRE_MINUTES  # Token TTL (default 30)
+BOOTSTRAP_ADMIN_PASSWORD      # Password inicial del admin bootstrap (opcional)
 
 # Frontend
 NEXT_PUBLIC_API_URL   # URL del backend (http://localhost:8000)

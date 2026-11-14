@@ -26,7 +26,14 @@ services:
         value: "587"
       - key: SMTP_USER
         value: noreply@thunderoll.com
+      # La contraseña SMTP se gestiona en el dashboard (Environment), nunca en
+      # el blueprint: declararla aquí la sobreescribiría con un literal en
+      # cada deploy.
       - key: SMTP_PASSWORD
-        value: changeme
+        sync: false
       - key: SMTP_FROM
         value: noreply@thunderoll.com
+      # Contraseña inicial del admin bootstrap (solo aplica a una base vacía).
+      # Si no se define, el seed genera una aleatoria y la imprime una vez.
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
