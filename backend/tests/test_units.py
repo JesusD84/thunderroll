@@ -142,3 +142,98 @@ async def test_get_unit_transfers(client: AsyncClient, auth_headers, test_users,
     response = await client.get(f"/api/v1/units/{unit_id}/transfers", headers=auth_headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_sell_unit_marks_sold_without_transfer(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """POST /units/{id}/sell sets SOLD, stamps sold_date, keeps location and creates no transfer."""
+    create_resp = await client.post(
+        "/api/v1/units/",
+        json={
+            "model": "TR-SELL",
+            "brand": "Thunderoll",
+            "color": "Black",
+            "current_location_id": test_locations[0].id,
+            "engine_number": "ENG-SELL-001",
+        },
+        headers=auth_headers,
+    )
+    unit_id = create_resp.json()["id"]
+
+    resp = await client.post(
+        f"/api/v1/units/{unit_id}/sell", json={"notes": "Cliente frecuente"}, headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["status"] == "SOLD"
+    assert data["sold_date"] is not None
+    assert "Cliente frecuente" in (data["notes"] or "")
+
+    assert data["current_location_id"] == test_locations[0].id
+
+    transfers = await client.get("/api/v1/transfers/", headers=auth_headers)
+    assert transfers.status_code == 200
+    matching = [t for t in transfers.json() if t["unit_id"] == unit_id]
+    assert matching == []
+
+
+@pytest.mark.asyncio
+async def test_sell_unit_twice_returns_400(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """Selling an already sold unit is rejected."""
+    create_resp = await client.post(
+        "/api/v1/units/",
+        json={
+            "model": "TR-SELL2",
+            "brand": "Thunderoll",
+            "color": "Black",
+            "current_location_id": test_locations[0].id,
+            "engine_number": "ENG-SELL-002",
+        },
+        headers=auth_headers,
+    )
+    unit_id = create_resp.json()["id"]
+    first = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    assert first.status_code == 200
+    second = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    assert second.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_sell_unit_not_found(client: AsyncClient, auth_headers, test_users):
+    resp = await client.post("/api/v1/units/999999/sell", json={}, headers=auth_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_sold_units_hidden_from_default_list(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """Sold units are excluded from the default list but shown when status=SOLD."""
+    create_resp = await client.post(
+        "/api/v1/units/",
+        json={
+            "model": "TR-HIDE",
+            "brand": "Thunderoll",
+            "color": "Red",
+            "current_location_id": test_locations[0].id,
+            "engine_number": "ENG-HIDE-001",
+        },
+        headers=auth_headers,
+    )
+    unit_id = create_resp.json()["id"]
+    sell_resp = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    assert sell_resp.status_code == 200
+
+    default_resp = await client.get("/api/v1/units/", headers=auth_headers)
+    assert default_resp.status_code == 200
+    assert unit_id not in [u["id"] for u in default_resp.json()]
+    assert all(u["status"] != "SOLD" for u in default_resp.json())
+
+    sold_resp = await client.get("/api/v1/units/", params={"status": "SOLD"}, headers=auth_headers)
+    assert sold_resp.status_code == 200
+    assert unit_id in [u["id"] for u in sold_resp.json()]
+    assert int(sold_resp.headers["X-Total-Count"]) >= 1

@@ -60,6 +60,10 @@ class UnitUpdate(BaseModel):
             return v
         return v.strip().upper()
 
+class UnitSell(BaseModel):
+    notes: Optional[str] = Field(None, max_length=500)
+
+
 class UnitFilters(BaseModel):
     status: Optional[UnitStatus] = None
     location_id: Optional[int] = None

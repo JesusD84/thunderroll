@@ -16,6 +16,7 @@ from app.services.import_parser import (
     excel_engine_for,
     parse_workbook,
 )
+from app.services.color_mapping import normalize_color
 from app.services.model_equivalence_service import resolve_internal_model
 
 router = APIRouter()
@@ -285,7 +286,9 @@ async def process_inventory_file(
             "chassis_number": frame or None,
             "model": model_name,
             "brand": _text_or_default(canonical.get("brand"), DEFAULT_BRAND),
-            "color": _text_or_default(canonical.get("color"), DEFAULT_COLOR),
+            "color": normalize_color(
+                _text_or_default(canonical.get("color"), DEFAULT_COLOR)
+            ),
         })
 
     total_records = len(candidates)
