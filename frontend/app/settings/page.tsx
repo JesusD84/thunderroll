@@ -10,6 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -45,6 +53,15 @@ const emptyNewUser = {
   role: 'operator',
 };
 
+const emptyEditUser = {
+  email: '',
+  username: '',
+  first_name: '',
+  last_name: '',
+  role: 'operator',
+  is_active: 'true',
+};
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { manageUsers, isAdmin } = useAuth();
@@ -63,6 +80,11 @@ export default function SettingsPage() {
   const [newUser, setNewUser] = useState(emptyNewUser);
   const [userSaving, setUserSaving] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState(emptyEditUser);
+  const [editUserSaving, setEditUserSaving] = useState(false);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
+  const [userActionError, setUserActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session && !manageUsers) {
@@ -218,6 +240,85 @@ export default function SettingsPage() {
       setUserError('Error de conexión');
     } finally {
       setUserSaving(false);
+    }
+  };
+
+  const isEditingSelf = editingUser !== null && session?.user?.id === String(editingUser.id);
+
+  const openEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditUserForm({
+      email: user.email,
+      username: user.username,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      role: user.role,
+      is_active: user.is_active ? 'true' : 'false',
+    });
+    setEditUserError(null);
+  };
+
+  const closeEditUser = () => {
+    setEditingUser(null);
+    setEditUserError(null);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = (session as any)?.accessToken;
+    if (!token || !editingUser) return;
+    setEditUserSaving(true);
+    setEditUserError(null);
+
+    try {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: editUserForm.email,
+          username: editUserForm.username,
+          first_name: editUserForm.first_name,
+          last_name: editUserForm.last_name,
+          role: editUserForm.role,
+          is_active: editUserForm.is_active === 'true',
+        }),
+      });
+
+      if (res.ok) {
+        const updated: User = await res.json();
+        setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+        closeEditUser();
+      } else {
+        const err = await res.json();
+        setEditUserError(typeof err.detail === 'string' ? err.detail : 'Error actualizando usuario');
+      }
+    } catch {
+      setEditUserError('Error de conexión');
+    } finally {
+      setEditUserSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (!confirm(`¿Seguro que deseas eliminar a ${user.first_name} ${user.last_name}? Esta acción no se puede deshacer.`)) return;
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+    setUserActionError(null);
+
+    try {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/${user.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== user.id));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setUserActionError(typeof err.detail === 'string' ? err.detail : 'Error eliminando usuario');
+      }
+    } catch {
+      setUserActionError('Error de conexión');
     }
   };
 
@@ -529,6 +630,9 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {userActionError && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{userActionError}</div>
+              )}
               {loading ? (
                 <div className="text-center py-8">Cargando usuarios...</div>
               ) : (
@@ -540,31 +644,59 @@ export default function SettingsPage() {
                       <TableHead>Rol</TableHead>
                       <TableHead>Creado</TableHead>
                       <TableHead>Estado</TableHead>
+                      {isAdmin && <TableHead>Acciones</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.first_name} {user.last_name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Badge className={roleColors[user.role] || 'bg-gray-100 text-gray-800'}>
-                            {roleLabels[user.role] || user.role.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatDate(user.created_at)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                            {user.is_active ? 'Activo' : 'Inactivo'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {users.map((user) => {
+                      const isSelf = session?.user?.id === String(user.id);
+                      return (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.first_name} {user.last_name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge className={roleColors[user.role] || 'bg-gray-100 text-gray-800'}>
+                              {roleLabels[user.role] || user.role.toUpperCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatDate(user.created_at)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                              {user.is_active ? 'Activo' : 'Inactivo'}
+                            </Badge>
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  aria-label={`Editar ${user.first_name} ${user.last_name}`}
+                                  onClick={() => openEditUser(user)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  aria-label={`Eliminar ${user.first_name} ${user.last_name}`}
+                                  disabled={isSelf}
+                                  title={isSelf ? 'No puedes eliminar tu propia cuenta' : undefined}
+                                  onClick={() => handleDeleteUser(user)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
                     {users.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-sm text-gray-500">
+                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-sm text-gray-500">
                           No hay usuarios o no tienes permisos para verlos
                         </TableCell>
                       </TableRow>
@@ -606,6 +738,102 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Editar Usuario */}
+      <Dialog open={editingUser !== null} onOpenChange={(open) => { if (!open) closeEditUser(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>Actualiza los datos y el rol del usuario</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateUser} className="space-y-4">
+            {editUserError && (
+              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{editUserError}</div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_user_first_name">Nombre *</Label>
+                <Input
+                  id="edit_user_first_name"
+                  value={editUserForm.first_name}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, first_name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_user_last_name">Apellido *</Label>
+                <Input
+                  id="edit_user_last_name"
+                  value={editUserForm.last_name}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, last_name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_user_email">Email *</Label>
+                <Input
+                  id="edit_user_email"
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_user_username">Usuario *</Label>
+                <Input
+                  id="edit_user_username"
+                  value={editUserForm.username}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, username: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_user_role">Rol *</Label>
+                <Select
+                  value={editUserForm.role}
+                  onValueChange={(value) => setEditUserForm(prev => ({ ...prev, role: value }))}
+                  disabled={isEditingSelf}
+                >
+                  <SelectTrigger id="edit_user_role">
+                    <SelectValue placeholder="Selecciona rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="operator">Operativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit_user_status">Estado *</Label>
+                <Select
+                  value={editUserForm.is_active}
+                  onValueChange={(value) => setEditUserForm(prev => ({ ...prev, is_active: value }))}
+                  disabled={isEditingSelf}
+                >
+                  <SelectTrigger id="edit_user_status">
+                    <SelectValue placeholder="Selecciona estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Activo</SelectItem>
+                    <SelectItem value="false">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeEditUser} disabled={editUserSaving}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={editUserSaving}>
+                {editUserSaving ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.database.database import get_db
 from app.models import models, schemas
-from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters
+from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters, UnitSell
 from app.models.models import UserRole
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.unit_service import UnitService
@@ -72,3 +72,13 @@ def get_unit_transfers(
     current_user: models.User = Depends(get_current_active_user)
 ):
     return UnitService.get_unit_transfers(db, unit_id, skip, limit)
+
+@router.post("/{unit_id}/sell", response_model=Unit)
+def sell_unit(
+    unit_id: int,
+    payload: UnitSell | None = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+):
+    notes = payload.notes if payload else None
+    return UnitService.sell_unit(db, unit_id, current_user.id, notes)

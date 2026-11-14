@@ -265,13 +265,8 @@ class ReportService:
         if date_to:
             query = query.filter(Unit.sold_date <= date_to)
         if location_id:
-            sold_units_sub = db.query(Transfer.unit_id).filter(
-                or_(
-                    Transfer.origin_location_id == location_id,
-                    Transfer.destination_location_id == location_id,
-                )
-            ).subquery()
-            query = query.filter(Unit.id.in_(sold_units_sub))
+            # A sold unit stays at its last location, so filter on that.
+            query = query.filter(Unit.current_location_id == location_id)
 
         sold_units = query.all()
 

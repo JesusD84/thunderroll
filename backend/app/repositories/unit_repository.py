@@ -10,6 +10,10 @@ class UnitRepository:
     def _apply_filters(query, filters: UnitFilters):
         if filters.status:
             query = query.filter(Unit.status == filters.status)
+        else:
+            # Sold units are hidden from the default list; they only show when
+            # the status filter explicitly asks for SOLD.
+            query = query.filter(Unit.status != UnitStatus.SOLD)
 
         if filters.location_id:
             query = query.filter(Unit.current_location_id == filters.location_id)

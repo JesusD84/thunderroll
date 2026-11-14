@@ -133,3 +133,31 @@ class UnitService:
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
         return UnitRepository.get_unit_transfers(db, unit_id, skip, limit)
+
+    @staticmethod
+    def sell_unit(db: Session, unit_id: int, user_id: int, notes: str | None = None) -> Unit:
+        """Mark a unit as SOLD and stamp sold_date. Location and transfers are untouched."""
+        unit = UnitRepository.get_unit(db, unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
+
+        if unit.status == UnitStatus.SOLD:
+            raise HTTPException(status_code=400, detail="Unit is already sold")
+
+        if unit.status == UnitStatus.IN_TRANSIT:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot sell unit in transit. The transit should be completed first.",
+            )
+
+        now = datetime.now(UTC)
+
+        unit.status = UnitStatus.SOLD
+        unit.sold_date = now
+        if notes and notes.strip():
+            sale_note = f"Venta: {notes.strip()}"
+            unit.notes = f"{unit.notes}\n{sale_note}" if unit.notes else sale_note
+        db.commit()
+        db.refresh(unit)
+
+        return UnitRepository.get_unit(db, unit.id)

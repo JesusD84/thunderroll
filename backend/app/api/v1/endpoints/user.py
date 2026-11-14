@@ -42,3 +42,22 @@ async def update_users_me(
     current_user: models.User = Depends(get_current_active_user)
 ):
     return UserService.update_current_user(db, current_user, user_update)
+
+
+@router.put("/{user_id}", response_model=User)
+def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+):
+    return UserService.update_user(db, user_id, user_update, current_user)
+
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+):
+    UserService.delete_user(db, user_id, current_user)
