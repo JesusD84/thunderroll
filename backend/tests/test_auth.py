@@ -36,7 +36,12 @@ async def test_login_invalid_credentials(client: AsyncClient, test_users, test_l
 
 @pytest.mark.asyncio
 async def test_login_inactive_user(client: AsyncClient, db_session, test_locations):
-    """Inactive user can obtain a token but cannot access protected endpoints."""
+    """An inactive user cannot log in at all: no token is handed out.
+
+    Deactivating an account must actually close the credentials, otherwise the
+    password keeps working against the API even though every business
+    endpoint rejects the user afterwards.
+    """
     inactive = User(
         first_name="Inactive",
         last_name="User",
@@ -51,14 +56,8 @@ async def test_login_inactive_user(client: AsyncClient, db_session, test_locatio
 
     login_data = {"username": "inactive", "password": "testpass123"}
     response = await client.post("/api/v1/auth/login", data=login_data)
-    # Login succeeds — token is issued even for inactive users
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-
-    # But accessing a protected endpoint is denied
-    headers = {"Authorization": f"Bearer {token}"}
-    me_response = await client.get("/api/v1/user/me", headers=headers)
-    assert me_response.status_code == 400
+    assert response.status_code == 401
+    assert "access_token" not in response.json()
 
 
 @pytest.mark.asyncio

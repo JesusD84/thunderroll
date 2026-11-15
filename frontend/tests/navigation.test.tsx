@@ -46,7 +46,7 @@ describe('Navigation', () => {
     expect(screen.getByText('Configuración')).toBeInTheDocument();
   });
 
-  it('hides imports/equivalences/reports/settings for operator', () => {
+  it('hides imports/equivalences/reports for operator but keeps settings', () => {
     mockRole = 'operator';
     render(<Navigation />);
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
@@ -55,7 +55,9 @@ describe('Navigation', () => {
     expect(screen.queryByText('Importar')).not.toBeInTheDocument();
     expect(screen.queryByText('Equivalencias')).not.toBeInTheDocument();
     expect(screen.queryByText('Reportes')).not.toBeInTheDocument();
-    expect(screen.queryByText('Configuración')).not.toBeInTheDocument();
+    // Settings stays reachable: it is where an operator changes its own
+    // password.
+    expect(screen.getByText('Configuración')).toBeInTheDocument();
   });
 
   it('shows user name', () => {

@@ -2,9 +2,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.models import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import PasswordChange, UserCreate, UserUpdate
 from app.repositories.user_repository import UserRepository
-from app.services.auth_service import get_password_hash
+from app.services.auth_service import get_password_hash, verify_password
 
 
 class UserService:
@@ -38,6 +38,26 @@ class UserService:
         return UserRepository.update_user(db, current_user, user_update)
 
     @staticmethod
+    def change_own_password(db: Session, current_user: User, payload: PasswordChange) -> None:
+        """Change the caller's own password.
+
+        The current password is required: a stolen session alone must not be
+        enough to lock the legitimate user out of the account.
+        """
+        if not verify_password(payload.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="La contraseña actual no es correcta")
+
+        if payload.current_password == payload.new_password:
+            raise HTTPException(
+                status_code=400,
+                detail="La nueva contraseña debe ser distinta de la actual",
+            )
+
+        current_user.hashed_password = get_password_hash(payload.new_password)
+        db.commit()
+        db.refresh(current_user)
+
+    @staticmethod
     def _get_user_or_404(db: Session, user_id: int) -> User:
         db_user = UserRepository.get_user_by_id(db, user_id)
         if db_user is None:
@@ -48,6 +68,9 @@ class UserService:
     def update_user(db: Session, user_id: int, user_update: UserUpdate, admin: User) -> User:
         db_user = UserService._get_user_or_404(db, user_id)
         changes = user_update.model_dump(exclude_unset=True)
+        # ``password`` is handled here, never written as a plain attribute:
+        # the column is ``hashed_password``.
+        new_password = changes.pop("password", None)
 
         # An admin cannot lock themselves out of the system.
         if db_user.id == admin.id:
@@ -63,6 +86,9 @@ class UserService:
         if "username" in changes and changes["username"] != db_user.username:
             if UserRepository.get_user_by_username(db, username=changes["username"]):
                 raise HTTPException(status_code=400, detail="Username already registered")
+
+        if new_password is not None:
+            db_user.hashed_password = get_password_hash(new_password)
 
         return UserRepository.update_user(db, db_user, user_update)
 

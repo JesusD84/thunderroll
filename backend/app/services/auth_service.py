@@ -72,6 +72,12 @@ def authenticate_user(db: Session, username: str, password: str):
         user = get_user_by_email(db, username)
     if not user:
         return False
+    # A deactivated account must not authenticate at all: handing out a token
+    # would keep the credentials alive even though every business endpoint
+    # rejects the user right after. Only an explicit False deactivates:
+    # the column is nullable, so NULL means "not set", not "disabled".
+    if user.is_active is False:
+        return False
     if not verify_password(password, user.hashed_password):
         return False
     return user
@@ -97,8 +103,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+    if current_user.is_active is False:
+        # 401 (not 400): the frontend only runs the sign-out flow on 401, so a
+        # 400 would leave the user staring at a generic error instead of being
+        # redirected to the login page.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return current_user
 
 def require_role(required_roles: list):

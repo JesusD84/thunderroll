@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models import models
 from app.models.models import UserRole
-from app.schemas import User, UserCreate, UserUpdate
+from app.schemas import PasswordChange, User, UserCreate, UserUpdate
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.user_service import UserService
 
@@ -42,6 +42,16 @@ async def update_users_me(
     current_user: models.User = Depends(get_current_active_user)
 ):
     return UserService.update_current_user(db, current_user, user_update)
+
+
+@router.put("/me/password", status_code=204)
+def change_own_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """Change the caller's own password. Requires the current password."""
+    UserService.change_own_password(db, current_user, payload)
 
 
 @router.put("/{user_id}", response_model=User)

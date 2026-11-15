@@ -303,3 +303,147 @@ async def test_delete_user_with_transfers_is_blocked(client: AsyncClient, auth_h
 
     response = await client.delete(f"/api/v1/user/{user_id}", headers=auth_headers)
     assert response.status_code == 409
+
+
+# --- Cambio de contraseña y bloqueo de cuentas desactivadas -----------------
+
+
+@pytest.mark.asyncio
+async def test_change_own_password(client: AsyncClient, auth_headers, test_users, test_locations):
+    """A user can change their own password: the old one stops working."""
+    me = (await client.get("/api/v1/user/me", headers=auth_headers)).json()
+
+    response = await client.put(
+        "/api/v1/user/me/password",
+        json={"current_password": "testpass123", "new_password": "nueva-clave-123"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204, response.text
+
+    old = await client.post(
+        "/api/v1/auth/login", data={"username": "admin", "password": "testpass123"}
+    )
+    assert old.status_code == 401
+
+    new = await client.post(
+        "/api/v1/auth/login", data={"username": "admin", "password": "nueva-clave-123"}
+    )
+    assert new.status_code == 200
+
+    # Restore the fixture password so the session-scoped users stay usable.
+    db = TestingSessionLocal()
+    db_user = db.query(User).filter(User.id == me["id"]).first()
+    db_user.hashed_password = Security.get_password_hash("testpass123")
+    db.commit()
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_change_own_password_requires_current_password(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """Without the current password the change is rejected."""
+    response = await client.put(
+        "/api/v1/user/me/password",
+        json={"current_password": "no-es-la-actual", "new_password": "nueva-clave-123"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_change_own_password_rejects_short_password(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """The new password must respect the minimum length."""
+    response = await client.put(
+        "/api/v1/user/me/password",
+        json={"current_password": "testpass123", "new_password": "corta"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_own_password_requires_auth(client: AsyncClient, test_users, test_locations):
+    response = await client.put(
+        "/api/v1/user/me/password",
+        json={"current_password": "testpass123", "new_password": "nueva-clave-123"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_admin_can_reset_another_user_password(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """An admin can set a new password for another account (password reset)."""
+    target_id = _create_db_user("resetpass")
+
+    response = await client.put(
+        f"/api/v1/user/{target_id}",
+        json={"password": "clave-reseteada-1"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    old = await client.post(
+        "/api/v1/auth/login", data={"username": "resetpass", "password": "testpass123"}
+    )
+    assert old.status_code == 401
+
+    new = await client.post(
+        "/api/v1/auth/login", data={"username": "resetpass", "password": "clave-reseteada-1"}
+    )
+    assert new.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_operator_cannot_reset_other_user_password(
+    client: AsyncClient, test_users, test_locations
+):
+    """Only admins can set another user's password."""
+    target_id = _create_db_user("resetpass2")
+    headers = await _login_as(client, "inventario")
+
+    response = await client.put(
+        f"/api/v1/user/{target_id}",
+        json={"password": "clave-reseteada-2"},
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_deactivated_user_cannot_login(client: AsyncClient, test_users, test_locations):
+    """A deactivated account must not authenticate at all (401, no token)."""
+    user_id = _create_db_user("desactivado")
+    db = TestingSessionLocal()
+    db_user = db.query(User).filter(User.id == user_id).first()
+    db_user.is_active = False
+    db.commit()
+    db.close()
+
+    response = await client.post(
+        "/api/v1/auth/login", data={"username": "desactivado", "password": "testpass123"}
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_deactivated_user_token_is_rejected_with_401(
+    client: AsyncClient, test_users, test_locations
+):
+    """A token issued before deactivation stops working with 401 (not 400),
+    so the frontend runs its sign-out flow."""
+    user_id = _create_db_user("desactivado2")
+    headers = await _login_as(client, "desactivado2")
+
+    db = TestingSessionLocal()
+    db_user = db.query(User).filter(User.id == user_id).first()
+    db_user.is_active = False
+    db.commit()
+    db.close()
+
+    response = await client.get("/api/v1/user/me", headers=headers)
+    assert response.status_code == 401
