@@ -186,15 +186,17 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('renders demo credentials card', async () => {
+  it('does not render demo credentials', async () => {
     mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
     mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Credenciales Demo')).toBeInTheDocument();
+      expect(screen.getByText('Bodega Central')).toBeInTheDocument();
     });
-    expect(screen.getByText('Administrador')).toBeInTheDocument();
-    expect(screen.getByText('Manager')).toBeInTheDocument();
+    expect(screen.queryByText('Credenciales Demo')).not.toBeInTheDocument();
+    expect(screen.queryByText('admin123')).not.toBeInTheDocument();
+    expect(screen.queryByText('manager123')).not.toBeInTheDocument();
+    expect(screen.queryByText('operator123')).not.toBeInTheDocument();
   });
 
   it('shows location error message on delete failure', async () => {
