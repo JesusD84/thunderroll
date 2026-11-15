@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Equivalencias', href: '/model-equivalences', icon: Repeat, show: (p: ReturnType<typeof useAuth>) => p.viewEquivalences },
   { name: 'Transferencias', href: '/transfers', icon: Truck, show: () => true },
   { name: 'Reportes', href: '/reports', icon: FileText, show: (p: ReturnType<typeof useAuth>) => p.viewReports },
-  { name: 'Configuración', href: '/settings', icon: Settings, show: (p: ReturnType<typeof useAuth>) => p.manageUsers },
+  { name: 'Configuración', href: '/settings', icon: Settings, show: () => true },
 ];
 
 export default function Navigation() {

@@ -29,6 +29,17 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    # Solo un ADMIN puede fijarla (reseteo de contraseña). La contraseña nunca
+    # se escribe tal cual: el servicio guarda siempre el hash.
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
+
+
+class PasswordChange(BaseModel):
+    """Cambio de contraseña propia: exige la actual para no dejar al usuario
+    fuera de su cuenta si alguien más tiene su sesión."""
+
+    current_password: str = Field(..., min_length=1, max_length=100)
+    new_password: str = Field(..., min_length=8, max_length=100)
 
 class User(UserBase):
     id: int

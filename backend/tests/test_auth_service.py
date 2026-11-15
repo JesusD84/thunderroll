@@ -268,11 +268,15 @@ async def test_get_current_active_user_active():
 
 @pytest.mark.asyncio
 async def test_get_current_active_user_inactive():
-    """Raises HTTPException when is_active is False."""
+    """Raises HTTPException 401 when is_active is False.
+
+    401 (not 400) so the frontend runs its sign-out flow and redirects to the
+    login page instead of showing a generic error.
+    """
     user = User(username="admin", is_active=False)
     with pytest.raises(HTTPException) as exc:
         await get_current_active_user(user)
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 401
 
 
 # ---------------------------------------------------------------------------

@@ -36,6 +36,10 @@ class UserRepository:
     @staticmethod
     def update_user(db: Session, db_user: User, user_update: UserUpdate) -> User:
         update_data = user_update.model_dump(exclude_unset=True)
+        # ``password`` is never a column: it is hashed by the service before
+        # reaching this point. Setting it here would shadow a non-mapped
+        # attribute instead of updating ``hashed_password``.
+        update_data.pop("password", None)
         for field, value in update_data.items():
             setattr(db_user, field, value)
         db.commit()

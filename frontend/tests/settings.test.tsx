@@ -41,7 +41,9 @@ const mockUsers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+  // The role drives the permissions: without it the page would only offer the
+  // "Mi cuenta" tab and the locations/users tabs would not render.
+  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -220,5 +222,69 @@ describe('SettingsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('No se puede eliminar: hay 5 unidades en esta ubicación')).toBeInTheDocument();
     });
+  });
+});
+// ============================================================
+// Mi cuenta — cambio de contraseña
+// ============================================================
+describe('SettingsPage — Mi cuenta', () => {
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+  it('lets the user change their own password', async () => {
+    mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
+    mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
+    render(<SettingsPage />);
+
+    await user.click(screen.getByText('Mi cuenta'));
+
+    await user.type(screen.getByLabelText('Contraseña actual *'), 'vieja123');
+    await user.type(screen.getByLabelText('Nueva contraseña *'), 'nueva12345');
+    await user.type(screen.getByLabelText('Confirmar nueva contraseña *'), 'nueva12345');
+    // Third call: the PUT to /user/me/password.
+    mockFetch.mockResolvedValueOnce(
+      Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) })
+    );
+    await user.click(screen.getByText('Cambiar contraseña', { selector: 'button' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Contraseña actualizada correctamente.')).toBeInTheDocument();
+    });
+
+    const call = mockFetch.mock.calls.find((c) => c[0].includes('/api/v1/user/me/password'));
+    expect(call).toBeDefined();
+    expect(call![1].method).toBe('PUT');
+    const body = JSON.parse(call![1].body);
+    expect(body.current_password).toBe('vieja123');
+    expect(body.new_password).toBe('nueva12345');
+  });
+
+  it('rejects a confirmation that does not match', async () => {
+    mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
+    mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
+    render(<SettingsPage />);
+
+    await user.click(screen.getByText('Mi cuenta'));
+    await user.type(screen.getByLabelText('Contraseña actual *'), 'vieja123');
+    await user.type(screen.getByLabelText('Nueva contraseña *'), 'nueva12345');
+    await user.type(screen.getByLabelText('Confirmar nueva contraseña *'), 'otra99999');
+    await user.click(screen.getByText('Cambiar contraseña', { selector: 'button' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('La nueva contraseña y su confirmación no coinciden')).toBeInTheDocument();
+    });
+    expect(mockFetch.mock.calls.some((c) => c[0].includes('/api/v1/user/me/password'))).toBe(false);
+  });
+
+  it('shows only the account tab for an operator', async () => {
+    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
+    mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cambiar contraseña', { selector: 'button' })).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Ubicaciones')).not.toBeInTheDocument();
+    expect(screen.queryByText('Usuarios')).not.toBeInTheDocument();
   });
 });

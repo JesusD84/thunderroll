@@ -18,9 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
+import { Plus, Edit, Trash2, MapPin, KeyRound } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -60,16 +59,16 @@ const emptyEditUser = {
   last_name: '',
   role: 'operator',
   is_active: 'true',
+  password: '',
 };
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { manageUsers, isAdmin } = useAuth();
-  const router = useRouter();
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'locations' | 'users'>('locations');
+  const [activeTab, setActiveTab] = useState<'locations' | 'users' | 'account'>('locations');
   const [showNewLocation, setShowNewLocation] = useState(false);
   const [newLocation, setNewLocation] = useState({ name: '', address: '' });
   const [editingLocation, setEditingLocation] = useState<number | null>(null);
@@ -85,12 +84,23 @@ export default function SettingsPage() {
   const [editUserSaving, setEditUserSaving] = useState(false);
   const [editUserError, setEditUserError] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: '',
+  });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
+  // Operators have no access to locations or user management, but every role
+  // must be able to change its own password: that is the only way out of a
+  // compromised or forgotten credential without an admin.
   useEffect(() => {
     if (session && !manageUsers) {
-      router.replace('/');
+      setActiveTab('account');
     }
-  }, [session, manageUsers, router]);
+  }, [session, manageUsers]);
 
   const mapDeleteLocationErrorToSpanish = (detail: string): string => {
     const match = detail.match(/^Cannot delete: there (?:is|are) (\d+) units? at this location$/);
@@ -107,19 +117,22 @@ export default function SettingsPage() {
       if (!token) return;
 
       try {
+        // Operators cannot list users (403): only fetch what the role allows.
         const [locRes, usersRes] = await Promise.all([
           sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
-          sessionAwareFetch(`${API_URL}/api/v1/user/`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
+          manageUsers
+            ? sessionAwareFetch(`${API_URL}/api/v1/user/`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+              })
+            : Promise.resolve(null),
         ]);
 
         if (locRes.ok) {
           setLocations(await locRes.json());
         }
-        if (usersRes.ok) {
+        if (usersRes?.ok) {
           setUsers(await usersRes.json());
         }
       } catch (err) {
@@ -130,7 +143,7 @@ export default function SettingsPage() {
     };
 
     fetchData();
-  }, [session]);
+  }, [session, manageUsers]);
 
   const handleCreateLocation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,6 +258,50 @@ export default function SettingsPage() {
 
   const isEditingSelf = editingUser !== null && session?.user?.id === String(editingUser.id);
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    setPasswordError(null);
+    setPasswordChanged(false);
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError('La nueva contraseña y su confirmación no coinciden');
+      return;
+    }
+    if (passwordForm.new_password.length < 8) {
+      setPasswordError('La nueva contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/me/password`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: passwordForm.current_password,
+          new_password: passwordForm.new_password,
+        }),
+      });
+
+      if (res.ok) {
+        setPasswordChanged(true);
+        setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setPasswordError(
+          typeof err.detail === 'string' ? err.detail : 'Error cambiando la contraseña'
+        );
+      }
+    } catch {
+      setPasswordError('Error de conexión');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   const openEditUser = (user: User) => {
     setEditingUser(user);
     setEditUserForm({
@@ -254,6 +311,7 @@ export default function SettingsPage() {
       last_name: user.last_name,
       role: user.role,
       is_active: user.is_active ? 'true' : 'false',
+      password: '',
     });
     setEditUserError(null);
   };
@@ -281,6 +339,8 @@ export default function SettingsPage() {
           last_name: editUserForm.last_name,
           role: editUserForm.role,
           is_active: editUserForm.is_active === 'true',
+          // Only sent when filled: an empty field means "leave it as is".
+          ...(editUserForm.password ? { password: editUserForm.password } : {}),
         }),
       });
 
@@ -346,27 +406,107 @@ export default function SettingsPage() {
       <div className="bg-white shadow">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-          <p className="text-gray-600">Gestiona ubicaciones y usuarios del sistema</p>
+          <p className="text-gray-600">
+            {manageUsers
+              ? 'Gestiona ubicaciones y usuarios del sistema'
+              : 'Gestiona tu contraseña y tus datos de acceso'}
+          </p>
         </div>
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Tabs */}
         <div className="flex space-x-1 mb-6">
+          {manageUsers && (
+            <>
+              <Button
+                variant={activeTab === 'locations' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('locations')}
+              >
+                <MapPin className="mr-2 h-4 w-4" />
+                Ubicaciones
+              </Button>
+              <Button
+                variant={activeTab === 'users' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('users')}
+              >
+                Usuarios
+              </Button>
+            </>
+          )}
           <Button
-            variant={activeTab === 'locations' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('locations')}
+            variant={activeTab === 'account' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('account')}
           >
-            <MapPin className="mr-2 h-4 w-4" />
-            Ubicaciones
-          </Button>
-          <Button
-            variant={activeTab === 'users' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('users')}
-          >
-            Usuarios
+            <KeyRound className="mr-2 h-4 w-4" />
+            Mi cuenta
           </Button>
         </div>
+
+        {/* Mi cuenta */}
+        {activeTab === 'account' && (
+          <div className="max-w-xl">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cambiar contraseña</CardTitle>
+                <CardDescription>
+                  Necesitas tu contraseña actual para cambiarla. Al cambiarla, tu sesión actual sigue
+                  activa.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  {passwordError && (
+                    <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{passwordError}</div>
+                  )}
+                  {passwordChanged && (
+                    <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">
+                      Contraseña actualizada correctamente.
+                    </div>
+                  )}
+                  <div>
+                    <Label htmlFor="current_password">Contraseña actual *</Label>
+                    <Input
+                      id="current_password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={passwordForm.current_password}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new_password">Nueva contraseña *</Label>
+                    <Input
+                      id="new_password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={passwordForm.new_password}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirm_password">Confirmar nueva contraseña *</Label>
+                    <Input
+                      id="confirm_password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={passwordForm.confirm_password}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={passwordSaving}>
+                      {passwordSaving ? 'Guardando...' : 'Cambiar contraseña'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Ubicaciones */}
         {activeTab === 'locations' && (
@@ -791,6 +931,20 @@ export default function SettingsPage() {
                     <SelectItem value="false">Inactivo</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="edit_user_password">Nueva contraseña</Label>
+                <Input
+                  id="edit_user_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={editUserForm.password}
+                  onChange={(e) => setEditUserForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Dejar vacío para no cambiarla (mínimo 8 caracteres)"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Restablece la contraseña de este usuario. Se guarda cifrada y no se muestra de nuevo.
+                </p>
               </div>
             </div>
 
