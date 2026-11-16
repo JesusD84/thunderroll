@@ -620,16 +620,19 @@ export default function SettingsPage() {
                               </div>
                             ) : (
                               <div className="flex space-x-2">
-                                <Button variant="outline" size="sm" onClick={() => {
-                                  setEditingLocation(location.id);
-                                  setEditForm({ name: location.name, address: location.address || '' });
-                                  setLocationError(null);
-                                }}>
+                                <Button variant="outline" size="sm"
+                                  aria-label={`Editar ${location.name}`}
+                                  onClick={() => {
+                                    setEditingLocation(location.id);
+                                    setEditForm({ name: location.name, address: location.address || '' });
+                                    setLocationError(null);
+                                  }}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
+                                  aria-label={`Eliminar ${location.name}`}
                                   disabled={!deleteLocation}
                                   title={deleteLocation ? undefined : 'Solo un administrador puede eliminar ubicaciones'}
                                   onClick={() => handleDeleteLocation(location.id)}
