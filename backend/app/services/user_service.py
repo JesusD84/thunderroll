@@ -16,7 +16,6 @@ SELF_UPDATE_FIELDS = frozenset({"first_name", "last_name"})
 
 
 class UserService:
-
     @staticmethod
     def create_user(db: Session, user_data: UserCreate, creator: User) -> User:
         # A Manager may only onboard Operator accounts; only an Admin can grant
@@ -64,7 +63,9 @@ class UserService:
 
         if payload.get("username") and payload["username"] != current_user.username:
             if UserRepository.get_user_by_username(db, username=payload["username"]):
-                raise HTTPException(status_code=400, detail="Username already registered")
+                raise HTTPException(
+                    status_code=400, detail="Username already registered"
+                )
 
         changes = {
             field: value
@@ -89,14 +90,18 @@ class UserService:
             ) from exc
 
     @staticmethod
-    def change_own_password(db: Session, current_user: User, payload: PasswordChange) -> None:
+    def change_own_password(
+        db: Session, current_user: User, payload: PasswordChange
+    ) -> None:
         """Change the caller's own password.
 
         The current password is required: a stolen session alone must not be
         enough to lock the legitimate user out of the account.
         """
         if not verify_password(payload.current_password, current_user.hashed_password):
-            raise HTTPException(status_code=400, detail="La contraseña actual no es correcta")
+            raise HTTPException(
+                status_code=400, detail="La contraseña actual no es correcta"
+            )
 
         if payload.current_password == payload.new_password:
             raise HTTPException(
@@ -116,7 +121,9 @@ class UserService:
         return db_user
 
     @staticmethod
-    def update_user(db: Session, user_id: int, user_update: UserUpdate, admin: User) -> User:
+    def update_user(
+        db: Session, user_id: int, user_update: UserUpdate, admin: User
+    ) -> User:
         db_user = UserService._get_user_or_404(db, user_id)
         changes = user_update.model_dump(exclude_unset=True)
         # ``password`` is handled here, never written as a plain attribute:
@@ -126,15 +133,24 @@ class UserService:
         # A NOT NULL column may not be nulled out: reject it as a bad request
         # instead of letting the ORM raise (which would surface as a 500).
         for field, value in changes.items():
-            if value is None and field in ("email", "username", "first_name", "last_name"):
+            if value is None and field in (
+                "email",
+                "username",
+                "first_name",
+                "last_name",
+            ):
                 raise HTTPException(status_code=422, detail=f"{field} cannot be null")
 
         # An admin cannot lock themselves out of the system.
         if db_user.id == admin.id:
             if changes.get("role", admin.role) != UserRole.ADMIN:
-                raise HTTPException(status_code=400, detail="You cannot remove your own Admin role")
+                raise HTTPException(
+                    status_code=400, detail="You cannot remove your own Admin role"
+                )
             if changes.get("is_active", True) is False:
-                raise HTTPException(status_code=400, detail="You cannot deactivate your own account")
+                raise HTTPException(
+                    status_code=400, detail="You cannot deactivate your own account"
+                )
 
         if "email" in changes and changes["email"] != db_user.email:
             if UserRepository.get_user_by_email(db, email=changes["email"]):
@@ -142,7 +158,9 @@ class UserService:
 
         if "username" in changes and changes["username"] != db_user.username:
             if UserRepository.get_user_by_username(db, username=changes["username"]):
-                raise HTTPException(status_code=400, detail="Username already registered")
+                raise HTTPException(
+                    status_code=400, detail="Username already registered"
+                )
 
         if new_password is not None:
             db_user.hashed_password = get_password_hash(new_password)
@@ -162,11 +180,17 @@ class UserService:
         db_user = UserService._get_user_or_404(db, user_id)
 
         if db_user.id == admin.id:
-            raise HTTPException(status_code=400, detail="You cannot delete your own account")
+            raise HTTPException(
+                status_code=400, detail="You cannot delete your own account"
+            )
 
         # Transfers and imports keep a reference to the user for traceability.
         # Deleting them would break that history, so the account must be deactivated instead.
-        if db_user.dispatched_transfers or db_user.received_transfers or db_user.imports:
+        if (
+            db_user.dispatched_transfers
+            or db_user.received_transfers
+            or db_user.imports
+        ):
             raise HTTPException(
                 status_code=409,
                 detail="User has transfers or imports on record; deactivate the account instead",

@@ -1,4 +1,3 @@
-
 """Authentication schemas."""
 
 from pydantic import BaseModel, EmailStr, Field
@@ -6,6 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class Token(BaseModel):
     """Token response schema."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -13,21 +13,25 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     """Token data schema."""
+
     user_id: int | None = None
 
 
 class UserLogin(BaseModel):
     """User login request schema."""
+
     email: EmailStr
     password: str
 
 
 class ForgotPasswordRequest(BaseModel):
     """Forgot password request schema."""
+
     email: EmailStr
 
 
 class ResetPasswordRequest(BaseModel):
     """Reset password request schema."""
+
     token: str
     new_password: str = Field(..., min_length=8)

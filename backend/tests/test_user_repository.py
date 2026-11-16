@@ -10,6 +10,7 @@ from app.schemas.user import UserCreate, UserUpdate
 # get_user_by_id
 # ---------------------------------------------------------------------------
 
+
 def test_get_user_by_id_found():
     """Returns user when ID exists."""
     mock_db = MagicMock()
@@ -32,6 +33,7 @@ def test_get_user_by_id_not_found():
 # ---------------------------------------------------------------------------
 # get_user_by_email
 # ---------------------------------------------------------------------------
+
 
 def test_get_user_by_email_found():
     """Returns user when email exists."""
@@ -56,6 +58,7 @@ def test_get_user_by_email_not_found():
 # get_user_by_username
 # ---------------------------------------------------------------------------
 
+
 def test_get_user_by_username_found():
     """Returns user when username exists."""
     mock_db = MagicMock()
@@ -78,6 +81,7 @@ def test_get_user_by_username_not_found():
 # ---------------------------------------------------------------------------
 # create_user
 # ---------------------------------------------------------------------------
+
 
 def test_create_user_success():
     """Creates a user with the given data and hashed password."""
@@ -103,12 +107,17 @@ def test_create_user_success():
 # update_user
 # ---------------------------------------------------------------------------
 
+
 def test_update_user_changes_fields():
     """Updates only the fields present in the update data."""
     mock_db = MagicMock()
     existing = User(
-        id=1, username="admin", email="admin@test.com",
-        first_name="Old", last_name="Name", role=UserRole.ADMIN,
+        id=1,
+        username="admin",
+        email="admin@test.com",
+        first_name="Old",
+        last_name="Name",
+        role=UserRole.ADMIN,
     )
     update_data = UserUpdate(first_name="NewName")
 

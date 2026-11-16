@@ -13,6 +13,7 @@ from app.services.unit_service import UnitService
 # get_units
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.unit_service.UnitRepository")
 def test_get_units_delegates(mock_repo):
     """Delegates to UnitRepository.get_units."""
@@ -43,14 +44,18 @@ def test_count_units_delegates(mock_repo):
 # create_unit
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.unit_service.UnitRepository")
 @patch("app.services.unit_service.LocationRepository")
 def test_create_unit_success(mock_loc_repo, mock_unit_repo):
     """Creates a unit when location exists and no duplicates."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderoll", color="Red",
-        current_location_id=1, engine_number="ENG1",
+        model="TR",
+        brand="Thunderoll",
+        color="Red",
+        current_location_id=1,
+        engine_number="ENG1",
     )
     mock_loc_repo.get_location.return_value = Location(id=1, name="Bodega")
     mock_unit_repo.get_by_engine_or_chassis.return_value = None
@@ -67,7 +72,9 @@ def test_create_unit_location_not_found(mock_loc_repo, mock_unit_repo):
     """Raises 404 when location does not exist."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderoll", color="Red",
+        model="TR",
+        brand="Thunderoll",
+        color="Red",
         current_location_id=999,
     )
     mock_loc_repo.get_location.return_value = None
@@ -83,11 +90,16 @@ def test_create_unit_duplicate_engine(mock_loc_repo, mock_unit_repo):
     """Raises 400 when engine/chassis already exists."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderoll", color="Red",
-        current_location_id=1, engine_number="ENG1",
+        model="TR",
+        brand="Thunderoll",
+        color="Red",
+        current_location_id=1,
+        engine_number="ENG1",
     )
     mock_loc_repo.get_location.return_value = Location(id=1, name="Bodega")
-    mock_unit_repo.get_by_engine_or_chassis.return_value = Unit(id=2, engine_number="ENG1")
+    mock_unit_repo.get_by_engine_or_chassis.return_value = Unit(
+        id=2, engine_number="ENG1"
+    )
 
     with pytest.raises(HTTPException) as exc:
         UnitService.create_unit(mock_db, unit_data)
@@ -97,6 +109,7 @@ def test_create_unit_duplicate_engine(mock_loc_repo, mock_unit_repo):
 # ---------------------------------------------------------------------------
 # get_unit_by_id
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.unit_service.UnitRepository")
 def test_get_unit_by_id_found(mock_repo):
@@ -124,6 +137,7 @@ def test_get_unit_by_id_not_found(mock_repo):
 # update_unit
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.unit_service.TransferService")
 @patch("app.services.unit_service.UnitRepository")
 @patch("app.services.unit_service.LocationRepository")
@@ -143,7 +157,9 @@ def test_update_unit_success(mock_loc_repo, mock_unit_repo, mock_transfer_svc):
 @patch("app.services.unit_service.TransferService")
 @patch("app.services.unit_service.UnitRepository")
 @patch("app.services.unit_service.LocationRepository")
-def test_update_unit_location_change_creates_transfer(mock_loc_repo, mock_unit_repo, mock_transfer_svc):
+def test_update_unit_location_change_creates_transfer(
+    mock_loc_repo, mock_unit_repo, mock_transfer_svc
+):
     """Changing location creates a transfer record."""
     mock_db = MagicMock()
     unit = Unit(id=1, model="TR", current_location_id=1, status=UnitStatus.AVAILABLE)
@@ -160,7 +176,9 @@ def test_update_unit_location_change_creates_transfer(mock_loc_repo, mock_unit_r
 @patch("app.services.unit_service.TransferService")
 @patch("app.services.unit_service.UnitRepository")
 @patch("app.services.unit_service.LocationRepository")
-def test_update_unit_status_to_sold_creates_transfer(mock_loc_repo, mock_unit_repo, mock_transfer_svc):
+def test_update_unit_status_to_sold_creates_transfer(
+    mock_loc_repo, mock_unit_repo, mock_transfer_svc
+):
     """Changing status to SOLD creates a RECEIVED transfer record."""
     mock_db = MagicMock()
     unit = Unit(id=1, model="TR", current_location_id=1, status=UnitStatus.AVAILABLE)
@@ -212,6 +230,7 @@ def test_update_unit_not_found(mock_repo):
 # delete_unit
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.unit_service.UnitRepository")
 def test_delete_unit_success(mock_repo):
     """Deletes a unit that is not in transit."""
@@ -251,6 +270,7 @@ def test_delete_unit_not_found(mock_repo):
 # get_stats
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.unit_service.UnitRepository")
 def test_get_stats_delegates(mock_repo):
     """Delegates to UnitRepository.get_stats."""
@@ -264,6 +284,7 @@ def test_get_stats_delegates(mock_repo):
 # ---------------------------------------------------------------------------
 # get_unit_transfers
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.unit_service.UnitRepository")
 def test_get_unit_transfers_success(mock_repo):
@@ -286,4 +307,3 @@ def test_get_unit_transfers_unit_not_found(mock_repo):
     with pytest.raises(HTTPException) as exc:
         UnitService.get_unit_transfers(mock_db, 999, skip=0, limit=10)
     assert exc.value.status_code == 404
-

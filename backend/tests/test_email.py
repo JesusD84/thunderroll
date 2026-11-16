@@ -52,7 +52,9 @@ async def test_send_password_reset_email(mock_fastmail_cls):
 
 @patch("app.services.email.FastMail")
 @patch("app.services.email.MessageSchema")
-async def test_send_password_reset_email_uses_frontend_url(mock_msg_schema, mock_fastmail_cls):
+async def test_send_password_reset_email_uses_frontend_url(
+    mock_msg_schema, mock_fastmail_cls
+):
     """Reset URL includes the frontend base URL."""
     mock_fm = AsyncMock()
     mock_fastmail_cls.return_value = mock_fm
@@ -70,7 +72,9 @@ async def test_send_password_reset_email_uses_frontend_url(mock_msg_schema, mock
 
 @patch("app.services.email.FastMail")
 @patch("app.services.email.MessageSchema")
-async def test_send_password_reset_email_plain_text_alternative(mock_msg_schema, mock_fastmail_cls):
+async def test_send_password_reset_email_plain_text_alternative(
+    mock_msg_schema, mock_fastmail_cls
+):
     """Email includes a plain text alternative body."""
     mock_fm = AsyncMock()
     mock_fastmail_cls.return_value = mock_fm

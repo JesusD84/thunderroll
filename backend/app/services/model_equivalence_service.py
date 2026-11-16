@@ -10,7 +10,6 @@ Matching is case-insensitive and whitespace-normalized so noisy supplier labels
 ("X3", "x3 ", "X3\n") resolve to the same equivalence.
 """
 
-
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -43,7 +42,9 @@ def resolve_internal_model(db: Session, manufacturer_model: str | None) -> str |
     return match.internal_model if match else None
 
 
-def get_equivalences(db: Session, skip: int = 0, limit: int = 100) -> list[ModelEquivalence]:
+def get_equivalences(
+    db: Session, skip: int = 0, limit: int = 100
+) -> list[ModelEquivalence]:
     return (
         db.query(ModelEquivalence)
         .order_by(ModelEquivalence.manufacturer_model)
@@ -54,16 +55,23 @@ def get_equivalences(db: Session, skip: int = 0, limit: int = 100) -> list[Model
 
 
 def get_equivalence(db: Session, equivalence_id: int) -> ModelEquivalence:
-    record = db.query(ModelEquivalence).filter(ModelEquivalence.id == equivalence_id).first()
+    record = (
+        db.query(ModelEquivalence).filter(ModelEquivalence.id == equivalence_id).first()
+    )
     if not record:
         raise HTTPException(status_code=404, detail="Model equivalence not found")
     return record
 
 
-def _find_by_manufacturer(db: Session, manufacturer_model: str) -> ModelEquivalence | None:
+def _find_by_manufacturer(
+    db: Session, manufacturer_model: str
+) -> ModelEquivalence | None:
     return (
         db.query(ModelEquivalence)
-        .filter(func.lower(ModelEquivalence.manufacturer_model) == manufacturer_model.lower())
+        .filter(
+            func.lower(ModelEquivalence.manufacturer_model)
+            == manufacturer_model.lower()
+        )
         .first()
     )
 
@@ -101,7 +109,9 @@ def update_equivalence(
     if payload.manufacturer_model is not None:
         manufacturer = normalize_model(payload.manufacturer_model)
         if not manufacturer:
-            raise HTTPException(status_code=400, detail="manufacturer_model cannot be blank")
+            raise HTTPException(
+                status_code=400, detail="manufacturer_model cannot be blank"
+            )
         clash = _find_by_manufacturer(db, manufacturer)
         if clash and clash.id != record.id:
             raise HTTPException(
@@ -112,7 +122,9 @@ def update_equivalence(
     if payload.internal_model is not None:
         internal = normalize_model(payload.internal_model)
         if not internal:
-            raise HTTPException(status_code=400, detail="internal_model cannot be blank")
+            raise HTTPException(
+                status_code=400, detail="internal_model cannot be blank"
+            )
         record.internal_model = internal
     if payload.notes is not None:
         record.notes = payload.notes
@@ -148,7 +160,9 @@ def list_unmapped_models(db: Session) -> list[str]:
     return sorted(unmapped)
 
 
-def upsert_equivalence(db: Session, manufacturer_model: str, internal_model: str) -> ModelEquivalence:
+def upsert_equivalence(
+    db: Session, manufacturer_model: str, internal_model: str
+) -> ModelEquivalence:
     """Create or update an equivalence by manufacturer model. Idempotent (seeding)."""
     manufacturer = normalize_model(manufacturer_model)
     internal = normalize_model(internal_model)
@@ -156,7 +170,9 @@ def upsert_equivalence(db: Session, manufacturer_model: str, internal_model: str
     if record:
         record.internal_model = internal
     else:
-        record = ModelEquivalence(manufacturer_model=manufacturer, internal_model=internal)
+        record = ModelEquivalence(
+            manufacturer_model=manufacturer, internal_model=internal
+        )
         db.add(record)
     db.commit()
     db.refresh(record)

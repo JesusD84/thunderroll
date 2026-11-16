@@ -1,4 +1,3 @@
-
 """Unit management service."""
 
 from datetime import UTC, datetime
@@ -17,7 +16,9 @@ class UnitService:
     """Service for unit operations."""
 
     @staticmethod
-    def get_units(db: Session, filters: UnitFilters, skip: int, limit: int) -> list[Unit]:
+    def get_units(
+        db: Session, filters: UnitFilters, skip: int, limit: int
+    ) -> list[Unit]:
         return UnitRepository.get_units(db, filters, skip, limit)
 
     @staticmethod
@@ -35,7 +36,7 @@ class UnitService:
         if existing:
             raise HTTPException(
                 status_code=400,
-                detail="A unit with this engine number or chassis number already exists"
+                detail="A unit with this engine number or chassis number already exists",
             )
         try:
             return UnitRepository.create_unit(db, unit_data)
@@ -50,7 +51,9 @@ class UnitService:
         return unit
 
     @staticmethod
-    def update_unit(db: Session, unit_id: int, unit_update: UnitUpdate, user_id: int) -> Unit:
+    def update_unit(
+        db: Session, unit_id: int, unit_update: UnitUpdate, user_id: int
+    ) -> Unit:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
@@ -58,8 +61,12 @@ class UnitService:
         update_data = unit_update.model_dump(exclude_unset=True)
         if "current_location_id" in update_data:
             if update_data["current_location_id"] is None:
-                raise HTTPException(status_code=422, detail="current_location_id is required")
-            if not LocationRepository.get_location(db, update_data["current_location_id"]):
+                raise HTTPException(
+                    status_code=422, detail="current_location_id is required"
+                )
+            if not LocationRepository.get_location(
+                db, update_data["current_location_id"]
+            ):
                 raise HTTPException(status_code=404, detail="Location not found")
 
         if "engine_number" in update_data or "chassis_number" in update_data:
@@ -71,7 +78,7 @@ class UnitService:
             if existing:
                 raise HTTPException(
                     status_code=400,
-                    detail="Another unit with this engine number or chassis number already exists"
+                    detail="Another unit with this engine number or chassis number already exists",
                 )
 
         old_location_id = unit.current_location_id
@@ -82,7 +89,10 @@ class UnitService:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-        if "current_location_id" in update_data and update_data["current_location_id"] != old_location_id:
+        if (
+            "current_location_id" in update_data
+            and update_data["current_location_id"] != old_location_id
+        ):
             TransferService.create_unit_transfer_record(
                 db=db,
                 unit_id=unit.id,
@@ -94,8 +104,14 @@ class UnitService:
             )
 
         if "status" in update_data and update_data["status"] != old_status:
-            transfer_status = TransferStatus.RECEIVED if update_data["status"] == UnitStatus.SOLD else TransferStatus.PENDING
-            current_location_id = update_data.get("current_location_id", old_location_id)
+            transfer_status = (
+                TransferStatus.RECEIVED
+                if update_data["status"] == UnitStatus.SOLD
+                else TransferStatus.PENDING
+            )
+            current_location_id = update_data.get(
+                "current_location_id", old_location_id
+            )
             TransferService.create_unit_transfer_record(
                 db=db,
                 unit_id=unit.id,
@@ -104,7 +120,9 @@ class UnitService:
                 destination_location_id=current_location_id,
                 status=transfer_status,
                 dispatched_at=datetime.now(UTC),
-                received_at=datetime.now(UTC) if transfer_status == TransferStatus.RECEIVED else None,
+                received_at=datetime.now(UTC)
+                if transfer_status == TransferStatus.RECEIVED
+                else None,
             )
 
         return updated_unit
@@ -118,7 +136,7 @@ class UnitService:
         if unit.status == UnitStatus.IN_TRANSIT:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot delete unit in transit. The transit should be completed first."
+                detail="Cannot delete unit in transit. The transit should be completed first.",
             )
 
         UnitRepository.delete_unit(db, unit_id)
@@ -129,14 +147,18 @@ class UnitService:
         return UnitRepository.get_stats(db)
 
     @staticmethod
-    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
+    def get_unit_transfers(
+        db: Session, unit_id: int, skip: int, limit: int
+    ) -> list[Transfer]:
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
         return UnitRepository.get_unit_transfers(db, unit_id, skip, limit)
 
     @staticmethod
-    def sell_unit(db: Session, unit_id: int, user_id: int, notes: str | None = None) -> Unit:
+    def sell_unit(
+        db: Session, unit_id: int, user_id: int, notes: str | None = None
+    ) -> Unit:
         """Mark a unit as SOLD and stamp sold_date. Location and transfers are untouched."""
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:

@@ -78,7 +78,9 @@ def db_session(setup_database) -> Generator[Session, None, None]:
 
 @pytest.fixture
 async def client(db_session) -> AsyncClient:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
 
 
@@ -135,7 +137,9 @@ def test_users(db_session: Session):
     return users
 
 
-async def _login(client: AsyncClient, username: str, password: str = "testpass123") -> dict:
+async def _login(
+    client: AsyncClient, username: str, password: str = "testpass123"
+) -> dict:
     """Log in and return the Authorization header for that session."""
     response = await client.post(
         "/api/v1/auth/login", data={"username": username, "password": password}

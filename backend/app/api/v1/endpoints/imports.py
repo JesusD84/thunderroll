@@ -1,4 +1,3 @@
-
 import json
 import os
 from datetime import UTC, datetime
@@ -77,22 +76,35 @@ def get_imports(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
-    imports = db.query(models.Import).order_by(models.Import.import_date.desc()) \
-                .offset(skip).limit(limit).all()
+    imports = (
+        db.query(models.Import)
+        .order_by(models.Import.import_date.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return imports
+
 
 @router.get("/{import_id}", response_model=schemas.Import)
 def get_import(
     import_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
-    import_record = db.query(models.Import).filter(models.Import.id == import_id).first()
+    import_record = (
+        db.query(models.Import).filter(models.Import.id == import_id).first()
+    )
     if not import_record:
         raise HTTPException(status_code=404, detail="Import record not found")
     return import_record
+
 
 @router.get("/{import_id}/errors")
 def get_import_errors(
@@ -100,11 +112,19 @@ def get_import_errors(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
-    errors = db.query(models.ImportError).filter(models.ImportError.import_id == import_id) \
-               .offset(skip).limit(limit).all()
+    errors = (
+        db.query(models.ImportError)
+        .filter(models.ImportError.import_id == import_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return errors
+
 
 @router.post("/upload")
 async def upload_inventory_file(
@@ -113,13 +133,15 @@ async def upload_inventory_file(
     product_type: str | None = Form(None),
     column_mapping: str | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
     # Validate file type
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+    if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(
             status_code=400,
-            detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported."
+            detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.",
         )
 
     # Batch metadata sent by the supplier outside the file (TR-06).
@@ -179,7 +201,7 @@ async def upload_inventory_file(
             "message": f"File processed successfully. {result['successful_imports']} units imported, {result['failed_imports']} failed.",
             "total_records": result["total_records"],
             "successful_imports": result["successful_imports"],
-            "failed_imports": result["failed_imports"]
+            "failed_imports": result["failed_imports"],
         }
 
     except Exception as e:
@@ -189,6 +211,7 @@ async def upload_inventory_file(
         raise HTTPException(
             status_code=500, detail=f"Error processing file: {str(e)}"
         ) from e
+
 
 async def process_inventory_file(
     file_path: str,
@@ -238,13 +261,19 @@ async def process_inventory_file(
 
     # At least one sheet must expose an identifier column, otherwise we cannot
     # tell units apart (e.g. a no-header file mapped only positionally).
-    if not any(("frame" in t.field_map or "motor" in t.field_map) for t in result.tables):
+    if not any(
+        ("frame" in t.field_map or "motor" in t.field_map) for t in result.tables
+    ):
         raise Exception(
             "No identifier columns found (expected a frame/chassis or motor/engine column)"
         )
 
     # Get or create default location
-    default_location = db.query(models.Location).filter(models.Location.name == "Almacén Principal").first()
+    default_location = (
+        db.query(models.Location)
+        .filter(models.Location.name == "Almacén Principal")
+        .first()
+    )
     if not default_location:
         default_location = models.Location(
             name="Almacén Principal",
@@ -280,33 +309,49 @@ async def process_inventory_file(
         # Translate the manufacturer model to the client's internal model when
         # an equivalence exists; otherwise keep the manufacturer name as-is so
         # the import never blocks (TR-05).
-        model_name = resolve_internal_model(db, manufacturer_model) or manufacturer_model
-        candidates.append({
-            "row_number": row_number,
-            "sheet": sheet_row.sheet,
-            "canonical": canonical,
-            "engine_number": motor or None,
-            "chassis_number": frame or None,
-            "model": model_name,
-            "brand": _text_or_default(canonical.get("brand"), DEFAULT_BRAND),
-            "color": normalize_color(
-                _text_or_default(canonical.get("color"), DEFAULT_COLOR)
-            ),
-        })
+        model_name = (
+            resolve_internal_model(db, manufacturer_model) or manufacturer_model
+        )
+        candidates.append(
+            {
+                "row_number": row_number,
+                "sheet": sheet_row.sheet,
+                "canonical": canonical,
+                "engine_number": motor or None,
+                "chassis_number": frame or None,
+                "model": model_name,
+                "brand": _text_or_default(canonical.get("brand"), DEFAULT_BRAND),
+                "color": normalize_color(
+                    _text_or_default(canonical.get("color"), DEFAULT_COLOR)
+                ),
+            }
+        )
 
     total_records = len(candidates)
 
     # --- Duplicate detection: one query for existing identifiers in the DB. ---
     engine_values = [c["engine_number"] for c in candidates if c["engine_number"]]
     chassis_values = [c["chassis_number"] for c in candidates if c["chassis_number"]]
-    existing_engines = {
-        e for (e,) in db.query(models.Unit.engine_number)
-        .filter(models.Unit.engine_number.in_(engine_values)).all()
-    } if engine_values else set()
-    existing_chassis = {
-        c for (c,) in db.query(models.Unit.chassis_number)
-        .filter(models.Unit.chassis_number.in_(chassis_values)).all()
-    } if chassis_values else set()
+    existing_engines = (
+        {
+            e
+            for (e,) in db.query(models.Unit.engine_number)
+            .filter(models.Unit.engine_number.in_(engine_values))
+            .all()
+        }
+        if engine_values
+        else set()
+    )
+    existing_chassis = (
+        {
+            c
+            for (c,) in db.query(models.Unit.chassis_number)
+            .filter(models.Unit.chassis_number.in_(chassis_values))
+            .all()
+        }
+        if chassis_values
+        else set()
+    )
 
     # --- Pass 2: validate each candidate and build the batch. ----------------
     seen_engines: set = set()
@@ -331,12 +376,14 @@ async def process_inventory_file(
 
         if dup_message:
             sheet_label = f"[{c['sheet']}] " if c["sheet"] else ""
-            error_records.append(models.ImportError(
-                import_id=import_id,
-                row_number=c["row_number"],
-                error_message=f"{sheet_label}{dup_message}",
-                raw_data=json.dumps(c["canonical"], default=str),
-            ))
+            error_records.append(
+                models.ImportError(
+                    import_id=import_id,
+                    row_number=c["row_number"],
+                    error_message=f"{sheet_label}{dup_message}",
+                    raw_data=json.dumps(c["canonical"], default=str),
+                )
+            )
             continue
 
         if engine_number is not None:
@@ -344,17 +391,19 @@ async def process_inventory_file(
         if chassis_number is not None:
             seen_chassis.add(chassis_number)
 
-        units.append(models.Unit(
-            engine_number=engine_number,
-            chassis_number=chassis_number,
-            model=c["model"],
-            brand=c["brand"],
-            color=c["color"],
-            batch_period=batch_period,
-            product_type=product_type,
-            current_location_id=default_location.id,
-            status=UnitStatus.AVAILABLE,
-        ))
+        units.append(
+            models.Unit(
+                engine_number=engine_number,
+                chassis_number=chassis_number,
+                model=c["model"],
+                brand=c["brand"],
+                color=c["color"],
+                batch_period=batch_period,
+                product_type=product_type,
+                current_location_id=default_location.id,
+                status=UnitStatus.AVAILABLE,
+            )
+        )
 
     # --- Persist the whole batch in a single transaction. --------------------
     # Valid units and their inbound transfers are inserted together; per-row
@@ -364,17 +413,19 @@ async def process_inventory_file(
         db.add_all(units)
         db.flush()  # assign unit IDs without ending the transaction
         now = datetime.now(UTC)
-        db.add_all([
-            models.Transfer(
-                unit_id=unit.id,
-                dispatched_by_id=dispatched_by_id,
-                destination_location_id=default_location.id,
-                status=TransferStatus.RECEIVED,
-                dispatched_at=now,
-                received_at=now,
-            )
-            for unit in units
-        ])
+        db.add_all(
+            [
+                models.Transfer(
+                    unit_id=unit.id,
+                    dispatched_by_id=dispatched_by_id,
+                    destination_location_id=default_location.id,
+                    status=TransferStatus.RECEIVED,
+                    dispatched_at=now,
+                    received_at=now,
+                )
+                for unit in units
+            ]
+        )
         db.add_all(error_records)
         db.commit()
     except Exception:
@@ -387,6 +438,7 @@ async def process_inventory_file(
         "failed_imports": len(error_records),
     }
 
+
 # Cap how many invalid rows the preview reports so a wholly-broken file does
 # not produce an unbounded payload.
 _MAX_INVALID_PREVIEW_ROWS = 100
@@ -396,7 +448,9 @@ _MAX_INVALID_PREVIEW_ROWS = 100
 async def preview_inventory_file(
     file: UploadFile = File(...),
     column_mapping: str | None = Form(None),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
     """Preview an uploaded file for assisted mapping, without persisting anything.
 
@@ -406,10 +460,10 @@ async def preview_inventory_file(
     importing. An optional ``column_mapping`` (same JSON shape as ``/upload``)
     is applied so the user can preview the effect of a manual mapping (TR-07).
     """
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+    if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(
             status_code=400,
-            detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported."
+            detail="Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.",
         )
 
     manual_mapping = _parse_column_mapping(column_mapping)
@@ -431,15 +485,19 @@ async def preview_inventory_file(
     for table in result.tables:
         detected_fields.update(table.field_map.keys())
         field_by_column = {col: fld for fld, col in table.field_map.items()}
-        sheets.append({
-            "sheet": table.sheet,
-            "has_header": table.has_header,
-            "columns": table.columns,
-            # Proposed mapping in both directions for convenience.
-            "column_mapping": {col: field_by_column.get(col) for col in table.columns},
-            "mapped_fields": table.field_map,
-            "rows": len(table.rows),
-        })
+        sheets.append(
+            {
+                "sheet": table.sheet,
+                "has_header": table.has_header,
+                "columns": table.columns,
+                # Proposed mapping in both directions for convenience.
+                "column_mapping": {
+                    col: field_by_column.get(col) for col in table.columns
+                },
+                "mapped_fields": table.field_map,
+                "rows": len(table.rows),
+            }
+        )
 
     # Single pass over every row: build the bounded preview and flag invalid rows.
     preview_data: list[dict] = []
@@ -463,12 +521,14 @@ async def preview_inventory_file(
         if reasons:
             invalid_count += 1
             if len(invalid_rows) < _MAX_INVALID_PREVIEW_ROWS:
-                invalid_rows.append({
-                    "sheet": sheet_row.sheet,
-                    "row": index,
-                    "reasons": reasons,
-                    "data": {k: str(v) for k, v in canonical.items()},
-                })
+                invalid_rows.append(
+                    {
+                        "sheet": sheet_row.sheet,
+                        "row": index,
+                        "reasons": reasons,
+                        "data": {k: str(v) for k, v in canonical.items()},
+                    }
+                )
             continue
 
         if len(preview_data) < 10:
@@ -496,18 +556,23 @@ async def preview_inventory_file(
         },
     }
 
+
 @router.delete("/{import_id}")
 def delete_import(
     import_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN])),
 ):
-    import_record = db.query(models.Import).filter(models.Import.id == import_id).first()
+    import_record = (
+        db.query(models.Import).filter(models.Import.id == import_id).first()
+    )
     if not import_record:
         raise HTTPException(status_code=404, detail="Import record not found")
 
     # Delete associated errors
-    db.query(models.ImportError).filter(models.ImportError.import_id == import_id).delete()
+    db.query(models.ImportError).filter(
+        models.ImportError.import_id == import_id
+    ).delete()
 
     # Delete file if exists
     if os.path.exists(import_record.filename):

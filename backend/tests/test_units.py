@@ -21,7 +21,9 @@ async def test_get_units_unauthorized(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_unit(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_create_unit(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Admin can create a unit."""
     unit_data = {
         "model": "TR-2025",
@@ -38,7 +40,9 @@ async def test_create_unit(client: AsyncClient, auth_headers, test_users, test_l
 
 
 @pytest.mark.asyncio
-async def test_create_unit_duplicate_engine(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_create_unit_duplicate_engine(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Creating a unit with duplicate engine returns 400."""
     unit_data = {
         "model": "TR",
@@ -53,7 +57,9 @@ async def test_create_unit_duplicate_engine(client: AsyncClient, auth_headers, t
 
 
 @pytest.mark.asyncio
-async def test_get_unit_by_id(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_get_unit_by_id(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Can fetch a unit by ID."""
     unit_data = {
         "model": "TR-Get",
@@ -62,7 +68,9 @@ async def test_get_unit_by_id(client: AsyncClient, auth_headers, test_users, tes
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-GET-001",
     }
-    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    create_resp = await client.post(
+        "/api/v1/units/", json=unit_data, headers=auth_headers
+    )
     unit_id = create_resp.json()["id"]
 
     response = await client.get(f"/api/v1/units/{unit_id}", headers=auth_headers)
@@ -71,14 +79,18 @@ async def test_get_unit_by_id(client: AsyncClient, auth_headers, test_users, tes
 
 
 @pytest.mark.asyncio
-async def test_get_unit_not_found(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_get_unit_not_found(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Returns 404 for non-existent unit."""
     response = await client.get("/api/v1/units/9999", headers=auth_headers)
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_update_unit(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_update_unit(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Can update a unit's fields."""
     unit_data = {
         "model": "TR-Update",
@@ -87,17 +99,23 @@ async def test_update_unit(client: AsyncClient, auth_headers, test_users, test_l
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-UPDATE-001",
     }
-    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    create_resp = await client.post(
+        "/api/v1/units/", json=unit_data, headers=auth_headers
+    )
     unit_id = create_resp.json()["id"]
 
     update_data = {"model": "TR-Updated"}
-    response = await client.put(f"/api/v1/units/{unit_id}", json=update_data, headers=auth_headers)
+    response = await client.put(
+        f"/api/v1/units/{unit_id}", json=update_data, headers=auth_headers
+    )
     assert response.status_code == 200
     assert response.json()["model"] == "TR-UPDATED"
 
 
 @pytest.mark.asyncio
-async def test_delete_unit(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_delete_unit(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Admin can delete a unit."""
     unit_data = {
         "model": "TR-Delete",
@@ -106,7 +124,9 @@ async def test_delete_unit(client: AsyncClient, auth_headers, test_users, test_l
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-DEL-001",
     }
-    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    create_resp = await client.post(
+        "/api/v1/units/", json=unit_data, headers=auth_headers
+    )
     unit_id = create_resp.json()["id"]
 
     response = await client.delete(f"/api/v1/units/{unit_id}", headers=auth_headers)
@@ -118,7 +138,9 @@ async def test_delete_unit(client: AsyncClient, auth_headers, test_users, test_l
 
 
 @pytest.mark.asyncio
-async def test_get_unit_stats(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_get_unit_stats(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Can fetch unit statistics."""
     response = await client.get("/api/v1/units/stats", headers=auth_headers)
     assert response.status_code == 200
@@ -127,7 +149,9 @@ async def test_get_unit_stats(client: AsyncClient, auth_headers, test_users, tes
 
 
 @pytest.mark.asyncio
-async def test_get_unit_transfers(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_get_unit_transfers(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Can fetch transfers for a unit."""
     unit_data = {
         "model": "TR-Transfers",
@@ -136,10 +160,14 @@ async def test_get_unit_transfers(client: AsyncClient, auth_headers, test_users,
         "current_location_id": test_locations[0].id,
         "engine_number": "ENG-TRANS-001",
     }
-    create_resp = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
+    create_resp = await client.post(
+        "/api/v1/units/", json=unit_data, headers=auth_headers
+    )
     unit_id = create_resp.json()["id"]
 
-    response = await client.get(f"/api/v1/units/{unit_id}/transfers", headers=auth_headers)
+    response = await client.get(
+        f"/api/v1/units/{unit_id}/transfers", headers=auth_headers
+    )
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -163,7 +191,9 @@ async def test_sell_unit_marks_sold_without_transfer(
     unit_id = create_resp.json()["id"]
 
     resp = await client.post(
-        f"/api/v1/units/{unit_id}/sell", json={"notes": "Cliente frecuente"}, headers=auth_headers
+        f"/api/v1/units/{unit_id}/sell",
+        json={"notes": "Cliente frecuente"},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -196,9 +226,13 @@ async def test_sell_unit_twice_returns_400(
         headers=auth_headers,
     )
     unit_id = create_resp.json()["id"]
-    first = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    first = await client.post(
+        f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers
+    )
     assert first.status_code == 200
-    second = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    second = await client.post(
+        f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers
+    )
     assert second.status_code == 400
 
 
@@ -225,7 +259,9 @@ async def test_sold_units_hidden_from_default_list(
         headers=auth_headers,
     )
     unit_id = create_resp.json()["id"]
-    sell_resp = await client.post(f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers)
+    sell_resp = await client.post(
+        f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers
+    )
     assert sell_resp.status_code == 200
 
     default_resp = await client.get("/api/v1/units/", headers=auth_headers)
@@ -233,7 +269,9 @@ async def test_sold_units_hidden_from_default_list(
     assert unit_id not in [u["id"] for u in default_resp.json()]
     assert all(u["status"] != "SOLD" for u in default_resp.json())
 
-    sold_resp = await client.get("/api/v1/units/", params={"status": "SOLD"}, headers=auth_headers)
+    sold_resp = await client.get(
+        "/api/v1/units/", params={"status": "SOLD"}, headers=auth_headers
+    )
     assert sold_resp.status_code == 200
     assert unit_id in [u["id"] for u in sold_resp.json()]
     assert int(sold_resp.headers["X-Total-Count"]) >= 1

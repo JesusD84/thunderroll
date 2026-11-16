@@ -7,6 +7,7 @@ from httpx import AsyncClient
 # Auth edge cases
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_login_wrong_password(client: AsyncClient, test_users):
     """Login with wrong password returns 401."""
@@ -43,8 +44,11 @@ async def test_malformed_token(client: AsyncClient):
 # Unit creation edge cases
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_create_unit_missing_required_fields(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_create_unit_missing_required_fields(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Creating unit without required fields returns 422."""
     unit_data = {"brand": "Thunderoll"}
     response = await client.post("/api/v1/units/", json=unit_data, headers=auth_headers)
@@ -52,7 +56,9 @@ async def test_create_unit_missing_required_fields(client: AsyncClient, auth_hea
 
 
 @pytest.mark.asyncio
-async def test_create_unit_invalid_location(client: AsyncClient, auth_headers, test_users):
+async def test_create_unit_invalid_location(
+    client: AsyncClient, auth_headers, test_users
+):
     """Creating unit with non-existent location returns 404."""
     unit_data = {
         "model": "TR",
@@ -69,20 +75,26 @@ async def test_create_unit_invalid_location(client: AsyncClient, auth_headers, t
 # Transfer edge cases
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_transfer_nonexistent_unit(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_transfer_nonexistent_unit(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Transferring non-existent unit returns 404."""
     transfer_data = {
         "unit_id": 9999,
         "destination_location_id": test_locations[1].id,
     }
-    response = await client.post("/api/v1/transfers/", json=transfer_data, headers=auth_headers)
+    response = await client.post(
+        "/api/v1/transfers/", json=transfer_data, headers=auth_headers
+    )
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
 # Security edge cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_sql_injection_attempt(client: AsyncClient, auth_headers):
@@ -96,6 +108,7 @@ async def test_sql_injection_attempt(client: AsyncClient, auth_headers):
 # ---------------------------------------------------------------------------
 # Pagination edge cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pagination_negative_skip(client: AsyncClient, auth_headers):

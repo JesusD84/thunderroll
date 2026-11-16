@@ -7,9 +7,10 @@ from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
 
 
 class TransferRepository:
-
     @staticmethod
-    def get_transfers(db: Session, filters: TransferFilters, skip: int, limit: int) -> list[Transfer]:
+    def get_transfers(
+        db: Session, filters: TransferFilters, skip: int, limit: int
+    ) -> list[Transfer]:
         query = db.query(Transfer).options(selectinload(Transfer.dispatched_by))
 
         if filters.unit_id:
@@ -17,9 +18,13 @@ class TransferRepository:
         if filters.status:
             query = query.filter(Transfer.status == filters.status)
         if filters.origin_location_id:
-            query = query.filter(Transfer.origin_location_id == filters.origin_location_id)
+            query = query.filter(
+                Transfer.origin_location_id == filters.origin_location_id
+            )
         if filters.destination_location_id:
-            query = query.filter(Transfer.destination_location_id == filters.destination_location_id)
+            query = query.filter(
+                Transfer.destination_location_id == filters.destination_location_id
+            )
         if filters.dispatched_by_id:
             query = query.filter(Transfer.dispatched_by_id == filters.dispatched_by_id)
         if filters.received_by_id:
@@ -48,7 +53,9 @@ class TransferRepository:
         return db_transfer
 
     @staticmethod
-    def update_transfer(db: Session, db_transfer: Transfer, transfer_update: TransferUpdate) -> Transfer:
+    def update_transfer(
+        db: Session, db_transfer: Transfer, transfer_update: TransferUpdate
+    ) -> Transfer:
         update_data = transfer_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_transfer, field, value)
@@ -71,7 +78,12 @@ class TransferRepository:
 
     @staticmethod
     def get_recent_transfers(db: Session, limit: int = 10) -> list[Transfer]:
-        return db.query(Transfer).order_by(Transfer.dispatched_at.desc()).limit(limit).all()
+        return (
+            db.query(Transfer)
+            .order_by(Transfer.dispatched_at.desc())
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def create_unit_transfer(
@@ -110,7 +122,9 @@ class TransferRepository:
             )
             .filter(
                 Transfer.unit_id == unit_id,
-                Transfer.status.in_([TransferStatus.PENDING, TransferStatus.IN_TRANSIT]),
+                Transfer.status.in_(
+                    [TransferStatus.PENDING, TransferStatus.IN_TRANSIT]
+                ),
             )
             .order_by(Transfer.dispatched_at.desc())
             .first()

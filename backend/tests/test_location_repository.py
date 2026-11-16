@@ -10,6 +10,7 @@ from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 # get_locations
 # ---------------------------------------------------------------------------
 
+
 def test_get_locations_no_filters():
     """Returns paginated locations without filters."""
     mock_db = MagicMock()
@@ -34,6 +35,7 @@ def test_get_locations_with_name_filter():
 # get_location
 # ---------------------------------------------------------------------------
 
+
 def test_get_location_found():
     """Returns location when ID exists."""
     mock_db = MagicMock()
@@ -57,6 +59,7 @@ def test_get_location_not_found():
 # create_location
 # ---------------------------------------------------------------------------
 
+
 def test_create_location_success():
     """Creates a location and commits."""
     mock_db = MagicMock()
@@ -73,6 +76,7 @@ def test_create_location_success():
 # ---------------------------------------------------------------------------
 # update_location
 # ---------------------------------------------------------------------------
+
 
 def test_update_location_changes_fields():
     """Updates only provided fields."""
@@ -103,6 +107,7 @@ def test_update_location_no_fields():
 # delete_location
 # ---------------------------------------------------------------------------
 
+
 def test_delete_location_success():
     """Deletes the location and commits."""
     mock_db = MagicMock()
@@ -117,6 +122,7 @@ def test_delete_location_success():
 # ---------------------------------------------------------------------------
 # count_units_at_location
 # ---------------------------------------------------------------------------
+
 
 def test_count_units_at_location_zero():
     """Returns 0 when no units at location."""

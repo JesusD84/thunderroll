@@ -11,7 +11,6 @@ PROTECTED_FIELDS = frozenset({"id", "hashed_password"})
 
 
 class UserRepository:
-
     @staticmethod
     def get_user_by_id(db: Session, user_id: int) -> User | None:
         return db.query(User).filter(User.id == user_id).first()
@@ -32,7 +31,7 @@ class UserRepository:
             first_name=user_data.first_name,
             last_name=user_data.last_name,
             role=user_data.role,
-            hashed_password=hashed_password
+            hashed_password=hashed_password,
         )
         db.add(db_user)
         db.commit()

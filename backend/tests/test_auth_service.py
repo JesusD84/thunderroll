@@ -28,9 +28,11 @@ from app.services.auth_service import (
 # verify_password
 # ---------------------------------------------------------------------------
 
+
 def test_verify_password_correct():
     """verify_password returns True for correct password."""
     from passlib.context import CryptContext
+
     ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = ctx.hash("mypassword")
     assert verify_password("mypassword", hashed) is True
@@ -39,6 +41,7 @@ def test_verify_password_correct():
 def test_verify_password_incorrect():
     """verify_password returns False for wrong password."""
     from passlib.context import CryptContext
+
     ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = ctx.hash("mypassword")
     assert verify_password("wrongpassword", hashed) is False
@@ -47,6 +50,7 @@ def test_verify_password_incorrect():
 # ---------------------------------------------------------------------------
 # get_password_hash
 # ---------------------------------------------------------------------------
+
 
 def test_get_password_hash_returns_different_string():
     """get_password_hash returns a string different from the input."""
@@ -64,6 +68,7 @@ def test_get_password_hash_is_verifiable():
 # ---------------------------------------------------------------------------
 # create_access_token
 # ---------------------------------------------------------------------------
+
 
 def test_create_access_token_contains_sub():
     """Token encodes the 'sub' claim."""
@@ -86,7 +91,9 @@ def test_create_access_token_default_expiry():
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     after = datetime.now(UTC)
     expected_min = before + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    expected_max = after + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES) + timedelta(seconds=5)
+    expected_max = (
+        after + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES) + timedelta(seconds=5)
+    )
     exp = datetime.fromtimestamp(payload["exp"], tz=UTC)
     assert expected_min - timedelta(seconds=5) <= exp <= expected_max
 
@@ -104,6 +111,7 @@ def test_create_access_token_custom_expiry():
 # ---------------------------------------------------------------------------
 # get_user_by_username
 # ---------------------------------------------------------------------------
+
 
 def test_get_user_by_username_found():
     """Returns user when username exists."""
@@ -128,6 +136,7 @@ def test_get_user_by_username_not_found():
 # get_user_by_email
 # ---------------------------------------------------------------------------
 
+
 def test_get_user_by_email_found():
     """Returns user when email exists."""
     mock_db = MagicMock()
@@ -151,10 +160,12 @@ def test_get_user_by_email_not_found():
 # authenticate_user
 # ---------------------------------------------------------------------------
 
+
 def test_authenticate_user_success_by_username():
     """Authenticates with correct username + password."""
     mock_db = MagicMock()
     from passlib.context import CryptContext
+
     ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = ctx.hash("testpass123")
     mock_user = User(username="admin", email="admin@test.com", hashed_password=hashed)
@@ -169,13 +180,12 @@ def test_authenticate_user_success_by_email():
     """Authenticates when username is actually an email."""
     mock_db = MagicMock()
     from passlib.context import CryptContext
+
     ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = ctx.hash("testpass123")
     mock_user = User(username="admin", email="admin@test.com", hashed_password=hashed)
 
-    mock_db.query.return_value.filter.return_value.first.side_effect = [
-        None, mock_user
-    ]
+    mock_db.query.return_value.filter.return_value.first.side_effect = [None, mock_user]
 
     result = authenticate_user(mock_db, "admin@test.com", "testpass123")
     assert result is mock_user
@@ -185,6 +195,7 @@ def test_authenticate_user_wrong_password():
     """Returns False when password is incorrect."""
     mock_db = MagicMock()
     from passlib.context import CryptContext
+
     ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = ctx.hash("testpass123")
     mock_user = User(username="admin", email="admin@test.com", hashed_password=hashed)
@@ -208,6 +219,7 @@ def test_authenticate_user_not_found():
 # create_password_reset_token
 # ---------------------------------------------------------------------------
 
+
 def test_create_password_reset_token():
     """Creates a valid reset token with correct claims."""
     token = create_password_reset_token("admin@test.com")
@@ -220,6 +232,7 @@ def test_create_password_reset_token():
 # ---------------------------------------------------------------------------
 # verify_password_reset_token
 # ---------------------------------------------------------------------------
+
 
 def test_verify_password_reset_token_valid():
     """Returns email for a valid reset token."""
@@ -257,6 +270,7 @@ def test_verify_password_reset_token_invalid():
 # get_current_active_user
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_current_active_user_active():
     """Returns user when is_active is True."""
@@ -281,6 +295,7 @@ async def test_get_current_active_user_inactive():
 # ---------------------------------------------------------------------------
 # require_role
 # ---------------------------------------------------------------------------
+
 
 def test_require_role_allowed():
     """Returns user when role is in allowed list."""

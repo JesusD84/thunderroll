@@ -1,4 +1,3 @@
-
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -45,11 +44,14 @@ PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = 15
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password):
     return Security.get_password_hash(password)
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -61,11 +63,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
 def get_user_by_username(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
 
+
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
+
 
 def authenticate_user(db: Session, username: str, password: str):
     user = get_user_by_username(db, username)
@@ -83,7 +88,10 @@ def authenticate_user(db: Session, username: str, password: str):
         return False
     return user
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -103,6 +111,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return user
 
+
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     if current_user.is_active is False:
         # 401 (not 400): the frontend only runs the sign-out flow on 401, so a
@@ -115,12 +124,12 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         )
     return current_user
 
+
 def require_role(required_roles: list):
     def role_checker(current_user: User = Depends(get_current_active_user)):
         if current_user.role not in required_roles:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
             )
         return current_user
 
@@ -129,10 +138,12 @@ def require_role(required_roles: list):
     role_checker.required_roles = tuple(required_roles)
     return role_checker
 
+
 def create_password_reset_token(email: str) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
     to_encode = {"sub": email, "type": "password_reset", "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def verify_password_reset_token(token: str) -> str:
     try:

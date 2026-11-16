@@ -18,6 +18,7 @@ from app.services.transfer_service import TransferService
 # get_transfers
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.transfer_service.TransferRepository")
 def test_get_transfers_delegates(mock_repo):
     """Delegates to TransferRepository.get_transfers."""
@@ -32,6 +33,7 @@ def test_get_transfers_delegates(mock_repo):
 # ---------------------------------------------------------------------------
 # get_transfer_by_id
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.transfer_service.TransferRepository")
 def test_get_transfer_by_id_found(mock_repo):
@@ -58,6 +60,7 @@ def test_get_transfer_by_id_not_found(mock_repo):
 # ---------------------------------------------------------------------------
 # create_transfer
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.transfer_service.TransferRepository")
 @patch("app.services.transfer_service.UnitRepository")
@@ -94,7 +97,9 @@ def test_create_transfer_unit_not_found(mock_loc, mock_user, mock_unit, mock_tra
 @patch("app.services.transfer_service.UnitRepository")
 @patch("app.services.transfer_service.UserRepository")
 @patch("app.services.transfer_service.LocationRepository")
-def test_create_transfer_defaults_dispatched_at(mock_loc, mock_user, mock_unit, mock_transfer):
+def test_create_transfer_defaults_dispatched_at(
+    mock_loc, mock_user, mock_unit, mock_transfer
+):
     """Regression: dispatched_at must be populated even when not provided
     by the caller, so 'Fecha' never renders empty in the frontend grid.
     """
@@ -114,7 +119,9 @@ def test_create_transfer_defaults_dispatched_at(mock_loc, mock_user, mock_unit, 
 @patch("app.services.transfer_service.UnitRepository")
 @patch("app.services.transfer_service.UserRepository")
 @patch("app.services.transfer_service.LocationRepository")
-def test_create_transfer_same_origin_destination(mock_loc, mock_user, mock_unit, mock_transfer):
+def test_create_transfer_same_origin_destination(
+    mock_loc, mock_user, mock_unit, mock_transfer
+):
     """Raises 400 when origin and destination are the same."""
     mock_db = MagicMock()
     transfer_data = TransferCreate(
@@ -131,6 +138,7 @@ def test_create_transfer_same_origin_destination(mock_loc, mock_user, mock_unit,
 # ---------------------------------------------------------------------------
 # update_transfer
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.transfer_service.TransferRepository")
 @patch("app.services.transfer_service.UnitRepository")
@@ -164,6 +172,7 @@ def test_update_transfer_not_found(mock_repo):
 # delete_transfer
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.transfer_service.TransferRepository")
 def test_delete_transfer_success(mock_repo):
     """Deletes a transfer successfully."""
@@ -190,6 +199,7 @@ def test_delete_transfer_not_found(mock_repo):
 # get_transfer_stats
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.transfer_service.TransferRepository")
 def test_get_transfer_stats(mock_repo):
     """Returns transfer statistics."""
@@ -211,6 +221,7 @@ def test_get_transfer_stats(mock_repo):
 # create_unit_transfer_record
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.transfer_service.TransferRepository")
 def test_create_unit_transfer_record(mock_repo):
     """Delegates to TransferRepository.create_unit_transfer."""
@@ -219,7 +230,10 @@ def test_create_unit_transfer_record(mock_repo):
     mock_repo.create_unit_transfer.return_value = mock_transfer
 
     result = TransferService.create_unit_transfer_record(
-        mock_db, unit_id=1, user_id=2, status=TransferStatus.PENDING,
+        mock_db,
+        unit_id=1,
+        user_id=2,
+        status=TransferStatus.PENDING,
     )
     assert result is mock_transfer
 
@@ -231,6 +245,7 @@ def test_create_unit_transfer_record(mock_repo):
 # It used to be fed the wrong request schema (see git history) and had zero
 # coverage, which is exactly how that bug went unnoticed.
 
+
 @patch("app.services.transfer_service.TransferRepository")
 @patch("app.services.transfer_service.UnitRepository")
 def test_transfer_unit_not_found(mock_unit, mock_transfer):
@@ -240,7 +255,10 @@ def test_transfer_unit_not_found(mock_unit, mock_transfer):
 
     with pytest.raises(HTTPException) as exc:
         TransferService.transfer_unit_with_status_update(
-            mock_db, 999, UnitTransferRequest(to_location_id=2), user_id=1,
+            mock_db,
+            999,
+            UnitTransferRequest(to_location_id=2),
+            user_id=1,
         )
     assert exc.value.status_code == 404
 
@@ -254,7 +272,10 @@ def test_transfer_unit_with_destination_sets_in_transit(mock_unit, mock_transfer
     mock_unit.get_unit.return_value = unit
 
     TransferService.transfer_unit_with_status_update(
-        mock_db, 1, UnitTransferRequest(to_location_id=2), user_id=1,
+        mock_db,
+        1,
+        UnitTransferRequest(to_location_id=2),
+        user_id=1,
     )
 
     assert unit.status == UnitStatus.IN_TRANSIT
@@ -273,7 +294,10 @@ def test_transfer_unit_without_destination_sells_it(mock_unit, mock_transfer):
     mock_unit.get_unit.return_value = unit
 
     TransferService.transfer_unit_with_status_update(
-        mock_db, 1, UnitTransferRequest(from_location_id=1), user_id=1,
+        mock_db,
+        1,
+        UnitTransferRequest(from_location_id=1),
+        user_id=1,
     )
 
     assert unit.status == UnitStatus.SOLD
@@ -292,7 +316,10 @@ def test_transfer_unit_same_origin_destination(mock_unit, mock_transfer):
 
     with pytest.raises(HTTPException) as exc:
         TransferService.transfer_unit_with_status_update(
-            mock_db, 1, UnitTransferRequest(from_location_id=1, to_location_id=1), user_id=1,
+            mock_db,
+            1,
+            UnitTransferRequest(from_location_id=1, to_location_id=1),
+            user_id=1,
         )
     assert exc.value.status_code == 400
 
@@ -300,6 +327,7 @@ def test_transfer_unit_same_origin_destination(mock_unit, mock_transfer):
 # ---------------------------------------------------------------------------
 # get_active_transfer_for_unit
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.transfer_service.TransferRepository")
 @patch("app.services.transfer_service.UnitRepository")

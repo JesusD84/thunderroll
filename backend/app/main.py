@@ -1,4 +1,3 @@
-
 import os
 from contextlib import asynccontextmanager
 
@@ -23,11 +22,12 @@ async def lifespan(app: FastAPI):
     # Shutdown
     pass
 
+
 app = FastAPI(
     title="Thunderoll Inventory API",
     description="API for Thunderoll inventory management system",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS middleware

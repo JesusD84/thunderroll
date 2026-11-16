@@ -5,9 +5,10 @@ from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 
 
 class LocationRepository:
-
     @staticmethod
-    def get_locations(db: Session, filters: LocationFilters, skip: int, limit: int) -> list[Location]:
+    def get_locations(
+        db: Session, filters: LocationFilters, skip: int, limit: int
+    ) -> list[Location]:
         query = db.query(Location)
 
         if filters.name:
@@ -28,7 +29,9 @@ class LocationRepository:
         return db_location
 
     @staticmethod
-    def update_location(db: Session, db_location: Location, location_update: LocationUpdate) -> Location:
+    def update_location(
+        db: Session, db_location: Location, location_update: LocationUpdate
+    ) -> Location:
         update_data = location_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(db_location, field, value)

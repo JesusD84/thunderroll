@@ -10,10 +10,7 @@ from app.models.models import User, UserRole
 @pytest.mark.asyncio
 async def test_login_success(client: AsyncClient, test_users, test_locations):
     """Test successful login."""
-    login_data = {
-        "username": "admin",
-        "password": "testpass123"
-    }
+    login_data = {"username": "admin", "password": "testpass123"}
 
     response = await client.post("/api/v1/auth/login", data=login_data)
     assert response.status_code == 200
@@ -24,12 +21,11 @@ async def test_login_success(client: AsyncClient, test_users, test_locations):
 
 
 @pytest.mark.asyncio
-async def test_login_invalid_credentials(client: AsyncClient, test_users, test_locations):
+async def test_login_invalid_credentials(
+    client: AsyncClient, test_users, test_locations
+):
     """Test login with invalid credentials."""
-    login_data = {
-        "username": "admin@test.com",
-        "password": "wrongpassword"
-    }
+    login_data = {"username": "admin@test.com", "password": "wrongpassword"}
 
     response = await client.post("/api/v1/auth/login", data=login_data)
     assert response.status_code == 401
@@ -62,7 +58,9 @@ async def test_login_inactive_user(client: AsyncClient, db_session, test_locatio
 
 
 @pytest.mark.asyncio
-async def test_get_current_user(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_get_current_user(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Test get current user endpoint."""
     response = await client.get("/api/v1/user/me", headers=auth_headers)
     assert response.status_code == 200
@@ -82,6 +80,7 @@ async def test_get_current_user_unauthorized(client: AsyncClient):
 # ---------------------------------------------------------------------------
 # forgot-password: el fallo de SMTP debe ser visible
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_forgot_password_reports_smtp_failure(client, test_users, test_locations):
@@ -104,7 +103,9 @@ async def test_forgot_password_reports_smtp_failure(client, test_users, test_loc
 
 
 @pytest.mark.asyncio
-async def test_forgot_password_succeeds_when_email_is_sent(client, test_users, test_locations):
+async def test_forgot_password_succeeds_when_email_is_sent(
+    client, test_users, test_locations
+):
     """When the email goes out, the endpoint answers 200 as before."""
     from unittest.mock import AsyncMock, patch
 
@@ -121,7 +122,9 @@ async def test_forgot_password_succeeds_when_email_is_sent(client, test_users, t
 
 
 @pytest.mark.asyncio
-async def test_forgot_password_does_not_leak_user_existence(client, test_users, test_locations):
+async def test_forgot_password_does_not_leak_user_existence(
+    client, test_users, test_locations
+):
     """An unknown email still answers 200: no account enumeration."""
     response = await client.post(
         "/api/v1/auth/forgot-password", json={"email": "nadie-aqui@test.com"}

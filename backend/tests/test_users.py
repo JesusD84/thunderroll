@@ -9,7 +9,9 @@ from tests.conftest import TestingSessionLocal
 
 
 @pytest.mark.asyncio
-async def test_list_users_as_admin(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_list_users_as_admin(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Admin can list all users."""
     response = await client.get("/api/v1/user/", headers=auth_headers)
     assert response.status_code == 200
@@ -19,7 +21,9 @@ async def test_list_users_as_admin(client: AsyncClient, auth_headers, test_users
 
 
 @pytest.mark.asyncio
-async def test_list_users_requires_admin_or_manager(client: AsyncClient, test_users, test_locations):
+async def test_list_users_requires_admin_or_manager(
+    client: AsyncClient, test_users, test_locations
+):
     """Operator cannot list users."""
     login_data = {"username": "inventario", "password": "testpass123"}
     login_resp = await client.post("/api/v1/auth/login", data=login_data)
@@ -66,7 +70,9 @@ async def test_create_user_as_admin(client: AsyncClient, auth_headers, test_loca
 
 
 @pytest.mark.asyncio
-async def test_create_user_as_manager_limited_to_operator(client: AsyncClient, test_users, test_locations):
+async def test_create_user_as_manager_limited_to_operator(
+    client: AsyncClient, test_users, test_locations
+):
     """Manager can create an Operator account but not a Manager/Admin one."""
     manager = User(
         first_name="Test",
@@ -117,7 +123,9 @@ async def test_create_user_as_manager_limited_to_operator(client: AsyncClient, t
 
 
 @pytest.mark.asyncio
-async def test_create_user_duplicate_email(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_create_user_duplicate_email(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Creating a user with an existing email returns 400."""
     user_data = {
         "email": "admin@test.com",
@@ -133,7 +141,9 @@ async def test_create_user_duplicate_email(client: AsyncClient, auth_headers, te
 
 
 @pytest.mark.asyncio
-async def test_create_user_duplicate_username(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_create_user_duplicate_username(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Creating a user with an existing username returns 400."""
     user_data = {
         "email": "unique@test.com",
@@ -149,7 +159,9 @@ async def test_create_user_duplicate_username(client: AsyncClient, auth_headers,
 
 
 @pytest.mark.asyncio
-async def test_read_users_me(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_read_users_me(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Authenticated user can read their own profile."""
     response = await client.get("/api/v1/user/me", headers=auth_headers)
     assert response.status_code == 200
@@ -166,10 +178,14 @@ async def test_read_users_me_unauthorized(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_update_users_me(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_update_users_me(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Authenticated user can update their own profile."""
     update_data = {"first_name": "UpdatedName"}
-    response = await client.put("/api/v1/user/me", json=update_data, headers=auth_headers)
+    response = await client.put(
+        "/api/v1/user/me", json=update_data, headers=auth_headers
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["first_name"] == "UpdatedName"
@@ -182,8 +198,12 @@ async def test_update_users_me_unauthorized(client: AsyncClient):
     assert response.status_code == 401
 
 
-async def _login_as(client: AsyncClient, username: str, password: str = "testpass123") -> dict:
-    resp = await client.post("/api/v1/auth/login", data={"username": username, "password": password})
+async def _login_as(
+    client: AsyncClient, username: str, password: str = "testpass123"
+) -> dict:
+    resp = await client.post(
+        "/api/v1/auth/login", data={"username": username, "password": password}
+    )
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
@@ -206,7 +226,9 @@ def _create_db_user(username: str, role: UserRole = UserRole.OPERATOR) -> int:
 
 
 @pytest.mark.asyncio
-async def test_admin_can_update_other_user(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_admin_can_update_other_user(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Admin can change another user's name, role and active status."""
     user_id = _create_db_user("editable1")
     response = await client.put(
@@ -222,41 +244,59 @@ async def test_admin_can_update_other_user(client: AsyncClient, auth_headers, te
 
 
 @pytest.mark.asyncio
-async def test_update_user_requires_admin(client: AsyncClient, test_users, test_locations):
+async def test_update_user_requires_admin(
+    client: AsyncClient, test_users, test_locations
+):
     """Manager cannot edit users."""
     manager_id = _create_db_user("editable_mgr", UserRole.MANAGER)
     target_id = _create_db_user("editable2")
     headers = await _login_as(client, "editable_mgr")
-    response = await client.put(f"/api/v1/user/{target_id}", json={"first_name": "X"}, headers=headers)
+    response = await client.put(
+        f"/api/v1/user/{target_id}", json={"first_name": "X"}, headers=headers
+    )
     assert response.status_code == 403
     assert manager_id != target_id
 
 
 @pytest.mark.asyncio
-async def test_update_user_not_found(client: AsyncClient, auth_headers, test_users, test_locations):
-    response = await client.put("/api/v1/user/999999", json={"first_name": "X"}, headers=auth_headers)
+async def test_update_user_not_found(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    response = await client.put(
+        "/api/v1/user/999999", json={"first_name": "X"}, headers=auth_headers
+    )
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_admin_cannot_remove_own_admin_role(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_admin_cannot_remove_own_admin_role(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     me = (await client.get("/api/v1/user/me", headers=auth_headers)).json()
-    response = await client.put(f"/api/v1/user/{me['id']}", json={"role": "operator"}, headers=auth_headers)
+    response = await client.put(
+        f"/api/v1/user/{me['id']}", json={"role": "operator"}, headers=auth_headers
+    )
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_update_user_duplicate_email(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_update_user_duplicate_email(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     user_id = _create_db_user("editable3")
     response = await client.put(
-        f"/api/v1/user/{user_id}", json={"email": "admin@test.com"}, headers=auth_headers
+        f"/api/v1/user/{user_id}",
+        json={"email": "admin@test.com"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert "Email already registered" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_admin_can_delete_user(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_admin_can_delete_user(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """Admin can delete a user with no transfers or imports on record."""
     user_id = _create_db_user("deletable1")
     response = await client.delete(f"/api/v1/user/{user_id}", headers=auth_headers)
@@ -267,7 +307,9 @@ async def test_admin_can_delete_user(client: AsyncClient, auth_headers, test_use
 
 
 @pytest.mark.asyncio
-async def test_delete_user_requires_admin(client: AsyncClient, test_users, test_locations):
+async def test_delete_user_requires_admin(
+    client: AsyncClient, test_users, test_locations
+):
     """Operator cannot delete users."""
     target_id = _create_db_user("deletable2")
     headers = await _login_as(client, "inventario")
@@ -276,14 +318,18 @@ async def test_delete_user_requires_admin(client: AsyncClient, test_users, test_
 
 
 @pytest.mark.asyncio
-async def test_admin_cannot_delete_self(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_admin_cannot_delete_self(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     me = (await client.get("/api/v1/user/me", headers=auth_headers)).json()
     response = await client.delete(f"/api/v1/user/{me['id']}", headers=auth_headers)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_delete_user_with_transfers_is_blocked(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_delete_user_with_transfers_is_blocked(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """A user referenced by transfers/imports cannot be hard-deleted (409)."""
     from app.models.models import Location, Transfer, Unit, UnitStatus
 
@@ -291,13 +337,20 @@ async def test_delete_user_with_transfers_is_blocked(client: AsyncClient, auth_h
     db = TestingSessionLocal()
     location = db.query(Location).first()
     unit = Unit(
-        model="M", brand="B", color="Red", current_location_id=location.id,
+        model="M",
+        brand="B",
+        color="Red",
+        current_location_id=location.id,
         status=UnitStatus.AVAILABLE,
     )
     db.add(unit)
     db.commit()
     db.refresh(unit)
-    db.add(Transfer(unit_id=unit.id, dispatched_by_id=user_id, origin_location_id=location.id))
+    db.add(
+        Transfer(
+            unit_id=unit.id, dispatched_by_id=user_id, origin_location_id=location.id
+        )
+    )
     db.commit()
     db.close()
 
@@ -309,7 +362,9 @@ async def test_delete_user_with_transfers_is_blocked(client: AsyncClient, auth_h
 
 
 @pytest.mark.asyncio
-async def test_change_own_password(client: AsyncClient, auth_headers, test_users, test_locations):
+async def test_change_own_password(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
     """A user can change their own password: the old one stops working."""
     me = (await client.get("/api/v1/user/me", headers=auth_headers)).json()
 
@@ -365,7 +420,9 @@ async def test_change_own_password_rejects_short_password(
 
 
 @pytest.mark.asyncio
-async def test_change_own_password_requires_auth(client: AsyncClient, test_users, test_locations):
+async def test_change_own_password_requires_auth(
+    client: AsyncClient, test_users, test_locations
+):
     response = await client.put(
         "/api/v1/user/me/password",
         json={"current_password": "testpass123", "new_password": "nueva-clave-123"},
@@ -393,7 +450,8 @@ async def test_admin_can_reset_another_user_password(
     assert old.status_code == 401
 
     new = await client.post(
-        "/api/v1/auth/login", data={"username": "resetpass", "password": "clave-reseteada-1"}
+        "/api/v1/auth/login",
+        data={"username": "resetpass", "password": "clave-reseteada-1"},
     )
     assert new.status_code == 200
 
@@ -415,7 +473,9 @@ async def test_operator_cannot_reset_other_user_password(
 
 
 @pytest.mark.asyncio
-async def test_deactivated_user_cannot_login(client: AsyncClient, test_users, test_locations):
+async def test_deactivated_user_cannot_login(
+    client: AsyncClient, test_users, test_locations
+):
     """A deactivated account must not authenticate at all (401, no token)."""
     user_id = _create_db_user("desactivado")
     db = TestingSessionLocal()
@@ -425,7 +485,8 @@ async def test_deactivated_user_cannot_login(client: AsyncClient, test_users, te
     db.close()
 
     response = await client.post(
-        "/api/v1/auth/login", data={"username": "desactivado", "password": "testpass123"}
+        "/api/v1/auth/login",
+        data={"username": "desactivado", "password": "testpass123"},
     )
     assert response.status_code == 401
 

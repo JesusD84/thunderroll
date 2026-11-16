@@ -117,8 +117,7 @@ def test_sample_electric_bike_has_no_header():
     # The data rows are still read; they just await a manual mapping.
     assert len(table.rows) == 35
     assert any(
-        i.level == "warning" and "no header" in i.message.lower()
-        for i in result.issues
+        i.level == "warning" and "no header" in i.message.lower() for i in result.issues
     )
 
 
@@ -149,9 +148,7 @@ def test_sample_chinese_headers_and_numeric_frame_preserved():
     # The model lives under a non-synonym "NO" column, so it is not auto-mapped.
     assert "model" not in table.field_map
     # The leading index column (col_0) and NO are reported as ignored.
-    assert any(
-        "col_0" in i.message and "NO" in i.message for i in result.issues
-    )
+    assert any("col_0" in i.message and "NO" in i.message for i in result.issues)
     assert _unit_counts_by_sheet(result) == {"Sheet1": 98}
 
     first = next(result.iter_rows()).canonical()

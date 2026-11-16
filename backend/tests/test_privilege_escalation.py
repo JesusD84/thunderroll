@@ -36,7 +36,9 @@ from tests.conftest import TestingSessionLocal
 # ---------------------------------------------------------------------------
 
 
-async def _login(client: AsyncClient, username: str, password: str = "testpass123") -> dict:
+async def _login(
+    client: AsyncClient, username: str, password: str = "testpass123"
+) -> dict:
     response = await client.post(
         "/api/v1/auth/login", data={"username": username, "password": password}
     )

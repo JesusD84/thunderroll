@@ -85,3 +85,8 @@ jobs:
       # Las reglas viven en backend/pyproject.toml ([tool.ruff]).
       - name: Run ruff
         run: ruff check app/ tests/
+
+      # El formato también es parte del gate: --check no modifica nada,
+      # solo avisa si un archivo quedó fuera del formato canónico.
+      - name: Check ruff format
+        run: ruff format --check app/ tests/

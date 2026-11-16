@@ -54,6 +54,7 @@ from unittest.mock import MagicMock
 from app.services.auth_service import get_user_by_username
 from app.models.models import User
 
+
 def test_get_user_by_username_found():
     mock_db = MagicMock()
     mock_user = User(username="admin", email="admin@test.com")

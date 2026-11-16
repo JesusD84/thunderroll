@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,20 +11,25 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     username: str | None = None
+
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 # Location Schemas
 class LocationBase(BaseModel):
     name: str
     address: str | None = None
 
+
 class LocationCreate(LocationBase):
     pass
+
 
 class LocationUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,10 +37,12 @@ class LocationUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
 
+
 class Location(LocationBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 # Unit Schemas
 class UnitBase(BaseModel):
@@ -51,8 +57,10 @@ class UnitBase(BaseModel):
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
     notes: str | None = None
 
+
 class UnitCreate(UnitBase):
     pass
+
 
 class UnitUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
@@ -67,6 +75,7 @@ class UnitUpdate(BaseModel):
     sold_date: datetime | None = None
     notes: str | None = None
 
+
 class Unit(UnitBase):
     id: int
     sold_date: datetime | None = None
@@ -80,6 +89,7 @@ class Unit(UnitBase):
     current_location: Location | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 # Transfer Schemas
 class TransferBase(BaseModel):
     unit_id: int
@@ -91,12 +101,15 @@ class TransferBase(BaseModel):
     dispatched_at: datetime | None = None
     received_at: datetime | None = None
 
+
 class TransferCreate(TransferBase):
     model_config = ConfigDict(extra="forbid")
+
 
 class Transfer(TransferBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
 
 # Import Schemas
 class ImportBase(BaseModel):
@@ -105,8 +118,10 @@ class ImportBase(BaseModel):
     total_records: int
     notes: str | None = None
 
+
 class ImportCreate(ImportBase):
     pass
+
 
 class Import(ImportBase):
     id: int
@@ -121,6 +136,7 @@ class Import(ImportBase):
     user: User | None = None
     model_config = ConfigDict(from_attributes=True)
 
+
 # Model Equivalence Schemas (manufacturer model -> internal model)
 class ModelEquivalenceBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
@@ -129,8 +145,10 @@ class ModelEquivalenceBase(BaseModel):
     internal_model: str
     notes: str | None = None
 
+
 class ModelEquivalenceCreate(ModelEquivalenceBase):
     pass
+
 
 class ModelEquivalenceUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
@@ -139,11 +157,13 @@ class ModelEquivalenceUpdate(BaseModel):
     internal_model: str | None = None
     notes: str | None = None
 
+
 class ModelEquivalence(ModelEquivalenceBase):
     id: int
     created_at: datetime
     updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 # File Upload Schema
 class FileUploadResponse(BaseModel):
@@ -153,10 +173,12 @@ class FileUploadResponse(BaseModel):
     upload_date: datetime
     file_path: str
 
+
 # Pagination
 class PaginationParams(BaseModel):
     skip: int = Field(0, ge=0)
     limit: int = Field(100, ge=1, le=1000)
+
 
 class PaginatedResponse(BaseModel):
     items: list[dict]

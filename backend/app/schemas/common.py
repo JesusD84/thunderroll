@@ -1,15 +1,15 @@
-
 """Common schemas for API responses."""
 
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
     """Paginated response schema."""
+
     items: list[T]
     total: int
     page: int
@@ -19,6 +19,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 class ErrorResponse(BaseModel):
     """Error response schema."""
+
     error: str
     detail: str | None = None
     request_id: str | None = None
@@ -26,5 +27,6 @@ class ErrorResponse(BaseModel):
 
 class SuccessResponse(BaseModel):
     """Success response schema."""
+
     message: str
     data: dict | None = None

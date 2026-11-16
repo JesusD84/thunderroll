@@ -63,6 +63,7 @@ class UnitTransferRequest(BaseModel):
     `to_location_id` absent -> sell the unit (SOLD), per
     TransferService.transfer_unit_with_status_update.
     """
+
     from_location_id: int | None = Field(None, gt=0)
     to_location_id: int | None = Field(None, gt=0)
     notes: str | None = None

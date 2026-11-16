@@ -1,4 +1,3 @@
-
 """Report generation service."""
 
 import io
@@ -25,45 +24,76 @@ class ReportService:
     @staticmethod
     def get_dashboard_stats(db: Session) -> dict:
         total_units = db.query(Unit).count()
-        in_stock_units = db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
+        in_stock_units = (
+            db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
+        )
         sold_units = db.query(Unit).filter(Unit.status == UnitStatus.SOLD).count()
-        in_transit_units = db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
+        in_transit_units = (
+            db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
+        )
         total_locations = db.query(Location).count()
 
-        recent_transfers = db.query(Transfer).options(
-            selectinload(Transfer.dispatched_by),
-            selectinload(Transfer.received_by),
-            selectinload(Transfer.origin_location),
-            selectinload(Transfer.destination_location),
-        ).order_by(desc(Transfer.dispatched_at)).limit(10).all()
+        recent_transfers = (
+            db.query(Transfer)
+            .options(
+                selectinload(Transfer.dispatched_by),
+                selectinload(Transfer.received_by),
+                selectinload(Transfer.origin_location),
+                selectinload(Transfer.destination_location),
+            )
+            .order_by(desc(Transfer.dispatched_at))
+            .limit(10)
+            .all()
+        )
 
-        inventory_by_location = db.query(
-            Location.name.label("location"),
-            func.count(Unit.id).label("count"),
-        ).join(Unit, Unit.current_location_id == Location.id, isouter=True) \
-         .group_by(Location.id, Location.name).all()
+        inventory_by_location = (
+            db.query(
+                Location.name.label("location"),
+                func.count(Unit.id).label("count"),
+            )
+            .join(Unit, Unit.current_location_id == Location.id, isouter=True)
+            .group_by(Location.id, Location.name)
+            .all()
+        )
 
-        inventory_by_brand = db.query(
-            Unit.brand.label("brand"),
-            func.count(Unit.id).label("count"),
-        ).group_by(Unit.brand).all()
+        inventory_by_brand = (
+            db.query(
+                Unit.brand.label("brand"),
+                func.count(Unit.id).label("count"),
+            )
+            .group_by(Unit.brand)
+            .all()
+        )
 
         six_months_ago = datetime.now() - timedelta(days=180)
-        sales_by_month = db.query(
-            func.substr(cast(Unit.sold_date, String), 1, 7).label("month"),
-            func.count(Unit.id).label("count"),
-        ).filter(
-            and_(Unit.status == UnitStatus.SOLD, Unit.sold_date >= six_months_ago)
-        ).group_by(func.substr(cast(Unit.sold_date, String), 1, 7)) \
-         .order_by(func.substr(cast(Unit.sold_date, String), 1, 7)).all()
+        sales_by_month = (
+            db.query(
+                func.substr(cast(Unit.sold_date, String), 1, 7).label("month"),
+                func.count(Unit.id).label("count"),
+            )
+            .filter(
+                and_(Unit.status == UnitStatus.SOLD, Unit.sold_date >= six_months_ago)
+            )
+            .group_by(func.substr(cast(Unit.sold_date, String), 1, 7))
+            .order_by(func.substr(cast(Unit.sold_date, String), 1, 7))
+            .all()
+        )
 
-        recent_imports = db.query(Import).options(
-            selectinload(Import.user)
-        ).order_by(desc(Import.import_date)).limit(5).all()
+        recent_imports = (
+            db.query(Import)
+            .options(selectinload(Import.user))
+            .order_by(desc(Import.import_date))
+            .limit(5)
+            .all()
+        )
 
-        active_transfers = db.query(Transfer).filter(
-            Transfer.status.in_([TransferStatus.PENDING, TransferStatus.IN_TRANSIT])
-        ).count()
+        active_transfers = (
+            db.query(Transfer)
+            .filter(
+                Transfer.status.in_([TransferStatus.PENDING, TransferStatus.IN_TRANSIT])
+            )
+            .count()
+        )
 
         return {
             "units": {
@@ -78,10 +108,18 @@ class ReportService:
                 {
                     "id": t.id,
                     "unit_engine": t.unit.engine_number if t.unit else None,
-                    "origin_location": t.origin_location.name if t.origin_location else None,
-                    "destination_location": t.destination_location.name if t.destination_location else None,
-                    "dispatched_by": f"{t.dispatched_by.first_name} {t.dispatched_by.last_name}" if t.dispatched_by else None,
-                    "received_by": f"{t.received_by.first_name} {t.received_by.last_name}" if t.received_by else None,
+                    "origin_location": t.origin_location.name
+                    if t.origin_location
+                    else None,
+                    "destination_location": t.destination_location.name
+                    if t.destination_location
+                    else None,
+                    "dispatched_by": f"{t.dispatched_by.first_name} {t.dispatched_by.last_name}"
+                    if t.dispatched_by
+                    else None,
+                    "received_by": f"{t.received_by.first_name} {t.received_by.last_name}"
+                    if t.received_by
+                    else None,
                     "status": t.status,
                     "dispatched_at": t.dispatched_at,
                     "received_at": t.received_at,
@@ -111,7 +149,9 @@ class ReportService:
                     "successful": imp.successful_imports,
                     "failed": imp.failed_imports,
                     "date": imp.import_date,
-                    "user": f"{imp.user.first_name} {imp.user.last_name}" if imp.user else None,
+                    "user": f"{imp.user.first_name} {imp.user.last_name}"
+                    if imp.user
+                    else None,
                 }
                 for imp in recent_imports
             ],
@@ -152,7 +192,9 @@ class ReportService:
         for unit in units:
             status_key = unit.status.value if unit.status else "unknown"
             by_status[status_key] = by_status.get(status_key, 0) + 1
-            location_key = unit.current_location.name if unit.current_location else "No Location"
+            location_key = (
+                unit.current_location.name if unit.current_location else "No Location"
+            )
             by_location[location_key] = by_location.get(location_key, 0) + 1
 
         return {
@@ -169,7 +211,9 @@ class ReportService:
                     "brand": unit.brand,
                     "model": unit.model,
                     "color": unit.color,
-                    "location": unit.current_location.name if unit.current_location else None,
+                    "location": unit.current_location.name
+                    if unit.current_location
+                    else None,
                     "status": unit.status.value if unit.status else None,
                     "created_at": unit.created_at,
                     "sold_date": unit.sold_date,
@@ -197,7 +241,10 @@ class ReportService:
 
         if user_id:
             query = query.filter(
-                or_(Transfer.dispatched_by_id == user_id, Transfer.received_by_id == user_id)
+                or_(
+                    Transfer.dispatched_by_id == user_id,
+                    Transfer.received_by_id == user_id,
+                )
             )
         if location_id:
             query = query.filter(
@@ -212,17 +259,25 @@ class ReportService:
             query = query.filter(Transfer.dispatched_at <= date_to)
 
         total_transfers = query.count()
-        transfers = query.order_by(desc(Transfer.dispatched_at)).offset(skip).limit(limit).all()
+        transfers = (
+            query.order_by(desc(Transfer.dispatched_at)).offset(skip).limit(limit).all()
+        )
 
-        by_status = db.query(
-            Transfer.status, func.count(Transfer.id).label("count")
-        ).group_by(Transfer.status).all()
+        by_status = (
+            db.query(Transfer.status, func.count(Transfer.id).label("count"))
+            .group_by(Transfer.status)
+            .all()
+        )
 
-        by_month = db.query(
-            func.substr(cast(Transfer.dispatched_at, String), 1, 7).label("month"),
-            func.count(Transfer.id).label("count"),
-        ).group_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7)) \
-         .order_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7)).all()
+        by_month = (
+            db.query(
+                func.substr(cast(Transfer.dispatched_at, String), 1, 7).label("month"),
+                func.count(Transfer.id).label("count"),
+            )
+            .group_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7))
+            .order_by(func.substr(cast(Transfer.dispatched_at, String), 1, 7))
+            .all()
+        )
 
         return {
             "total_transfers": total_transfers,
@@ -263,9 +318,11 @@ class ReportService:
         date_to: datetime | None = None,
         location_id: int | None = None,
     ) -> dict:
-        query = db.query(Unit).options(
-            selectinload(Unit.current_location)
-        ).filter(Unit.status == UnitStatus.SOLD)
+        query = (
+            db.query(Unit)
+            .options(selectinload(Unit.current_location))
+            .filter(Unit.status == UnitStatus.SOLD)
+        )
 
         if date_from:
             query = query.filter(Unit.sold_date >= date_from)
@@ -310,7 +367,13 @@ class ReportService:
     def _prepare_df_for_excel(df: pd.DataFrame) -> pd.DataFrame:
         for col in df.columns:
             if df[col].dtype.name.startswith("datetime"):
-                df[col] = df[col].apply(lambda x: x.replace(tzinfo=None) if pd.notna(x) and hasattr(x, 'tzinfo') and x.tzinfo is not None else x)
+                df[col] = df[col].apply(
+                    lambda x: (
+                        x.replace(tzinfo=None)
+                        if pd.notna(x) and hasattr(x, "tzinfo") and x.tzinfo is not None
+                        else x
+                    )
+                )
         return df
 
     @staticmethod
@@ -327,14 +390,18 @@ class ReportService:
 
         df = ReportService._prepare_df_for_excel(pd.DataFrame(report_data["units"]))
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Inventory', index=False)
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Inventory", index=False)
 
             summary_data = []
             for category, data in report_data["summary"].items():
                 for key, value in data.items():
-                    summary_data.append({"Category": category, "Item": key, "Count": value})
-            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+                    summary_data.append(
+                        {"Category": category, "Item": key, "Count": value}
+                    )
+            pd.DataFrame(summary_data).to_excel(
+                writer, sheet_name="Summary", index=False
+            )
 
         output.seek(0)
         filename = f"inventory_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -356,8 +423,8 @@ class ReportService:
 
         df = ReportService._prepare_df_for_excel(pd.DataFrame(report_data["transfers"]))
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Transfers', index=False)
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Transfers", index=False)
 
         output.seek(0)
         filename = f"transfers_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -380,13 +447,15 @@ class ReportService:
 
         df = ReportService._prepare_df_for_excel(pd.DataFrame(report_data["sales"]))
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Sales', index=False)
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="Sales", index=False)
 
             summary_data = []
             for item in report_data["summary"]["by_month"]:
                 summary_data.append({"Month": item["month"], "Count": item["count"]})
-            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+            pd.DataFrame(summary_data).to_excel(
+                writer, sheet_name="Summary", index=False
+            )
 
         output.seek(0)
         filename = f"sales_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
