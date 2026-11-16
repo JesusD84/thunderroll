@@ -12,8 +12,10 @@ services:
       # Debe incluir ?sslmode=require.
       - key: DATABASE_URL
         sync: false
+      # La clave de firma de los JWT se gestiona en el dashboard (Environment),
+      # nunca en el blueprint: es un secreto que hay que poder rotar a mano.
       - key: SECRET_KEY
-        generateValue: true
+        sync: false
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
