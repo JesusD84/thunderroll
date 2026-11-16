@@ -365,7 +365,7 @@ async def test_upload_blank_rows_are_skipped(
 async def test_upload_without_identifier_column_fails(
     client, auth_headers, test_users, test_locations
 ):
-    """A file with no frame/motor column cannot identify units -> 500."""
+    """A file with no frame/motor column cannot identify units -> 422."""
     content = _make_xlsx(
         [
             (
@@ -378,8 +378,8 @@ async def test_upload_without_identifier_column_fails(
         ]
     )
     resp = await _upload(client, auth_headers, "no_id.xlsx", content)
-    assert resp.status_code == 500
-    assert "identifier" in resp.json()["detail"].lower()
+    assert resp.status_code == 422
+    assert "identificador" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -911,7 +911,7 @@ async def test_upload_rejects_unsupported_file_type(
     """A non-spreadsheet file is rejected with 400 before any processing."""
     resp = await _upload(client, auth_headers, "notes.txt", b"hello world")
     assert resp.status_code == 400
-    assert "Invalid file type" in resp.json()["detail"]
+    assert "no válido" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -921,8 +921,8 @@ async def test_upload_real_sample_without_identifier_column_fails(
     """The header-less sample has no mappable identifier and is reported, not silent."""
     content = (_SAMPLES_DIR / _SAMPLE_ELECTRIC_BIKE_XLSX).read_bytes()
     resp = await _upload(client, auth_headers, _SAMPLE_ELECTRIC_BIKE_XLSX, content)
-    assert resp.status_code == 500
-    assert "No identifier columns found" in resp.json()["detail"]
+    assert resp.status_code == 422
+    assert "identificador" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

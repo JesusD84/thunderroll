@@ -37,11 +37,17 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      # Archivos subidos: se guardan con nombre del servidor, en un directorio
+      # que ninguna ruta de la API sirve (ver app/services/upload_service.py).
+      IMPORT_STORAGE_DIR: ${IMPORT_STORAGE_DIR:-/app/var/imports}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+      MAX_IMPORT_ROWS_PER_SHEET: ${MAX_IMPORT_ROWS_PER_SHEET:-20000}
+      MAX_IMPORT_SHEETS: ${MAX_IMPORT_SHEETS:-50}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - backend_uploads:/app/uploads
+      - backend_imports:/app/var/imports
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +70,7 @@ services:
 
 volumes:
   postgres_data:
-  backend_uploads:
+  backend_imports:
 
 networks:
   default:

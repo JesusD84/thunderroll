@@ -28,6 +28,23 @@ import {
 } from '@/lib/imports';
 import { ApiError } from '@/lib/api';
 
+/**
+ * Título del error según el status que devolvió el backend.
+ *
+ * El backend responde con errores tipados (400 tipo de archivo, 413 tamaño,
+ * 422 contenido) y un mensaje que ya explica qué hacer. Aquí solo se
+ * distingue el título para que el usuario sepa de un vistazo si el problema
+ * es su archivo o el servidor.
+ */
+function getErrorTitle(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    if (err.status === 413) return 'El archivo es demasiado grande';
+    if (err.status === 400 || err.status === 422) return 'El archivo no es válido';
+    if (err.status === 500) return 'Error interno del servidor';
+  }
+  return fallback;
+}
+
 export default function ImportsPage() {
   const { data: session } = useSession();
   const { viewImports } = useAuth();
@@ -45,6 +62,7 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState('No se pudo procesar el archivo');
   const [overrides, setOverrides] = useState<Record<string, ColumnSelection>>({});
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
@@ -54,6 +72,7 @@ export default function ImportsPage() {
   const resetResult = () => {
     setPreview(null);
     setError(null);
+    setErrorTitle('No se pudo procesar el archivo');
     setOverrides({});
     setResult(null);
     setImportErrors(null);
@@ -78,9 +97,11 @@ export default function ImportsPage() {
         err instanceof ApiError
           ? err.message
           : 'No se pudo procesar el archivo. Inténtalo de nuevo.';
+      const title = getErrorTitle(err, 'No se pudo generar la vista previa');
       setError(message);
+      setErrorTitle(title);
       setPreview(null);
-      toast.error('Error al generar la vista previa', { description: message });
+      toast.error(title, { description: message });
     } finally {
       setLoading(false);
     }
@@ -124,8 +145,10 @@ export default function ImportsPage() {
         err instanceof ApiError
           ? err.message
           : 'No se pudo importar el archivo. Inténtalo de nuevo.';
+      const title = getErrorTitle(err, 'No se pudo importar el archivo');
       setError(message);
-      toast.error('Error al importar', { description: message });
+      setErrorTitle(title);
+      toast.error(title, { description: message });
     } finally {
       setUploading(false);
     }
@@ -229,7 +252,7 @@ export default function ImportsPage() {
               {error && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>No se pudo procesar el archivo</AlertTitle>
+                  <AlertTitle>{errorTitle}</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}

@@ -105,8 +105,9 @@ async def test_authorization_matrix(
     tmp_path,
 ):
     """Every protected endpoint, every role, against the declared rules."""
-    # The upload endpoint writes into ./uploads: keep the workspace clean.
+    # The upload endpoint stores the file: keep the workspace clean.
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("IMPORT_STORAGE_DIR", str(tmp_path / "imports"))
 
     await check_case(
         client,

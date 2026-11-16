@@ -249,10 +249,29 @@ describe('ImportsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Vista previa' }));
 
     await waitFor(() => {
-      expect(screen.getByText('No se pudo procesar el archivo')).toBeInTheDocument();
+      expect(screen.getByText('El archivo no es válido')).toBeInTheDocument();
     });
     expect(
       screen.getByText('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are supported.'),
+    ).toBeInTheDocument();
+  });
+
+  it('tells the user when the file is too big (413)', async () => {
+    mockFetch.mockReturnValue(
+      mockJson(
+        { detail: 'El archivo supera el tamaño máximo permitido (10 MB).' },
+        { ok: false, status: 413 },
+      ),
+    );
+    render(<ImportsPage />);
+    await user.upload(screen.getByLabelText('Archivo'), createFile('inv.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Vista previa' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('El archivo es demasiado grande')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('El archivo supera el tamaño máximo permitido (10 MB).'),
     ).toBeInTheDocument();
   });
 
