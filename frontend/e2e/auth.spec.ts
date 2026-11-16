@@ -6,11 +6,20 @@ const mockSession = {
   expires: new Date(Date.now() + 86400000).toISOString(),
 };
 
+// The shape the API really returns (app/services/report.py): the counts are
+// nested under "units"/"locations"/"transfers". An older flat shape
+// (total_units, available_units, ...) used to be mocked here, and since the
+// dashboard reads dashboardData.units.total, the page rendered zeros while
+// the test still passed. Keep this in sync with the backend.
 const mockDashboard = {
-  total_units: 42, available_units: 30, sold_units: 8, in_transit_units: 4,
+  units: { total: 42, available: 30, sold: 8, in_transit: 4 },
+  locations: { total: 3 },
+  transfers: { active: 2 },
   inventory_by_location: [{ location: 'Bodega Central', count: 25 }],
+  inventory_by_brand: [{ brand: 'Honda', count: 25 }],
   sales_by_month: [{ month: '2025-05', count: 3 }],
-  recent_transfers: [], recent_imports: [],
+  recent_transfers: [],
+  recent_imports: [],
 };
 
 // The API always returns ``color`` (NOT NULL in the model, required in the
@@ -60,6 +69,16 @@ test.describe('Authenticated', () => {
 
   test('dashboard loads', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Dashboard');
+  });
+
+  test('dashboard renders the counts the API returned', async ({ page }) => {
+    // Asserting only the heading proved nothing: with a stale mock the page
+    // rendered zeros and the test still passed. These check the numbers the
+    // dashboard actually shows.
+    await expect(page.getByText('Total de Unidades').first().locator('..')).toContainText('42');
+    await expect(page.getByText('Disponibles').first().locator('..')).toContainText('30');
+    await expect(page.getByText('Vendidas').first().locator('..')).toContainText('8');
+    await expect(page.getByText('En Tránsito').first().locator('..')).toContainText('4');
   });
 
   test('nav links visible', async ({ page }) => {
