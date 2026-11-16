@@ -15,6 +15,16 @@ from app.services.auth_service import get_password_hash, verify_password
 SELF_UPDATE_FIELDS = frozenset({"first_name", "last_name"})
 
 
+def bump_token_version(user: User) -> None:
+    """Revoca las sesiones abiertas del usuario, en memoria.
+
+    La versión del token viaja dentro de cada access token, así que subirla
+    invalida de golpe todos los tokens emitidos antes del cambio: no hace
+    falta guardar sesiones en ningún lado para poder cerrarlas.
+    """
+    user.token_version = (user.token_version or 0) + 1
+
+
 class UserService:
     @staticmethod
     def create_user(db: Session, user_data: UserCreate, creator: User) -> User:
@@ -110,6 +120,10 @@ class UserService:
             )
 
         current_user.hashed_password = get_password_hash(payload.new_password)
+        # La contraseña cambió: las sesiones abiertas con la contraseña vieja
+        # dejan de servir, y el propio token que hizo el cambio tampoco
+        # (habría que volver a iniciar sesión).
+        bump_token_version(current_user)
         db.commit()
         db.refresh(current_user)
 
@@ -164,6 +178,14 @@ class UserService:
 
         if new_password is not None:
             db_user.hashed_password = get_password_hash(new_password)
+
+        # Cualquier cambio de credenciales revoca las sesiones abiertas de
+        # esa cuenta: la contraseña, el rol (un token de operador no puede
+        # seguir valiendo como token de admin) y la baja.
+        role_changed = "role" in changes and changes["role"] != db_user.role
+        deactivated = changes.get("is_active") is False
+        if new_password is not None or role_changed or deactivated:
+            bump_token_version(db_user)
 
         try:
             return UserRepository.update_user(db, db_user, user_update)

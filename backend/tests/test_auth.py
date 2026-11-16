@@ -83,23 +83,70 @@ async def test_get_current_user_unauthorized(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_forgot_password_reports_smtp_failure(client, test_users, test_locations):
-    """A broken SMTP answers 503 instead of a silent 200.
+async def test_forgot_password_reports_smtp_failure_in_the_log(
+    client, test_users, test_locations, caplog
+):
+    """A broken SMTP no longer changes the answer, but it is still visible.
 
-    A 200 would be indistinguishable from a successful send, and this is the
-    only self-service way back into an account.
+    The email now goes out in a background task, so the response cannot depend
+    on how the SMTP behaves: a 503 here would tell whoever is probing the
+    endpoint that the account exists (and only for real accounts). The
+    failure is written to the log instead, where the operator sees it.
     """
+    import logging
     from unittest.mock import AsyncMock, patch
 
     with patch(
         "app.api.v1.endpoints.auth.send_password_reset_email",
         new=AsyncMock(side_effect=RuntimeError("SMTP unreachable")),
     ):
+        with caplog.at_level(logging.ERROR, logger="app.api.v1.endpoints.auth"):
+            response = await client.post(
+                "/api/v1/auth/forgot-password", json={"email": "admin@test.com"}
+            )
+
+    assert response.status_code == 200
+    assert "Failed to send password reset email" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_runs_a_bcrypt_for_an_unknown_email(
+    client, test_users, test_locations
+):
+    """An unknown email pays the same bcrypt as a known one.
+
+    If the unknown address answered faster, the difference would tell whoever
+    is probing the endpoint which addresses have an account.
+    """
+    from unittest.mock import patch
+
+    with patch(
+        "app.api.v1.endpoints.auth.verify_password_against_dummy"
+    ) as dummy_verify:
+        response = await client.post(
+            "/api/v1/auth/forgot-password", json={"email": "nadie-aqui@test.com"}
+        )
+
+    assert response.status_code == 200
+    dummy_verify.assert_called_once_with("nadie-aqui@test.com")
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_does_not_run_a_bcrypt_for_a_known_email(
+    client, test_users, test_locations
+):
+    """A known email goes straight to the background task."""
+    from unittest.mock import patch
+
+    with patch(
+        "app.api.v1.endpoints.auth.verify_password_against_dummy"
+    ) as dummy_verify:
         response = await client.post(
             "/api/v1/auth/forgot-password", json={"email": "admin@test.com"}
         )
 
-    assert response.status_code == 503
+    assert response.status_code == 200
+    dummy_verify.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -428,6 +428,11 @@ def snapshot_accounts(session_factory) -> dict:
                 "role": account.role,
                 "is_active": account.is_active,
                 "hashed_password": account.hashed_password,
+                # The revocation counter is part of the account state: the
+                # matrix changes passwords and roles, which bumps it. If it
+                # were not restored, the tokens cached for the whole run would
+                # stop matching and every later case would answer 401.
+                "token_version": account.token_version,
             }
             for account in accounts
         }

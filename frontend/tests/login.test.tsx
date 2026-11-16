@@ -116,4 +116,16 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Iniciar Sesión/ }));
     expect(screen.getByRole('button')).toBeDisabled();
   });
+
+  it('tells the user to wait when the backend rate-limits the login', async () => {
+    mockSignIn.mockResolvedValue({ ok: false, error: 'RateLimit', status: 429 });
+    render(<LoginPage />);
+    await userEvent.type(screen.getByLabelText('Email'), 'admin@test.com');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'pass123');
+    await userEvent.click(screen.getByRole('button', { name: /Iniciar Sesión/ }));
+
+    expect(await screen.findByText(/Demasiados intentos/)).toBeInTheDocument();
+    // No debe decir que la contraseña está mal: el problema es el límite.
+    expect(screen.queryByText(/Credenciales inválidas/)).not.toBeInTheDocument();
+  });
 });

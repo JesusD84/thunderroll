@@ -25,6 +25,15 @@ TEST_SECRET_KEY = "thunderoll-test-secret-key-only-for-the-test-suite"
 
 os.environ["SECRET_KEY"] = TEST_SECRET_KEY
 
+# La suite corre como desarrollo: los orígenes de localhost están en la lista
+# de CORS solo cuando ENV=development (ver app/core/cors.py).
+os.environ.setdefault("ENV", "development")
+
+# La duración del token de acceso queda fijada aquí, como el valor que
+# shippa el proyecto (60 minutos). Si el `.env` local del desarrollador
+# dice otra cosa, la suite seguiría probando el valor de referencia.
+os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "60"
+
 # La URL que usa el motor real de la app (app.database.database). En la suite
 # normal también es SQLite: los tests nunca deben tocar la base de datos real.
 # La matriz de autorización contra PostgreSQL (RUN_POSTGRES_MATRIX=1) sí
@@ -100,6 +109,21 @@ async def client(db_session) -> AsyncClient:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Limpia el contador del limitador antes y después de cada prueba.
+
+    El limitador guarda los conteos en memoria y los comparte toda la
+    aplicación: sin esto, las pruebas que inician sesión irían gastando el
+    límite por IP de las pruebas que vienen después.
+    """
+    from app.core.rate_limit import limiter
+
+    limiter._storage.reset()
+    yield
+    limiter._storage.reset()
 
 
 @pytest.fixture(scope="session")

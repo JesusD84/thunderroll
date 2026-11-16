@@ -1,10 +1,13 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.router import router as api_router
+from app.core.cors import build_allowed_origins
+from app.core.rate_limit import AccountCaptureMiddleware, limiter
 from app.database.database import engine
 from app.database.seed import create_demo_data
 from app.models import models
@@ -29,16 +32,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
-allowed_origins = ["http://localhost:3000", "http://frontend:3000"]
-# Single origin (backwards compat)
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    allowed_origins.append(frontend_url)
-# Comma-separated list for multiple Vercel/preview URLs
-extra_origins = os.getenv("ALLOWED_ORIGINS", "")
-if extra_origins:
-    allowed_origins.extend(o.strip() for o in extra_origins.split(",") if o.strip())
+# CORS middleware.
+#
+# Los orígenes de localhost solo se permiten en desarrollo (ENV=development):
+# en producción, dejarlos abiertos permitiría que cualquier página servida en
+# ese puerto hable con la API. FRONTEND_URL y ALLOWED_ORIGINS son los que
+# mandan en producción.
+allowed_origins = build_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +48,16 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Total-Count"],
 )
+
+# El limitador necesita leer el cuerpo de las peticiones de autenticación
+# para saber a qué cuenta se está atacando. Va por fuera del de CORS para que
+# el cuerpo llegue intacto tanto al middleware como al endpoint.
+app.add_middleware(AccountCaptureMiddleware)
+
+# Rate limiting: el decorador de cada endpoint registra sus límites, y aquí
+# se conecta el limitador con la aplicación y se traduce el exceso a un 429.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include routers
 app.include_router(api_router)

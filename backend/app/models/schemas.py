@@ -8,12 +8,26 @@ from app.schemas.user import User
 
 # Auth Schemas
 class Token(BaseModel):
+    """Respuesta del login y del refresco de token.
+
+    ``refresh_token`` sirve para pedir un ``access_token`` nuevo cuando el
+    primero ya venció, sin volver a pedir la contraseña. ``expires_in`` son los
+    segundos de vida del token de acceso.
+    """
+
     access_token: str
-    token_type: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
 
 
 class TokenData(BaseModel):
-    username: str | None = None
+    """Lo que se extrae de un token de acceso ya validado.
+
+    ``user_id`` y no ``username``: el subject del token es el id del usuario.
+    """
+
+    user_id: int | None = None
 
 
 class LoginRequest(BaseModel):
