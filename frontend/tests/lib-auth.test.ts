@@ -97,23 +97,29 @@ describe('getPermissions', () => {
 });
 
 describe('useAuth', () => {
-  it('exposes token and role flags for an admin session', () => {
-    mockSession = { accessToken: 'tok', user: { role: 'ADMIN' } };
+  it('exposes the role flags and permissions for an admin session', () => {
+    mockSession = { user: { role: 'ADMIN' } };
     const { result } = renderHook(() => useAuth());
-    expect(result.current.token).toBe('tok');
     expect(result.current.role).toBe('admin');
     expect(result.current.isAdmin).toBe(true);
     expect(result.current.deleteImport).toBe(true);
     expect(result.current.manageEquivalences).toBe(true);
   });
 
+  it('does not expose any token: the credential never reaches the browser', () => {
+    mockSession = { accessToken: 'tok', user: { role: 'admin' } };
+    const { result } = renderHook(() => useAuth());
+    expect('token' in result.current).toBe(false);
+    expect('accessToken' in result.current).toBe(false);
+  });
+
   it('defaults to no permissions when there is no session', () => {
     mockSession = null;
     const { result } = renderHook(() => useAuth());
-    expect(result.current.token).toBeUndefined();
     expect(result.current.role).toBe('');
     expect(result.current.isAdmin).toBe(false);
     expect(result.current.deleteImport).toBe(false);
     expect(result.current.manageEquivalences).toBe(false);
+    expect('token' in result.current).toBe(false);
   });
 });

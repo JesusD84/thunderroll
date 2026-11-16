@@ -55,20 +55,21 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      # Los e2e interceptan la API con mocks (page.route): no hacen falta
-      # backend ni base de datos. El job es el navegador real contra la UI
-      # real, compilada en modo producción.
+      # Los e2e no necesitan backend ni base de datos: playwright.config.ts
+      # levanta una API de mentira (e2e/mock-backend.mjs) y la app real
+      # compilada en modo producción.
       #
-      # NEXT_PUBLIC_API_URL apunta al MISMO origen que la app a propósito:
-      # si la API viviera en otro origen, el navegador haría un preflight
-      # CORS contra él antes de cada petición mockeada, y en firefox/webkit
-      # ese preflight falla (la petición nunca sale y la respuesta del mock
-      # se pierde). Con un solo origen no hay preflight y los mocks mandan.
+      # El navegador ya no habla con la API directamente (todo pasa por el
+      # proxy del servidor), así que no hay CORS ni preflight: un solo
+      # origen y los mocks mandan.
+      #
+      # NEXTAUTH_SECRET tiene que ser el mismo en el proceso de los tests
+      # (que firma la cookie de sesión) y en el servidor (que la abre):
+      # playwright.config.ts lo define para los dos.
       - name: Run Playwright tests
         run: npx playwright test
         env:
           CI: 'true'
-          NEXT_PUBLIC_API_URL: http://localhost:3000
 
       - name: Upload Playwright report
         if: always()

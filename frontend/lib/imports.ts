@@ -178,10 +178,15 @@ function pageQuery(pagination?: Pagination): string {
   return query ? `?${query}` : '';
 }
 
+/**
+ * Ninguna de estas funciones recibe un token: las llamadas van por el proxy
+ * del servidor (`lib/api.ts`), que pone el `Authorization` header con el
+ * token que vive dentro de la cookie cifrada. El navegador nunca lo ve.
+ */
+
 export async function previewImport(
   file: File,
   columnMapping: ColumnMapping | null | undefined,
-  token: string | null | undefined,
 ): Promise<ImportPreviewResponse> {
   const formData = new FormData();
   formData.append('file', file);
@@ -190,7 +195,6 @@ export async function previewImport(
   }
   return apiFetch<ImportPreviewResponse>(`${IMPORTS_BASE}/preview`, {
     method: 'POST',
-    token,
     body: formData,
   });
 }
@@ -198,7 +202,6 @@ export async function previewImport(
 export async function uploadImport(
   file: File,
   metadata: UploadMetadata,
-  token: string | null | undefined,
 ): Promise<UploadResult> {
   const formData = new FormData();
   formData.append('file', file);
@@ -209,67 +212,56 @@ export async function uploadImport(
   }
   return apiFetch<UploadResult>(`${IMPORTS_BASE}/upload`, {
     method: 'POST',
-    token,
     body: formData,
   });
 }
 
 export async function listImports(
-  token: string | null | undefined,
   pagination?: Pagination,
 ): Promise<ImportRecord[]> {
-  return apiFetch<ImportRecord[]>(`${IMPORTS_BASE}/${pageQuery(pagination)}`, { token });
+  return apiFetch<ImportRecord[]>(`${IMPORTS_BASE}/${pageQuery(pagination)}`);
 }
 
 export async function getImport(
   id: number,
-  token: string | null | undefined,
 ): Promise<ImportRecord> {
-  return apiFetch<ImportRecord>(`${IMPORTS_BASE}/${id}`, { token });
+  return apiFetch<ImportRecord>(`${IMPORTS_BASE}/${id}`);
 }
 
 export async function getImportErrors(
   id: number,
-  token: string | null | undefined,
   pagination?: Pagination,
 ): Promise<ImportError[]> {
-  return apiFetch<ImportError[]>(`${IMPORTS_BASE}/${id}/errors${pageQuery(pagination)}`, { token });
+  return apiFetch<ImportError[]>(`${IMPORTS_BASE}/${id}/errors${pageQuery(pagination)}`);
 }
 
 export async function deleteImport(
   id: number,
-  token: string | null | undefined,
 ): Promise<void> {
-  await apiFetch<unknown>(`${IMPORTS_BASE}/${id}`, { method: 'DELETE', token });
+  await apiFetch<unknown>(`${IMPORTS_BASE}/${id}`, { method: 'DELETE' });
 }
 
 export async function listModelEquivalences(
-  token: string | null | undefined,
   pagination?: Pagination,
 ): Promise<ModelEquivalence[]> {
-  return apiFetch<ModelEquivalence[]>(`${EQUIVALENCES_BASE}/${pageQuery(pagination)}`, { token });
+  return apiFetch<ModelEquivalence[]>(`${EQUIVALENCES_BASE}/${pageQuery(pagination)}`);
 }
 
-export async function listUnmappedModels(
-  token: string | null | undefined,
-): Promise<string[]> {
-  return apiFetch<string[]>(`${EQUIVALENCES_BASE}/unmapped`, { token });
+export async function listUnmappedModels(): Promise<string[]> {
+  return apiFetch<string[]>(`${EQUIVALENCES_BASE}/unmapped`);
 }
 
 export async function getModelEquivalence(
   id: number,
-  token: string | null | undefined,
 ): Promise<ModelEquivalence> {
-  return apiFetch<ModelEquivalence>(`${EQUIVALENCES_BASE}/${id}`, { token });
+  return apiFetch<ModelEquivalence>(`${EQUIVALENCES_BASE}/${id}`);
 }
 
 export async function createModelEquivalence(
   payload: ModelEquivalenceInput,
-  token: string | null | undefined,
 ): Promise<ModelEquivalence> {
   return apiFetch<ModelEquivalence>(`${EQUIVALENCES_BASE}/`, {
     method: 'POST',
-    token,
     json: payload,
   });
 }
@@ -277,18 +269,15 @@ export async function createModelEquivalence(
 export async function updateModelEquivalence(
   id: number,
   payload: Partial<ModelEquivalenceInput>,
-  token: string | null | undefined,
 ): Promise<ModelEquivalence> {
   return apiFetch<ModelEquivalence>(`${EQUIVALENCES_BASE}/${id}`, {
     method: 'PUT',
-    token,
     json: payload,
   });
 }
 
 export async function deleteModelEquivalence(
   id: number,
-  token: string | null | undefined,
 ): Promise<void> {
-  await apiFetch<unknown>(`${EQUIVALENCES_BASE}/${id}`, { method: 'DELETE', token });
+  await apiFetch<unknown>(`${EQUIVALENCES_BASE}/${id}`, { method: 'DELETE' });
 }

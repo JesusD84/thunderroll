@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,6 @@ import { Truck, CheckCircle, ArrowRight, Eye, Package, Plus, Trash2 } from 'luci
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Location {
   id: number;
@@ -57,6 +55,27 @@ const statusLabels: Record<string, string> = {
   'CANCELLED': 'Cancelada',
 };
 
+/**
+ * The backend reports a validation problem either as a plain string or as a
+ * list of {msg} objects.
+ */
+const detailToMessage = (detail: unknown, fallback: string): string => {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((d: unknown) => {
+        if (d && typeof d === 'object' && 'msg' in d) {
+          const msg = (d as { msg?: unknown }).msg;
+          return typeof msg === 'string' ? msg : String(msg ?? '');
+        }
+        return '';
+      })
+      .filter((m) => m !== '');
+    if (messages.length > 0) return messages.join(', ');
+  }
+  return fallback;
+};
+
 export default function TransfersPage() {
   const { data: session } = useSession();
   const { deleteTransfer } = useAuth();
@@ -79,16 +98,15 @@ export default function TransfersPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token) return;
+      if (!session) return;
 
       try {
-        const [tRes, lRes] = await Promise.all([
-          sessionAwareFetch(`${API_URL}/api/v1/transfers/`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          sessionAwareFetch(`${API_URL}/api/v1/locations/`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        const [transfersData, locationsData] = await Promise.all([
+          apiFetch<Transfer[]>('/api/v1/transfers/').catch(() => null),
+          apiFetch<Location[]>('/api/v1/locations/').catch(() => null),
         ]);
-        if (tRes.ok) setTransfers(await tRes.json());
-        if (lRes.ok) setLocations(await lRes.json());
+        if (transfersData) setTransfers(transfersData);
+        if (locationsData) setLocations(locationsData);
       } catch (err) {
         console.error('Error fetching transfers:', err);
       } finally {
@@ -102,16 +120,13 @@ export default function TransfersPage() {
   // Fetch available units when origin location changes
   useEffect(() => {
     const fetchUnits = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token || !fromLocationId) { setAvailableUnits([]); return; }
+      if (!session || !fromLocationId) { setAvailableUnits([]); return; }
       setUnitsLoading(true);
       setSelectedUnitId('');
       try {
-        const res = await sessionAwareFetch(
-          `${API_URL}/api/v1/units/?status=AVAILABLE&location_id=${fromLocationId}`,
-          { headers: { 'Authorization': `Bearer ${token}` } }
+        setAvailableUnits(
+          await apiFetch<AvailableUnit[]>(`/api/v1/units/?status=AVAILABLE&location_id=${fromLocationId}`),
         );
-        if (res.ok) setAvailableUnits(await res.json());
       } catch (err) {
         console.error('Error fetching units:', err);
       } finally {
@@ -122,57 +137,47 @@ export default function TransfersPage() {
   }, [fromLocationId, session]);
 
   const handleCreateTransfer = async () => {
-    const token = (session as any)?.accessToken;
-    if (!token || !selectedUnitId || !fromLocationId || !toLocationId) return;
+    if (!session || !selectedUnitId || !fromLocationId || !toLocationId) return;
     setCreateLoading(true);
     setCreateError(null);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
+      await apiFetch('/api/v1/transfers/', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           unit_id: parseInt(selectedUnitId),
           origin_location_id: parseInt(fromLocationId),
           destination_location_id: parseInt(toLocationId),
-        }),
+        },
       });
-      if (res.ok) {
-        // Refresh list and reset form
-        const listRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (listRes.ok) setTransfers(await listRes.json());
-        setShowNewTransfer(false);
-        setFromLocationId(''); setToLocationId(''); setSelectedUnitId(''); setTransferNotes('');
-        setAvailableUnits([]);
+      // Refresh list and reset form
+      const list = await apiFetch<Transfer[]>('/api/v1/transfers/').catch(() => null);
+      if (list) setTransfers(list);
+      setShowNewTransfer(false);
+      setFromLocationId(''); setToLocationId(''); setSelectedUnitId(''); setTransferNotes('');
+      setAvailableUnits([]);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setCreateError(detailToMessage(err.detail, 'Error creando transferencia'));
       } else {
-        const err = await res.json();
-        const detail = err.detail;
-        setCreateError(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error creando transferencia');
+        setCreateError('Error de conexión');
       }
-    } catch { setCreateError('Error de conexión'); }
+    }
     finally { setCreateLoading(false); }
   };
 
   const handleConfirmArrival = async (transferId: number) => {
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
     setActionLoading(transferId);
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${transferId}`, {
+      await apiFetch(`/api/v1/transfers/${transferId}`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'RECEIVED' }),
+        json: { status: 'RECEIVED' },
       });
 
-      if (res.ok) {
-        // Refresh transfers list
-        const listRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (listRes.ok) setTransfers(await listRes.json());
-      }
+      // Refresh transfers list
+      const list = await apiFetch<Transfer[]>('/api/v1/transfers/').catch(() => null);
+      if (list) setTransfers(list);
     } catch (err) {
       console.error('Error completing transfer:', err);
     } finally {
@@ -184,21 +189,11 @@ export default function TransfersPage() {
   // so the button only shows up for that role.
   const handleDeleteTransfer = async (transferId: number) => {
     if (!confirm('¿Seguro que deseas eliminar esta transferencia? Se pierde su registro de trazabilidad.')) return;
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${transferId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setTransfers(prev => prev.filter(t => t.id !== transferId));
-      } else {
-        const err = await res.json();
-        console.error('Error deleting transfer:', err);
-      }
+      await apiFetch<unknown>(`/api/v1/transfers/${transferId}`, { method: 'DELETE' });
+      setTransfers(prev => prev.filter(t => t.id !== transferId));
     } catch (err) {
       console.error('Error deleting transfer:', err);
     }

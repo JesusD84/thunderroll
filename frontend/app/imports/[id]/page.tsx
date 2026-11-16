@@ -52,7 +52,6 @@ export default function ImportDetailPage() {
   const { data: session } = useSession();
   const { viewImports } = useAuth();
   const router = useRouter();
-  const token = (session as { accessToken?: string } | null)?.accessToken;
 
   useEffect(() => {
     if (session && !viewImports) {
@@ -75,8 +74,8 @@ export default function ImportDetailPage() {
     setError(null);
     try {
       const [detail, detailErrors] = await Promise.all([
-        getImport(id, token),
-        getImportErrors(id, token),
+        getImport(id),
+        getImportErrors(id),
       ]);
       setRecord(detail);
       setErrors(detailErrors);
@@ -87,7 +86,7 @@ export default function ImportDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, token]);
+  }, [id]);
 
   useEffect(() => {
     load();

@@ -3,9 +3,13 @@ import { waitFor } from '@testing-library/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TransfersPage from '@/app/transfers/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin' } };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
@@ -19,6 +23,8 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: mockStatus,
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
@@ -49,12 +55,12 @@ const mockLocations = [
 ];
 
 function mockOk(data: any) {
-  return Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+  return Promise.resolve(mockResponse(data));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin' } };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -231,12 +237,26 @@ describe('TransfersPage', () => {
     });
   });
 
-  it('does not fetch when no session token', async () => {
+  it('does not fetch when there is no session', async () => {
     mockSession = null;
     mockStatus = 'unauthenticated';
     render(<TransfersPage />);
     expect(screen.getByText('Cargando transferencias...')).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('fetches the transfers with a session that has no accessToken', async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockOk(mockTransfers))
+      .mockResolvedValueOnce(mockOk(mockLocations));
+    render(<TransfersPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Unidad #10')).toBeInTheDocument();
+    });
+    const transfersCall = mockFetch.mock.calls.find((c) => String(c[0]).includes('/transfers/'));
+    expect(transfersCall).toBeDefined();
+    expect(String(transfersCall![0])).toContain(`${API_BASE}/api/v1/transfers/`);
+    expect(new Headers(transfersCall![1]?.headers).get('Authorization')).toBeNull();
   });
 });
 

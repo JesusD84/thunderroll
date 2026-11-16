@@ -3,9 +3,13 @@ import { waitFor } from '@testing-library/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReportsPage from '@/app/reports/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin' } };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
@@ -19,13 +23,15 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: mockStatus,
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 function mockOk(data: any) {
-  return Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+  return Promise.resolve(mockResponse(data));
 }
 
 const mockInventoryData = {
@@ -54,7 +60,7 @@ const mockSalesData = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin' } };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -182,18 +188,25 @@ describe('ReportsPage', () => {
   });
 
   it('downloads Excel report on button click', async () => {
-    const blob = new Blob(['test'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    mockFetch.mockResolvedValueOnce({ ok: true, blob: () => Promise.resolve(blob) });
+    mockFetch.mockResolvedValueOnce(
+      mockResponse('test', {
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    );
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     render(<ReportsPage />);
     await user.click(screen.getByText('Descargar Excel'));
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/reports/export/inventory'),
-        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer fake-token' }) })
-      );
+      expect(mockFetch).toHaveBeenCalled();
     });
+    expect(String(mockFetch.mock.calls[0][0])).toContain(
+      `${API_BASE}/api/v1/reports/export/inventory`,
+    );
+    // The browser never carries the credential: it lives in the cookie and
+    // the server-side proxy adds the Authorization header.
+    const call = mockFetch.mock.calls[0];
+    expect(new Headers(call[1]?.headers).get('Authorization')).toBeNull();
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
   });

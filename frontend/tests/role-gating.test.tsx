@@ -6,6 +6,7 @@ import SettingsPage from '@/app/settings/page';
 import UnitsPage from '@/app/units/page';
 import UnitDetailPage from '@/app/units/[id]/page';
 import TransfersPage from '@/app/transfers/page';
+import { mockResponse } from './mocks/response';
 
 /**
  * Role gating: what each role may actually DO in the UI.
@@ -21,7 +22,9 @@ import TransfersPage from '@/app/transfers/page';
  */
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin', role: 'admin' } };
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -34,20 +37,19 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: 'authenticated',
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 function mockOk(data: any, totalCount?: number) {
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve(data),
-    headers: {
-      get: (name: string) =>
-        name === 'X-Total-Count' ? String(totalCount ?? (Array.isArray(data) ? data.length : 0)) : null,
-    },
-  });
+  return Promise.resolve(
+    mockResponse(data, {
+      totalCount: totalCount ?? (Array.isArray(data) ? data.length : 0),
+    }),
+  );
 }
 
 const mockLocations = [
@@ -104,7 +106,7 @@ function routeFetch(url: string) {
 }
 
 function asRole(role: 'admin' | 'manager' | 'operator') {
-  mockSession = { user: { name: role, role }, accessToken: 'fake-token' };
+  mockSession = { user: { name: role, role } };
 }
 
 beforeEach(() => {

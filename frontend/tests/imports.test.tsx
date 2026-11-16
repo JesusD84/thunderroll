@@ -3,9 +3,13 @@ import { waitFor } from '@testing-library/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ImportsPage from '@/app/imports/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin' } };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
@@ -19,11 +23,13 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: mockStatus,
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin' } };
   mockStatus = 'authenticated';
 });
 
@@ -58,13 +64,8 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 function mockJson(body: unknown, init: { ok?: boolean; status?: number } = {}) {
-  const { ok = true, status = 200 } = init;
-  return Promise.resolve({
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    text: () => Promise.resolve(JSON.stringify(body)),
-  });
+  const { status = init.ok === false ? 500 : 200 } = init;
+  return Promise.resolve(mockResponse(body, { status }));
 }
 
 // ============================================================
@@ -119,7 +120,7 @@ describe('ImportsPage', () => {
     expect(screen.getByText('20250823035826')).toBeInTheDocument();
 
     const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('/api/v1/imports/preview');
+    expect(url).toBe(`${API_BASE}/api/v1/imports/preview`);
   });
 
   it('renders per-sheet columns with the proposed mapping', async () => {
@@ -309,7 +310,7 @@ describe('ImportsPage', () => {
 
     // The upload request carried metadata + column_mapping.
     const uploadCall = mockFetch.mock.calls[1];
-    expect(uploadCall[0]).toContain('/api/v1/imports/upload');
+    expect(uploadCall[0]).toBe(`${API_BASE}/api/v1/imports/upload`);
     const body = uploadCall[1].body as FormData;
     expect(body.get('batch_period')).toBe('2026-ABRIL');
     // Tipo de producto ya no se captura en el form (oculto, no solicitado por
@@ -350,7 +351,7 @@ describe('ImportsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Identificador duplicado')).toBeInTheDocument();
     });
-    expect(mockFetch.mock.calls[2][0]).toContain('/api/v1/imports/7/errors');
+    expect(mockFetch.mock.calls[2][0]).toBe(`${API_BASE}/api/v1/imports/7/errors`);
   });
 
   it('shows an error when the import fails', async () => {

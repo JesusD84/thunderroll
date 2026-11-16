@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { apiFetch, ApiError, API_URL } from '@/lib/api';
+import { apiFetch, ApiError, API_BASE } from '@/lib/api';
+import { mockResponse as buildResponse } from './mocks/response';
 import {
   previewImport,
   uploadImport,
@@ -25,14 +26,11 @@ function mockResponse(
   body: unknown,
   init: { ok?: boolean; status?: number; statusText?: string } = {},
 ) {
-  const { ok = true, status = 200, statusText = 'OK' } = init;
-  const text = typeof body === 'string' ? body : JSON.stringify(body);
-  return Promise.resolve({
-    ok,
-    status,
-    statusText,
-    text: () => Promise.resolve(text),
-  });
+  const { ok = true, status = 200, statusText } = init;
+  const response = buildResponse(body, { status });
+  response.ok = ok;
+  if (statusText) response.statusText = statusText;
+  return Promise.resolve(response);
 }
 
 function lastCall() {
@@ -49,19 +47,18 @@ beforeEach(() => {
 });
 
 describe('apiFetch', () => {
-  it('attaches the bearer token when provided', async () => {
-    mockFetch.mockReturnValue(mockResponse({ ok: true }));
-    await apiFetch('/ping', { token: 'abc123' });
-    const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/ping`);
-    expect(headerValue(init, 'Authorization')).toBe('Bearer abc123');
-  });
-
-  it('omits the Authorization header when no token', async () => {
+  it('never sends an Authorization header (the credential lives in the cookie)', async () => {
     mockFetch.mockReturnValue(mockResponse({ ok: true }));
     await apiFetch('/ping');
-    const { init } = lastCall();
+    const { url, init } = lastCall();
+    expect(url).toBe(`${API_BASE}/ping`);
     expect(headerValue(init, 'Authorization')).toBeNull();
+  });
+
+  it('calls the server-side proxy instead of the backend', async () => {
+    mockFetch.mockReturnValue(mockResponse({ ok: true }));
+    await apiFetch('/api/v1/units/');
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/units/`);
   });
 
   it('serializes a JSON body and sets content-type', async () => {
@@ -95,6 +92,28 @@ describe('apiFetch', () => {
     });
   });
 
+  it('carries the backend detail (and the whole body) on the error', async () => {
+    mockFetch.mockReturnValue(
+      mockResponse({ detail: 'Invalid file type' }, { ok: false, status: 400 }),
+    );
+    await expect(apiFetch('/upload')).rejects.toMatchObject({
+      detail: 'Invalid file type',
+      body: { detail: 'Invalid file type' },
+    });
+  });
+
+  it('carries the list of validation errors on the error', async () => {
+    mockFetch.mockReturnValue(
+      mockResponse(
+        { detail: [{ msg: 'field required', loc: ['body', 'x'] }] },
+        { ok: false, status: 422 },
+      ),
+    );
+    await expect(apiFetch('/x')).rejects.toMatchObject({
+      detail: [{ msg: 'field required', loc: ['body', 'x'] }],
+    });
+  });
+
   it('extracts the message from FastAPI validation errors (array detail)', async () => {
     mockFetch.mockReturnValue(
       mockResponse(
@@ -120,11 +139,12 @@ describe('imports client', () => {
   it('previewImport posts FormData with file and column_mapping', async () => {
     mockFetch.mockReturnValue(mockResponse({ filename: 'f.xlsx' }));
     const file = new File(['x'], 'f.xlsx');
-    await previewImport(file, { NO: 'model', Color: 'color' }, 'tok');
+    await previewImport(file, { NO: 'model', Color: 'color' });
     const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/api/v1/imports/preview`);
+    expect(url).toBe(`${API_BASE}/api/v1/imports/preview`);
     expect(init.method).toBe('POST');
-    expect(headerValue(init, 'Authorization')).toBe('Bearer tok');
+    // The credential is in the session cookie; the proxy adds the header.
+    expect(headerValue(init, 'Authorization')).toBeNull();
     const body = init.body as FormData;
     expect(body.get('file')).toBeInstanceOf(File);
     expect(body.get('column_mapping')).toBe(
@@ -134,7 +154,7 @@ describe('imports client', () => {
 
   it('previewImport omits column_mapping when empty', async () => {
     mockFetch.mockReturnValue(mockResponse({ filename: 'f.xlsx' }));
-    await previewImport(new File(['x'], 'f.xlsx'), null, 'tok');
+    await previewImport(new File(['x'], 'f.xlsx'), null);
     const body = lastCall().init.body as FormData;
     expect(body.has('column_mapping')).toBe(false);
   });
@@ -144,10 +164,9 @@ describe('imports client', () => {
     await uploadImport(
       new File(['x'], 'f.csv'),
       { batch_period: '2026-ABRIL', product_type: 'scooter', columnMapping: { A: 'frame' } },
-      'tok',
     );
     const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/api/v1/imports/upload`);
+    expect(url).toBe(`${API_BASE}/api/v1/imports/upload`);
     const body = init.body as FormData;
     expect(body.get('batch_period')).toBe('2026-ABRIL');
     expect(body.get('product_type')).toBe('scooter');
@@ -156,7 +175,7 @@ describe('imports client', () => {
 
   it('uploadImport omits empty metadata fields', async () => {
     mockFetch.mockReturnValue(mockResponse({ import_id: 1 }));
-    await uploadImport(new File(['x'], 'f.csv'), {}, 'tok');
+    await uploadImport(new File(['x'], 'f.csv'), {});
     const body = lastCall().init.body as FormData;
     expect(body.has('batch_period')).toBe(false);
     expect(body.has('product_type')).toBe(false);
@@ -165,27 +184,27 @@ describe('imports client', () => {
 
   it('listImports builds the pagination query', async () => {
     mockFetch.mockReturnValue(mockResponse([]));
-    await listImports('tok', { skip: 10, limit: 25 });
-    expect(lastCall().url).toBe(`${API_URL}/api/v1/imports/?skip=10&limit=25`);
+    await listImports({ skip: 10, limit: 25 });
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/imports/?skip=10&limit=25`);
   });
 
   it('getImport targets the record path', async () => {
     mockFetch.mockReturnValue(mockResponse({ id: 7 }));
-    await getImport(7, 'tok');
-    expect(lastCall().url).toBe(`${API_URL}/api/v1/imports/7`);
+    await getImport(7);
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/imports/7`);
   });
 
   it('getImportErrors targets the errors path', async () => {
     mockFetch.mockReturnValue(mockResponse([]));
-    await getImportErrors(7, 'tok');
-    expect(lastCall().url).toBe(`${API_URL}/api/v1/imports/7/errors`);
+    await getImportErrors(7);
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/imports/7/errors`);
   });
 
   it('deleteImport uses the DELETE method', async () => {
     mockFetch.mockReturnValue(mockResponse(''));
-    await deleteImport(7, 'tok');
+    await deleteImport(7);
     const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/api/v1/imports/7`);
+    expect(url).toBe(`${API_BASE}/api/v1/imports/7`);
     expect(init.method).toBe('DELETE');
   });
 });
@@ -193,24 +212,23 @@ describe('imports client', () => {
 describe('model-equivalences client', () => {
   it('listModelEquivalences targets the base path', async () => {
     mockFetch.mockReturnValue(mockResponse([]));
-    await listModelEquivalences('tok');
-    expect(lastCall().url).toBe(`${API_URL}/api/v1/model-equivalences/`);
+    await listModelEquivalences();
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/model-equivalences/`);
   });
 
   it('listUnmappedModels targets the unmapped path', async () => {
     mockFetch.mockReturnValue(mockResponse([]));
-    await listUnmappedModels('tok');
-    expect(lastCall().url).toBe(`${API_URL}/api/v1/model-equivalences/unmapped`);
+    await listUnmappedModels();
+    expect(lastCall().url).toBe(`${API_BASE}/api/v1/model-equivalences/unmapped`);
   });
 
   it('createModelEquivalence posts a JSON payload', async () => {
     mockFetch.mockReturnValue(mockResponse({ id: 1 }));
     await createModelEquivalence(
       { manufacturer_model: 'X3', internal_model: '571' },
-      'tok',
     );
     const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/api/v1/model-equivalences/`);
+    expect(url).toBe(`${API_BASE}/api/v1/model-equivalences/`);
     expect(init.method).toBe('POST');
     expect(headerValue(init, 'Content-Type')).toBe('application/json');
     expect(init.body).toBe(
@@ -220,15 +238,15 @@ describe('model-equivalences client', () => {
 
   it('updateModelEquivalence uses PUT', async () => {
     mockFetch.mockReturnValue(mockResponse({ id: 1 }));
-    await updateModelEquivalence(1, { internal_model: 'TR 571 PLUS' }, 'tok');
+    await updateModelEquivalence(1, { internal_model: 'TR 571 PLUS' });
     const { url, init } = lastCall();
-    expect(url).toBe(`${API_URL}/api/v1/model-equivalences/1`);
+    expect(url).toBe(`${API_BASE}/api/v1/model-equivalences/1`);
     expect(init.method).toBe('PUT');
   });
 
   it('deleteModelEquivalence uses DELETE', async () => {
     mockFetch.mockReturnValue(mockResponse(''));
-    await deleteModelEquivalence(1, 'tok');
+    await deleteModelEquivalence(1);
     expect(lastCall().init.method).toBe('DELETE');
   });
 });

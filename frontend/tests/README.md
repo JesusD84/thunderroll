@@ -29,9 +29,10 @@ frontend/
 │   ├── reports.test.tsx      # Reports page (15 tests)
 │   ├── settings.test.tsx     # Settings page (13 tests)
 │   ├── use-cases.test.tsx    # Smoke/acceptance tests (17 tests)
-│   └── mocks/               # MSW handlers + server
+│   └── mocks/               # MSW handlers + server + shared fetch mock
 │       ├── handlers.ts
-│       └── server.ts
+│       ├── server.ts
+│       └── response.ts      # Shared `Response` mock for the fetch stubs
 ├── e2e/                    # End-to-end tests (Playwright)
 │   ├── auth.spec.ts        # Auth flows + navigation (10 tests)
 │   └── responsive.spec.ts  # Responsive design (1 test)

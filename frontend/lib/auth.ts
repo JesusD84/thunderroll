@@ -2,74 +2,36 @@
 
 import { useSession } from 'next-auth/react';
 
-export type Role = 'admin' | 'manager' | 'operator';
-
-/** Lowercase a possibly-missing role value, returning '' when absent. */
-export function normalizeRole(value: unknown): string {
-  return typeof value === 'string' ? value.toLowerCase() : '';
-}
+import { getPermissions, normalizeRole } from '@/lib/permissions';
+import type { Permissions, Role } from '@/lib/permissions';
 
 /**
- * Centralized, permission-based gating for the whole app.
- * Mirrors the backend `require_role` rules so the UI hides actions the
- * API would reject. Operator ("Operativo") is intentionally the most
- * restricted role: it can only dispatch/receive transfers (check units
- * in/out) and view available units across locations — no imports, no
- * equivalences, no reports, no unit CRUD, no user management.
+ * The permission rules live in `lib/permissions.ts` so the edge middleware
+ * can use the very same ones. They are re-exported here because this module
+ * is the one the UI imports.
  */
-export interface Permissions {
-  manageEquivalences: boolean;
-  deleteEquivalence: boolean;
-  viewEquivalences: boolean;
-  deleteImport: boolean;
-  uploadImport: boolean;
-  viewImports: boolean;
-  viewReports: boolean;
-  manageUnits: boolean;
-  deleteUnit: boolean;
-  deleteTransfer: boolean;
-  deleteLocation: boolean;
-  manageUsers: boolean;
-}
-
-export function getPermissions(role: unknown): Permissions {
-  const r = normalizeRole(role);
-  const isAdmin = r === 'admin';
-  const isManager = r === 'manager';
-  return {
-    manageEquivalences: isAdmin || isManager,
-    deleteEquivalence: isAdmin,
-    viewEquivalences: isAdmin || isManager,
-    deleteImport: isAdmin,
-    uploadImport: isAdmin || isManager,
-    viewImports: isAdmin || isManager,
-    viewReports: isAdmin || isManager,
-    manageUnits: isAdmin || isManager,
-    // The destructive endpoints are admin-only on the API
-    // (DELETE /units/{id}, DELETE /transfers/{id}, DELETE /locations/{id}),
-    // so the UI must not offer them to anyone else.
-    deleteUnit: isAdmin,
-    deleteTransfer: isAdmin,
-    deleteLocation: isAdmin,
-    manageUsers: isAdmin || isManager,
-  };
-}
+export { getPermissions, normalizeRole } from '@/lib/permissions';
+export type { Permissions, Role } from '@/lib/permissions';
 
 export interface AuthInfo extends Permissions {
-  token: string | undefined;
   role: string;
   isAdmin: boolean;
   isManager: boolean;
   isOperator: boolean;
 }
 
-/** Read the session once and expose token + role flags + permissions. */
+/**
+ * Read the session once and expose the role flags + permissions.
+ *
+ * The backend access token is NOT part of this: it lives inside the
+ * encrypted session cookie and is only ever read on the server (the proxy
+ * route handler). The browser never sees it, so there is nothing to leak
+ * through an XSS.
+ */
 export function useAuth(): AuthInfo {
   const { data: session } = useSession();
-  const token = (session as { accessToken?: string } | null)?.accessToken;
   const role = normalizeRole((session?.user as { role?: string } | undefined)?.role);
   return {
-    token,
     role,
     isAdmin: role === 'admin',
     isManager: role === 'manager',

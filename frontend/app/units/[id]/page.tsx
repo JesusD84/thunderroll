@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +14,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Unit {
   id: number;
@@ -134,57 +132,63 @@ export default function UnitDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeTransferId, setActiveTransferId] = useState<number | null>(null);
 
-  const parseError = (err: any): string => {
-    const detail = err.detail;
-    return typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : 'Error realizando operación';
+  const parseError = (err: unknown): string => {
+    const detail = err instanceof ApiError ? err.detail : undefined;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((d: unknown) => {
+          if (d && typeof d === 'object' && 'msg' in d) {
+            const msg = (d as { msg?: unknown }).msg;
+            return typeof msg === 'string' ? msg : String(msg ?? '');
+          }
+          return '';
+        })
+        .filter((m) => m !== '');
+      if (messages.length > 0) return messages.join(', ');
+    }
+    return 'Error realizando operación';
   };
 
-  const refreshData = async (token: string) => {
-    const [uRes, mRes] = await Promise.all([
-      sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-      sessionAwareFetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+  const refreshData = async () => {
+    const [unitData, movementsData] = await Promise.all([
+      apiFetch<Unit>(`/api/v1/units/${unitId}`).catch(() => null),
+      apiFetch<Movement[]>(`/api/v1/transfers/?unit_id=${unitId}`).catch(() => null),
     ]);
-    if (uRes.ok) setUnit(await uRes.json());
-    if (mRes.ok) setMovements(await mRes.json());
+    if (unitData) setUnit(unitData);
+    if (movementsData) setMovements(movementsData);
     // Check for active transfer
     try {
-      const atRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      setActiveTransferId(atRes.ok ? (await atRes.json()).id : null);
+      const active = await apiFetch<{ id: number }>(`/api/v1/transfers/unit/${unitId}/active`);
+      setActiveTransferId(active?.id ?? null);
     } catch { setActiveTransferId(null); }
   };
 
   const handleTransfer = async (toLocationId: number, notes?: string) => {
-    const token = (session as any)?.accessToken;
-    if (!token || !unit) return;
+    if (!session || !unit) return;
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/`, {
+      await apiFetch('/api/v1/transfers/', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           unit_id: unit.id,
           origin_location_id: unit.current_location_id,
           destination_location_id: toLocationId,
-        }),
+        },
       });
-      if (res.ok) {
-        await refreshData(token);
-        setShowTransfer(false);
-        setTransferTo('');
-        setTransferNotes('');
-      } else {
-        setActionError(parseError(await res.json()));
-      }
-    } catch { setActionError('Error de conexión'); }
+      await refreshData();
+      setShowTransfer(false);
+      setTransferTo('');
+      setTransferNotes('');
+    } catch (err) {
+      setActionError(err instanceof ApiError ? parseError(err) : 'Error de conexión');
+    }
     finally { setActionLoading(false); }
   };
 
   const handleConfirmArrival = async () => {
-    const token = (session as any)?.accessToken;
-    if (!token || !unit) return;
+    if (!session || !unit) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -197,82 +201,70 @@ export default function UnitDetailPage() {
       }
       // Complete the Transfer record: the unit becomes AVAILABLE at the
       // destination.
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
+      await apiFetch(`/api/v1/transfers/${activeTransferId}`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'RECEIVED' }),
+        json: { status: 'RECEIVED' },
       });
-      if (res.ok) {
-        await refreshData(token);
-      } else {
-        setActionError(parseError(await res.json()));
-      }
-    } catch { setActionError('Error de conexión'); }
+      await refreshData();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? parseError(err) : 'Error de conexión');
+    }
     finally { setActionLoading(false); }
   };
 
   const handleSell = async (notes?: string) => {
-    const token = (session as any)?.accessToken;
-    if (!token || !unit) return;
+    if (!session || !unit) return;
     setActionLoading(true);
     setActionError(null);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}/sell`, {
+      await apiFetch(`/api/v1/units/${unitId}/sell`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: notes?.trim() || null }),
+        json: { notes: notes?.trim() || null },
       });
-      if (res.ok) {
-        await refreshData(token);
-        setShowSell(false);
-        setSellNotes('');
-      } else {
-        setActionError(parseError(await res.json()));
-      }
-    } catch { setActionError('Error de conexión'); }
+      await refreshData();
+      setShowSell(false);
+      setSellNotes('');
+    } catch (err) {
+      setActionError(err instanceof ApiError ? parseError(err) : 'Error de conexión');
+    }
     finally { setActionLoading(false); }
   };
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token) return;
+      if (!session) return;
 
       try {
-        const [unitRes, movementsRes] = await Promise.all([
-          sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
-          sessionAwareFetch(`${API_URL}/api/v1/transfers/?unit_id=${unitId}`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
+        const [unitData, movementsData] = await Promise.all([
+          apiFetch<Unit>(`/api/v1/units/${unitId}`),
+          // The history is optional: the unit itself is what must load.
+          apiFetch<Movement[]>(`/api/v1/transfers/?unit_id=${unitId}`).catch(() => null),
         ]);
-
-        if (!unitRes.ok) throw new Error(`Unidad no encontrada (${unitRes.status})`);
-
-        const unitData = await unitRes.json();
         setUnit(unitData);
+        if (movementsData) setMovements(movementsData);
 
-        if (movementsRes.ok) {
-          const movementsData = await movementsRes.json();
-          setMovements(movementsData);
+        try {
+          setLocations(await apiFetch<Location[]>('/api/v1/locations/'));
+        } catch {
+          // Without the locations the modal cannot be filled in.
         }
-
-        const locsRes = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (locsRes.ok) setLocations(await locsRes.json());
 
         // Check for active transfer if unit is in transit
         if (unitData.status === 'IN_TRANSIT') {
-          const atRes = await sessionAwareFetch(`${API_URL}/api/v1/transfers/unit/${unitId}/active`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (atRes.ok) setActiveTransferId((await atRes.json()).id);
+          try {
+            const active = await apiFetch<{ id: number }>(`/api/v1/transfers/unit/${unitId}/active`);
+            setActiveTransferId(active?.id ?? null);
+          } catch {
+            setActiveTransferId(null);
+          }
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching unit:', err);
-        setError(err.message);
+        if (err instanceof ApiError && err.status === 404) {
+          setError(`Unidad no encontrada (${err.status})`);
+        } else {
+          setError(err instanceof Error ? err.message : 'Unidad no encontrada');
+        }
       } finally {
         setLoading(false);
       }
@@ -482,31 +474,27 @@ export default function UnitDetailPage() {
                 e.preventDefault();
                 setSaving(true);
                 setEditError(null);
-                const token = (session as any)?.accessToken;
-                if (!token) return;
+                if (!session) return;
                 try {
-                  const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
+                  const updated = await apiFetch<Unit>(`/api/v1/units/${unitId}`, {
                     method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    json: {
                       brand: editForm.brand || undefined,
                       model: editForm.model || undefined,
                       color: editForm.color || undefined,
                       engine_number: editForm.engine_number || null,
                       chassis_number: editForm.chassis_number || null,
                       notes: editForm.notes || null,
-                    }),
+                    },
                   });
-                  if (res.ok) {
-                    const updated = await res.json();
-                    setUnit(updated);
-                    setEditing(false);
-                  } else {
-                    const err = await res.json();
-                    setEditError(err.detail || 'Error actualizando unidad');
-                  }
+                  setUnit(updated);
+                  setEditing(false);
                 } catch (err) {
-                  setEditError('Error de conexión');
+                  if (err instanceof ApiError) {
+                    setEditError(typeof err.detail === 'string' ? err.detail : 'Error actualizando unidad');
+                  } else {
+                    setEditError('Error de conexión');
+                  }
                 } finally {
                   setSaving(false);
                 }

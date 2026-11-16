@@ -4,11 +4,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import UnitsPage from '@/app/units/page';
 import NewUnitPage from '@/app/units/new/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
 const mockPush = vi.fn();
 let mockSearchParams = new URLSearchParams();
-let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin', role: 'admin' } };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
@@ -22,6 +26,8 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: mockStatus,
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
@@ -57,11 +63,9 @@ const mockLocations = [
 ];
 
 function mockOk(data: any, totalCount?: number) {
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve(data),
-    headers: { get: (name: string) => (name === 'X-Total-Count' ? String(totalCount ?? data.length) : null) },
-  });
+  return Promise.resolve(
+    mockResponse(data, { totalCount: totalCount ?? data.length }),
+  );
 }
 
 function filterMockUnits(url: string) {
@@ -96,7 +100,7 @@ function mockUnitsAndLocations() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSearchParams = new URLSearchParams();
-  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin', role: 'admin' } };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -214,7 +218,7 @@ describe('UnitsPage', () => {
   });
 
   it('hides create-unit link for operator role', async () => {
-    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockSession = { user: { name: 'Op', role: 'operator' } };
     mockUnitsAndLocations();
     render(<UnitsPage />);
     await waitFor(() => {
@@ -245,10 +249,7 @@ describe('UnitsPage', () => {
       if (url.includes('/locations')) {
         return mockOk(mockLocations);
       }
-      return Promise.resolve({
-        ok: false, status: 500,
-        json: () => Promise.resolve({ detail: 'err' }),
-      });
+      return Promise.resolve(mockResponse({ detail: 'err' }, { status: 500 }));
     });
     render(<UnitsPage />);
     await waitFor(() => {
@@ -256,12 +257,26 @@ describe('UnitsPage', () => {
     });
   });
 
-  it('does not fetch when no session token', async () => {
+  it('does not fetch when there is no session', async () => {
     mockSession = null;
     mockStatus = 'unauthenticated';
     render(<UnitsPage />);
     expect(screen.getByText('Cargando unidades...')).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('fetches the units with a session that has no accessToken', async () => {
+    mockUnitsAndLocations();
+    render(<UnitsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Honda')).toBeInTheDocument();
+    });
+    expect(mockFetch).toHaveBeenCalled();
+    // The call goes to the server-side proxy and carries no credential.
+    const unitsCall = mockFetch.mock.calls.find((c) => String(c[0]).includes('/units/'));
+    expect(unitsCall).toBeDefined();
+    expect(String(unitsCall![0])).toContain(`${API_BASE}/api/v1/units/`);
+    expect(new Headers(unitsCall![1]?.headers).get('Authorization')).toBeNull();
   });
 
   it('pre-fills status filter from search params', async () => {
@@ -365,10 +380,11 @@ describe('NewUnitPage', () => {
   it('shows error message on failed creation', async () => {
     mockFetch
       .mockResolvedValueOnce(mockOk(mockLocations))
-      .mockResolvedValueOnce(Promise.resolve({
-        ok: false,
-        json: () => Promise.resolve({ detail: 'Motor ya existe' }),
-      }));
+      // The page shows the detail of the failed call: the stubbed body is
+      // the envelope FastAPI really sends.
+      .mockResolvedValueOnce(
+        mockResponse({ detail: 'Motor ya existe' }, { status: 400 }),
+      );
     render(<NewUnitPage />);
     await waitFor(() => {
       expect(screen.getByText('Agregar Nueva Unidad')).toBeInTheDocument();

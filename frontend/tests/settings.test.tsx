@@ -3,9 +3,13 @@ import { waitFor } from '@testing-library/react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SettingsPage from '@/app/settings/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin', role: 'admin' } };
 let mockStatus = 'authenticated';
 
 vi.mock('next/navigation', () => ({
@@ -19,13 +23,15 @@ vi.mock('next-auth/react', () => ({
     data: mockSession,
     status: mockStatus,
   }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 function mockOk(data: any) {
-  return Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+  return Promise.resolve(mockResponse(data));
 }
 
 const mockLocations = [
@@ -43,7 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // The role drives the permissions: without it the page would only offer the
   // "Mi cuenta" tab and the locations/users tabs would not render.
-  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin', role: 'admin' } };
   mockStatus = 'authenticated';
   mockFetch.mockReset();
 });
@@ -204,10 +210,14 @@ describe('SettingsPage', () => {
   it('shows location error message on delete failure', async () => {
     mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
     mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
-    mockFetch.mockResolvedValueOnce(Promise.resolve({
-      ok: false,
-      json: () => Promise.resolve({ detail: 'Cannot delete: there are 5 units at this location' }),
-    }));
+    // The page shows the detail of the failed call: the stubbed body is the
+    // envelope FastAPI really sends.
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(
+        { detail: 'Cannot delete: there are 5 units at this location' },
+        { status: 400 },
+      ),
+    );
     window.confirm = vi.fn(() => true);
     render(<SettingsPage />);
     await waitFor(() => {
@@ -241,16 +251,14 @@ describe('SettingsPage — Mi cuenta', () => {
     await user.type(screen.getByLabelText('Nueva contraseña *'), 'nueva12345');
     await user.type(screen.getByLabelText('Confirmar nueva contraseña *'), 'nueva12345');
     // Third call: the PUT to /user/me/password.
-    mockFetch.mockResolvedValueOnce(
-      Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) })
-    );
+    mockFetch.mockResolvedValueOnce(mockResponse('', { status: 204 }));
     await user.click(screen.getByText('Cambiar contraseña', { selector: 'button' }));
 
     await waitFor(() => {
       expect(screen.getByText('Contraseña actualizada correctamente.')).toBeInTheDocument();
     });
 
-    const call = mockFetch.mock.calls.find((c) => c[0].includes('/api/v1/user/me/password'));
+    const call = mockFetch.mock.calls.find((c) => c[0].includes(`${API_BASE}/api/v1/user/me/password`));
     expect(call).toBeDefined();
     expect(call![1].method).toBe('PUT');
     const body = JSON.parse(call![1].body);
@@ -272,11 +280,11 @@ describe('SettingsPage — Mi cuenta', () => {
     await waitFor(() => {
       expect(screen.getByText('La nueva contraseña y su confirmación no coinciden')).toBeInTheDocument();
     });
-    expect(mockFetch.mock.calls.some((c) => c[0].includes('/api/v1/user/me/password'))).toBe(false);
+    expect(mockFetch.mock.calls.some((c) => c[0].includes(`${API_BASE}/api/v1/user/me/password`))).toBe(false);
   });
 
   it('shows only the account tab for an operator', async () => {
-    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockSession = { user: { name: 'Op', role: 'operator' } };
     mockFetch.mockResolvedValueOnce(mockOk(mockLocations));
     mockFetch.mockResolvedValueOnce(mockOk(mockUsers));
     render(<SettingsPage />);

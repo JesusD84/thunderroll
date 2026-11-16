@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,8 +21,6 @@ import {
 import { Plus, Edit, Trash2, MapPin, KeyRound } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Location {
   id: number;
@@ -113,27 +111,22 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token) return;
+      if (!session) return;
 
       try {
         // Operators cannot list users (403): only fetch what the role allows.
-        const [locRes, usersRes] = await Promise.all([
-          sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          }),
+        const [locationsData, usersData] = await Promise.all([
+          apiFetch<Location[]>('/api/v1/locations/').catch(() => null),
           manageUsers
-            ? sessionAwareFetch(`${API_URL}/api/v1/user/`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-              })
+            ? apiFetch<User[]>('/api/v1/user/').catch(() => null)
             : Promise.resolve(null),
         ]);
 
-        if (locRes.ok) {
-          setLocations(await locRes.json());
+        if (locationsData) {
+          setLocations(locationsData);
         }
-        if (usersRes?.ok) {
-          setUsers(await usersRes.json());
+        if (usersData) {
+          setUsers(usersData);
         }
       } catch (err) {
         console.error('Error fetching settings data:', err);
@@ -147,110 +140,87 @@ export default function SettingsPage() {
 
   const handleCreateLocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
+      const created = await apiFetch<Location>('/api/v1/locations/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        json: {
           name: newLocation.name,
           address: newLocation.address || null,
-        }),
+        },
       });
-
-      if (res.ok) {
-        const created = await res.json();
-        setLocations(prev => [...prev, created]);
-        setShowNewLocation(false);
-        setNewLocation({ name: '', address: '' });
-      }
+      setLocations(prev => [...prev, created]);
+      setShowNewLocation(false);
+      setNewLocation({ name: '', address: '' });
     } catch (err) {
       console.error('Error creating location:', err);
     }
   };
 
   const handleEditLocation = async (locationId: number) => {
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
     setEditSaving(true);
     setLocationError(null);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/${locationId}`, {
+      const updated = await apiFetch<Location>(`/api/v1/locations/${locationId}`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           name: editForm.name || undefined,
           address: editForm.address || null,
-        }),
+        },
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setLocations(prev => prev.map(l => l.id === locationId ? updated : l));
-        setEditingLocation(null);
-      } else {
-        const err = await res.json();
+      setLocations(prev => prev.map(l => l.id === locationId ? updated : l));
+      setEditingLocation(null);
+    } catch (err) {
+      if (err instanceof ApiError) {
         setLocationError(typeof err.detail === 'string' ? err.detail : 'Error actualizando ubicación');
+      } else {
+        setLocationError('Error de conexión');
       }
-    } catch { setLocationError('Error de conexión'); }
-    finally { setEditSaving(false); }
+    } finally { setEditSaving(false); }
   };
 
   const handleDeleteLocation = async (locationId: number) => {
     if (!confirm('¿Seguro que deseas eliminar esta ubicación? Solo se puede eliminar si no tiene unidades asignadas.')) return;
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
     setLocationError(null);
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/${locationId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setLocations(prev => prev.filter(loc => loc.id !== locationId));
-      } else {
-        const err = await res.json();
+      await apiFetch<unknown>(`/api/v1/locations/${locationId}`, { method: 'DELETE' });
+      setLocations(prev => prev.filter(loc => loc.id !== locationId));
+    } catch (err) {
+      if (err instanceof ApiError) {
         setLocationError(typeof err.detail === 'string' ? mapDeleteLocationErrorToSpanish(err.detail) : 'Error eliminando ubicación');
+      } else {
+        setLocationError('Error de conexión');
       }
-    } catch {
-      setLocationError('Error de conexión');
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
     setUserSaving(true);
     setUserError(null);
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/`, {
+      const created = await apiFetch<User>('/api/v1/user/', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           ...newUser,
           role: isAdmin ? newUser.role : 'operator',
-        }),
+        },
       });
-
-      if (res.ok) {
-        const created = await res.json();
-        setUsers(prev => [...prev, created]);
-        setShowNewUser(false);
-        setNewUser(emptyNewUser);
-      } else {
-        const err = await res.json();
+      setUsers(prev => [...prev, created]);
+      setShowNewUser(false);
+      setNewUser(emptyNewUser);
+    } catch (err) {
+      if (err instanceof ApiError) {
         setUserError(typeof err.detail === 'string' ? err.detail : 'Error creando usuario');
+      } else {
+        setUserError('Error de conexión');
       }
-    } catch {
-      setUserError('Error de conexión');
     } finally {
       setUserSaving(false);
     }
@@ -260,8 +230,7 @@ export default function SettingsPage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     setPasswordError(null);
     setPasswordChanged(false);
@@ -277,26 +246,22 @@ export default function SettingsPage() {
 
     setPasswordSaving(true);
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/me/password`, {
+      await apiFetch('/api/v1/user/me/password', {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           current_password: passwordForm.current_password,
           new_password: passwordForm.new_password,
-        }),
+        },
       });
 
-      if (res.ok) {
-        setPasswordChanged(true);
-        setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+      setPasswordChanged(true);
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setPasswordError(typeof err.detail === 'string' ? err.detail : 'Error cambiando la contraseña');
       } else {
-        const err = await res.json().catch(() => ({}));
-        setPasswordError(
-          typeof err.detail === 'string' ? err.detail : 'Error cambiando la contraseña'
-        );
+        setPasswordError('Error de conexión');
       }
-    } catch {
-      setPasswordError('Error de conexión');
     } finally {
       setPasswordSaving(false);
     }
@@ -323,16 +288,14 @@ export default function SettingsPage() {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = (session as any)?.accessToken;
-    if (!token || !editingUser) return;
+    if (!session || !editingUser) return;
     setEditUserSaving(true);
     setEditUserError(null);
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/${editingUser.id}`, {
+      const updated = await apiFetch<User>(`/api/v1/user/${editingUser.id}`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           email: editUserForm.email,
           username: editUserForm.username,
           first_name: editUserForm.first_name,
@@ -341,19 +304,17 @@ export default function SettingsPage() {
           is_active: editUserForm.is_active === 'true',
           // Only sent when filled: an empty field means "leave it as is".
           ...(editUserForm.password ? { password: editUserForm.password } : {}),
-        }),
+        },
       });
 
-      if (res.ok) {
-        const updated: User = await res.json();
-        setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-        closeEditUser();
-      } else {
-        const err = await res.json();
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      closeEditUser();
+    } catch (err) {
+      if (err instanceof ApiError) {
         setEditUserError(typeof err.detail === 'string' ? err.detail : 'Error actualizando usuario');
+      } else {
+        setEditUserError('Error de conexión');
       }
-    } catch {
-      setEditUserError('Error de conexión');
     } finally {
       setEditUserSaving(false);
     }
@@ -361,24 +322,18 @@ export default function SettingsPage() {
 
   const handleDeleteUser = async (user: User) => {
     if (!confirm(`¿Seguro que deseas eliminar a ${user.first_name} ${user.last_name}? Esta acción no se puede deshacer.`)) return;
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
     setUserActionError(null);
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/user/${user.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setUsers(prev => prev.filter(u => u.id !== user.id));
-      } else {
-        const err = await res.json().catch(() => ({}));
+      await apiFetch<unknown>(`/api/v1/user/${user.id}`, { method: 'DELETE' });
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+    } catch (err) {
+      if (err instanceof ApiError) {
         setUserActionError(typeof err.detail === 'string' ? err.detail : 'Error eliminando usuario');
+      } else {
+        setUserActionError('Error de conexión');
       }
-    } catch {
-      setUserActionError('Error de conexión');
     }
   };
 

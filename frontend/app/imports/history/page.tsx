@@ -46,7 +46,7 @@ function formatDate(value: string | null): string {
 }
 
 export default function ImportsHistoryPage() {
-  const { token, deleteImport: canDelete, viewImports } = useAuth();
+  const { deleteImport: canDelete, viewImports } = useAuth();
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -63,7 +63,7 @@ export default function ImportsHistoryPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await listImports(token);
+      const data = await listImports();
       setImports(data);
     } catch (err) {
       const message =
@@ -71,7 +71,7 @@ export default function ImportsHistoryPage() {
       setError(message);
       setImports([]);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -80,7 +80,7 @@ export default function ImportsHistoryPage() {
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
-      await deleteImport(id, token);
+      await deleteImport(id);
       setImports((prev) => (prev ? prev.filter((i) => i.id !== id) : prev));
       toast.success('Importación eliminada');
     } catch (err) {

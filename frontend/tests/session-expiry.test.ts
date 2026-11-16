@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mockResponse } from './mocks/response';
 
-const mockSignOut = vi.fn(() => Promise.resolve());
+const mockSignOut = vi.fn((..._args: unknown[]) => Promise.resolve());
 vi.mock('next-auth/react', () => ({
   signOut: (...args: unknown[]) => mockSignOut(...args),
+  // The session renewal asks NextAuth for the session again; there is none.
+  getSession: () => Promise.resolve(null),
 }));
 
 const mockAssign = vi.fn();
@@ -75,12 +78,14 @@ describe('handleSessionExpired', () => {
 
 describe('sessionAwareFetch / apiFetch', () => {
   it('triggers the expiry flow on 401 and never resolves', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve(new Response('{"detail":"Could not validate credentials"}', { status: 401 })));
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(mockResponse({ detail: 'Could not validate credentials' }, { status: 401 })),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const { apiFetch } = await import('@/lib/api');
 
     let settled = false;
-    apiFetch('/api/v1/units/', { token: 'expired' }).finally(() => { settled = true; });
+    apiFetch('/api/v1/units/').finally(() => { settled = true; });
     await new Promise((r) => setTimeout(r, 20));
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
@@ -89,16 +94,20 @@ describe('sessionAwareFetch / apiFetch', () => {
   });
 
   it('passes 403 through as an ApiError without signing out', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{"detail":"Not enough permissions"}', { status: 403 }))));
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve(mockResponse({ detail: 'Not enough permissions' }, { status: 403 })),
+    ));
     const { apiFetch, ApiError } = await import('@/lib/api');
 
-    await expect(apiFetch('/api/v1/imports/', { token: 'ok' })).rejects.toBeInstanceOf(ApiError);
+    await expect(apiFetch('/api/v1/imports/')).rejects.toBeInstanceOf(ApiError);
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(mockAssign).not.toHaveBeenCalled();
   });
 
   it('does not treat a 401 as expiry when skipSessionExpiry is set', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{"detail":"Incorrect username or password"}', { status: 401 }))));
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve(mockResponse({ detail: 'Incorrect username or password' }, { status: 401 })),
+    ));
     const { apiFetch, ApiError } = await import('@/lib/api');
 
     await expect(apiFetch('/api/v1/auth/login', { skipSessionExpiry: true })).rejects.toBeInstanceOf(ApiError);

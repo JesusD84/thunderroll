@@ -1,9 +1,11 @@
 
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import type { JWT } from 'next-auth/jwt';
 
 import {
   BackendTokenResponse,
+  fetchBackendUser,
   refreshBackendToken,
   shouldRefreshAccessToken,
 } from '@/lib/backend-auth';
@@ -11,6 +13,38 @@ import {
 export const dynamic = "force-dynamic";
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+
+/**
+ * Cada cuánto se relee el rol del backend.
+ *
+ * El rol se guarda en la cookie de sesión (para que el middleware pueda
+ * aplicarlo sin pedir nada al backend). Como un cambio de rol debe
+ * reflejarse sin cerrar la sesión, la copia se refresca cada vez que la
+ * sesión se renueva y, como máximo, una vez por minuto en el resto de
+ * lecturas: así el cambio se ve en menos de un minuto sin pedir el usuario
+ * al backend en cada navegación.
+ */
+const ROLE_REFRESH_INTERVAL_MS = 60_000;
+
+/**
+ * Relee el rol del backend y lo guarda en la cookie de sesión.
+ *
+ * Con `renewed` (la sesión acaba de renovarse) el rol se relee siempre; si
+ * no, solo cuando la copia es más vieja que el intervalo.
+ */
+async function refreshRole(token: JWT, renewed: boolean): Promise<void> {
+  if (!token.accessToken) return;
+
+  const checkedAt = typeof token.roleCheckedAt === 'number' ? token.roleCheckedAt : 0;
+  const stale = Date.now() - checkedAt > ROLE_REFRESH_INTERVAL_MS;
+  if (!renewed && !stale) return;
+
+  const user = await fetchBackendUser(token.accessToken);
+  if (!user) return;
+
+  token.role = user.role;
+  token.roleCheckedAt = Date.now();
+}
 
 const handler = NextAuth({
   providers: [
@@ -92,6 +126,8 @@ const handler = NextAuth({
         token.accessToken = (user as any).accessToken;
         token.refreshToken = (user as any).refreshToken;
         token.accessTokenExpiresAt = (user as any).accessTokenExpiresAt;
+        // El rol recién leído del backend ya está al día.
+        token.roleCheckedAt = Date.now();
         return token;
       }
 
@@ -99,11 +135,13 @@ const handler = NextAuth({
       // uno nuevo con el token de refresco. Esto pasa en cada lectura de
       // sesión (/api/auth/session), así que la sesión se renueva sola.
       const expiresAt = token.accessTokenExpiresAt;
+      let renewed = false;
       if (token.refreshToken && shouldRefreshAccessToken(expiresAt)) {
         const fresh = await refreshBackendToken(token.refreshToken);
         if (fresh) {
           token.accessToken = fresh.access_token;
           token.accessTokenExpiresAt = Date.now() + fresh.expires_in * 1000;
+          renewed = true;
         } else {
           // El token de refresco ya no vale: la sesión se cierra. Se borra
           // también el refresh token para no reintentar en cada lectura.
@@ -113,14 +151,20 @@ const handler = NextAuth({
         }
       }
 
+      // El rol se relee del backend: un cambio de rol aplica sin cerrar la
+      // sesión. El backend sigue siendo la fuente de verdad (evalúa el rol
+      // en cada petición); esto solo mantiene la copia de la cookie al día.
+      await refreshRole(token, renewed);
+
       return token;
     },
     async session({ session, token }) {
       if (token) {
         (session.user as any).role = token.role;
         (session.user as any).id = token.id;
-        (session as any).accessToken = token.accessToken;
-        (session as any).accessTokenExpiresAt = token.accessTokenExpiresAt;
+        // El token de acceso NO se copia a la sesión: vive solo dentro de
+        // la cookie cifrada y lo lee el servidor (el proxy de la API). Si
+        // llegara al navegador, cualquier XSS podría leerlo.
       }
       return session;
     },

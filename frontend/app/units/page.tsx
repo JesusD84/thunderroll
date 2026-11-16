@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { API_BASE, apiFetch, ApiError, sessionAwareFetch } from '@/lib/api';
 import { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { useSearchParams } from 'next/navigation';
 import { ErrorState, LoadingState, EmptyState } from '@/components/ui/states';
 import { useAuth } from '@/lib/auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const PAGE_SIZE = 20;
 
 interface Unit {
@@ -105,20 +104,15 @@ function UnitsPageContent() {
   }, [searchTerm, statusFilter, locationFilter]);
 
   useEffect(() => {
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
-    sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
-      .then((res) => (res.ok ? res.json() : []))
+    apiFetch<Location[]>('/api/v1/locations/')
       .then(setLocations)
       .catch((err) => console.error('Error fetching locations:', err));
   }, [session]);
 
   const fetchUnits = async () => {
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     setLoading(true);
     setError(null);
@@ -131,15 +125,14 @@ function UnitsPageContent() {
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (locationFilter !== 'all') params.set('location_id', locationFilter);
 
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      // The total count travels in a header, so this call needs the raw Response.
+      const res = await sessionAwareFetch(`${API_BASE}/api/v1/units/?${params.toString()}`);
 
       if (!res.ok) {
         throw new Error('No se pudieron cargar las unidades');
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as Unit[];
       setUnits(data);
       setTotalCount(Number(res.headers.get('X-Total-Count') ?? data.length));
     } catch (err) {
@@ -159,25 +152,19 @@ function UnitsPageContent() {
   // button only shows up for that role.
   const handleDeleteUnit = async (unitId: number) => {
     if (!confirm('¿Seguro que deseas eliminar esta unidad? Esta acción no se puede deshacer.')) return;
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        setError(typeof err.detail === 'string' ? err.detail : 'Error eliminando unidad');
-        return;
-      }
+      await apiFetch<unknown>(`/api/v1/units/${unitId}`, { method: 'DELETE' });
       setUnits(prev => prev.filter(u => u.id !== unitId));
       setTotalCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Error deleting unit:', err);
-      setError('Error de conexión');
+      if (err instanceof ApiError) {
+        setError(typeof err.detail === 'string' ? err.detail : 'Error eliminando unidad');
+      } else {
+        setError('Error de conexión');
+      }
     }
   };
 
