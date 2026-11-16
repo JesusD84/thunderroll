@@ -4,6 +4,8 @@
 
 Sistema de trazabilidad de inventario para **Thunderoll**, empresa de scooters/motos en Guadalajara. Rastrea unidades desde importación hasta venta, pasando por bodega, taller, tránsito y sucursales.
 
+> **Onboarding:** [`docs/RAMPEO_PRODUCTO.md`](./docs/RAMPEO_PRODUCTO.md) (negocio y cliente) · [`docs/RAMPEO_TECNICO.md`](./docs/RAMPEO_TECNICO.md) (stack, cómo correr el código, primer PR) · [`AGENTS.md`](./AGENTS.md) (contexto rápido cross-agent).
+
 ---
 
 ## Stack tecnológico
@@ -33,28 +35,35 @@ thunderroll/
 │   │   │   └── v1/
 │   │   │       ├── router.py           # Registra todos los endpoint routers
 │   │   │       └── endpoints/
-│   │   │           ├── auth.py          # Login, JWT
-│   │   │           ├── units.py         # CRUD de unidades
+│   │   │           ├── auth.py          # Login, refresh y reset de contraseña (JWT + rate limit)
+│   │   │           ├── units.py         # CRUD de unidades (+ /stats, filtro server-side, paginación)
 │   │   │           ├── locations.py     # Ubicaciones
-│   │   │           ├── imports.py       # Importación Excel
+│   │   │           ├── imports.py       # Importación Excel (/preview, /upload, historial, errores)
+│   │   │           ├── model_equivalences.py # Equivalencias de modelo (+ /unmapped)
 │   │   │           ├── transfers.py     # Transferencias entre ubicaciones
 │   │   │           ├── reports.py       # Reportes y exportaciones
 │   │   │           └── user.py          # Gestión de usuarios
 │   │   ├── core/
-│   │   │   └── security.py             # CryptContext para bcrypt
+│   │   │   ├── security.py             # CryptContext para bcrypt
+│   │   │   ├── config.py               # Config validada al importar (SECRET_KEY, DATABASE_URL)
+│   │   │   ├── cors.py                 # Orígenes permitidos (localhost solo en development)
+│   │   │   └── rate_limit.py           # slowapi: límites por IP y por cuenta
 │   │   ├── database/
 │   │   │   ├── database.py             # Engine, SessionLocal, Base, get_db
 │   │   │   └── seed.py                 # Bootstrap: crea la cuenta admin si la DB está vacía (corre en startup)
 │   │   ├── models/
-│   │   │   ├── models.py               # SQLAlchemy models (User, Location, Unit, Transfer, Import, ImportError)
+│   │   │   ├── models.py               # SQLAlchemy models (User, Location, Unit, Transfer, ModelEquivalence, Import, ImportError)
 │   │   │   └── schemas.py              # Pydantic schemas (Token, Unit, Transfer, etc.)
 │   │   ├── repositories/               # Capa de acceso a datos
 │   │   ├── schemas/                    # Schemas Pydantic adicionales por dominio
 │   │   ├── services/                   # Lógica de negocio
 │   │   │   ├── auth_service.py         # JWT, password hashing, RBAC
 │   │   │   ├── unit_service.py
-│   │   │   ├── transfer.py
-│   │   │   ├── import_excel.py
+│   │   │   ├── transfer_service.py
+│   │   │   ├── import_parser.py        # Parser tolerante a esquemas del Excel del proveedor
+│   │   │   ├── model_equivalence_service.py
+│   │   │   ├── location_service.py
+│   │   │   ├── user_service.py
 │   │   │   ├── report.py
 │   │   │   ├── email.py
 │   │   │   └── ...
@@ -71,15 +80,27 @@ thunderroll/
 │   │   ├── units/page.tsx              # Listado de unidades
 │   │   ├── units/[id]/page.tsx         # Detalle de unidad
 │   │   ├── units/new/page.tsx          # Nueva unidad
-│   │   ├── imports/page.tsx            # Importación Excel
+│   │   ├── imports/page.tsx            # Importación Excel (wizard: upload → preview → mapeo → import)
+│   │   ├── imports/history/page.tsx    # Historial de imports (+ borrado, solo ADMIN)
+│   │   ├── imports/[id]/page.tsx       # Detalle de import + errores por fila
+│   │   ├── model-equivalences/page.tsx # CRUD de equivalencias + modelos sin equivalencia
 │   │   ├── transfers/page.tsx          # Transferencias
 │   │   ├── reports/page.tsx            # Reportes
 │   │   ├── settings/page.tsx           # Configuración
 │   │   ├── api/auth/                   # NextAuth route handler
 │   │   ├── layout.tsx                  # Root layout (Inter font, SessionProvider, Navigation)
 │   │   └── globals.css
+│   ├── lib/                            # Helpers compartidos del cliente
+│   │   ├── api.ts                      # apiFetch / sessionAwareFetch (inyecta Bearer, maneja 401)
+│   │   ├── imports.ts                  # Funciones tipadas + tipos del contrato de imports
+│   │   ├── auth.ts                     # useAuth + getPermissions (gating por rol)
+│   │   ├── session-expiry.ts           # handleSessionExpired + safeCallbackUrl
+│   │   ├── session-refresh.ts          # refreshAccessToken (single-flight) ante un 401
+│   │   ├── backend-auth.ts             # Cliente del backend: refreshBackendToken + shouldRefreshAccessToken
+│   │   └── utils.ts                    # (types.ts es boilerplate sin uso)
 │   ├── components/
 │   │   ├── Navigation.tsx              # Navbar principal
+│   │   ├── imports/                    # PreviewResult.tsx, ImportResult.tsx
 │   │   ├── providers/SessionProvider   # NextAuth wrapper
 │   │   └── ui/                         # shadcn/ui (button, card, table, select, etc.)
 │   ├── types/next-auth.d.ts            # Session/JWT type augmentation
@@ -102,14 +123,70 @@ thunderroll/
 - **TransferStatus**: `PENDING`, `IN_TRANSIT`, `RECEIVED`, `CANCELLED`
 
 ### Tablas principales
-- **users** — email, username, first_name, last_name, role, hashed_password, is_active
+- **users** — email, username, first_name, last_name, role, hashed_password, is_active, token_version (contador de revocación; viaja dentro de los tokens)
 - **locations** — name, address
 - **units** — engine_number (unique, nullable), chassis_number (unique, nullable), model, brand, color, current_location_id, status, sold_date, notes
 - **transfers** — unit_id, dispatched_by_id, received_by_id, origin_location_id, destination_location_id, status, dispatched_at, received_at (**una transferencia = una unidad**, no hay tabla pivote)
+- **model_equivalences** — manufacturer_model (unique), internal_model, notes, created_at, updated_at (mapea el nombre de modelo del fabricante al modelo interno del cliente)
 - **imports** — filename, original_filename, total_records, successful_imports, failed_imports, user_id, status, import_date, completed_at
 - **import_errors** — import_id, row_number, error_message, raw_data
 
 > No existe tabla `movements` ni enum `MovementType`. La trazabilidad se reconstruye a partir de los `transfers` y del `status`/`sold_date` de cada unidad.
+
+---
+
+## Autenticación y tokens
+
+Todos los tokens son JWT firmados con `SECRET_KEY`. Cada token dice **qué es** (`typ`) y **a qué versión de la cuenta** pertenece (`ver`); ambos claims se validan en el punto de uso, así que un token solo sirve para lo suyo.
+
+### Claims
+
+| Claim | Significado |
+|-------|-------------|
+| `sub` | id del usuario (nunca el username) en los tokens de acceso y refresco; email en los de reset |
+| `typ` | `access` \| `refresh` \| `password_reset` |
+| `ver` | `users.token_version` de la cuenta: si no coincide con el valor guardado, el token está revocado |
+| `exp` | caducidad (acceso 60 min, refresco 7 días, reset de contraseña 15 min) |
+
+### Tipos de token
+
+| `typ` | Para qué sirve | Cómo queda invalidado |
+|-------|----------------|-----------------------|
+| `access` | Credencial de la API (`Authorization: Bearer …`) | Al expirar, o al subir `token_version` |
+| `refresh` | Pedir un `access` nuevo sin volver a autenticarse | Al expirar, o al subir `token_version` |
+| `password_reset` | Canjear la contraseña desde el email | **De un solo uso**: al canjearlo, la contraseña cambia y el contador sube |
+
+Cada tipo se rechaza donde se espera el otro: un token de reset no abre sesión (**401**) y un token de acceso no resetea contraseñas (**400**).
+
+### Revocación (`users.token_version`)
+
+No hay session store: la revocación se hace con un contador entero en `users.token_version` que viaja dentro del token.
+
+- Se **incrementa** al cambiar la contraseña, al resetearla, al cambiar el rol y al desactivar la cuenta.
+- Un token cuyo `ver` no coincide con el valor guardado → **401**.
+- El token de reset también queda invalidado por lo mismo: al canjearlo, la contraseña cambia, el contador sube y ese token no se puede usar dos veces.
+
+### Contrato de los endpoints
+
+`POST /api/v1/auth/login` (form-urlencoded) →
+```json
+{ "access_token": "…", "refresh_token": "…", "token_type": "bearer", "expires_in": 3600 }
+```
+
+`POST /api/v1/auth/refresh` — cabecera `Authorization: Bearer <refresh_token>` →
+```json
+{ "access_token": "…", "refresh_token": "…", "token_type": "bearer", "expires_in": 3600 }
+```
+
+Devuelve un `access_token` nuevo; el `refresh_token` **no rota** (7 días fijos desde su emisión). Un refresh token revocado, expirado o de otro tipo → **401**.
+
+`POST /api/v1/auth/forgot-password` → `{"message": "…"}`, siempre **200** exista o no la cuenta. El correo se manda en un `BackgroundTask`: un SMTP roto no cambia la respuesta, solo queda en el log.
+
+`POST /api/v1/auth/reset-password` (`{"token": "…", "new_password": "…"}`) → **200** o **400**.
+
+### Rate limiting
+
+`login` y `forgot-password`: 5/min por IP **y** por cuenta. `refresh`: 30/min por IP y por cuenta. Al pasarse: **429**.
 
 ---
 
@@ -127,9 +204,12 @@ thunderroll/
 - **Next.js App Router** (no Pages Router)
 - **Path alias**: `@/*` apunta a la raíz del frontend
 - **Auth**: NextAuth con custom credentials provider que llama al backend JWT
-- **Session type** extendida en `types/next-auth.d.ts` con `role` y `accessToken`
+- **Session type** extendida en `types/next-auth.d.ts` con `role`, `accessToken` y `accessTokenExpiresAt`
 - **UI**: shadcn/ui components en `components/ui/`
-- **Fetching**: Mezcla de SWR, TanStack Query y fetch directo (no hay un patrón único consolidado)
+- **Fetching**: el patrón consolidado es `fetch` + `useState` vía `lib/api.ts` (`apiFetch` inyecta el `Bearer`); SWR, TanStack Query, Zustand y Jotai están instalados pero **no** son el estándar usado
+- **Permisos en UI**: `lib/auth.ts` (`useAuth` + `getPermissions`) es la única fuente de gating del frontend; refleja las reglas de `require_role` del backend
+- **401 / sesión expirada**: `lib/session-expiry.ts` (`handleSessionExpired`, single-flight) cierra sesión y redirige a `/login?reason=expired&callbackUrl=…`; `safeCallbackUrl()` bloquea redirects externos. Las peticiones autenticadas deben ir por `sessionAwareFetch()`
+- **Refresco de sesión**: el access token dura 60 min; el `refresh_token` (7 días) permite renovarlo sin volver a autenticarse. El backend renueva de forma proactiva en el callback `jwt` de NextAuth (`lib/backend-auth.ts`), y `lib/api.ts` reintenta la petición una vez si el backend responde 401. Si el refresh tampoco vale, cae al flujo de sesión expirada
 
 ---
 
@@ -210,7 +290,7 @@ La contraseña del admin bootstrap **no está en el repositorio**: usa `BOOTSTRA
 
 2. **Schemas duplicados**: Pydantic schemas existen en dos lugares: `app/models/schemas.py` (monolítico) y `app/schemas/` (separados por dominio). Al agregar/modificar schemas, verificar cuál se usa en el endpoint correspondiente.
 
-3. **Múltiples libs de state management instaladas**: Zustand, Jotai, SWR y TanStack Query están todas en package.json. No hay un estándar consolidado — al hacer nuevas features, verificar qué se usa en páginas similares.
+3. **Múltiples libs de state management instaladas**: Zustand, Jotai, SWR y TanStack Query están todas en package.json. El patrón consolidado del proyecto es `fetch` + `useState` vía `lib/api.ts` — al hacer nuevas features, seguir ese patrón y no introducir otra librería.
 
 4. **Múltiples libs de forms**: react-hook-form + zod y formik + yup coexisten.
 
@@ -218,7 +298,7 @@ La contraseña del admin bootstrap **no está en el repositorio**: usa `BOOTSTRA
 
 6. **Prisma NO se usa**: aunque pueda aparecer en devDeps, no hay `schema.prisma` ni configuración. La autenticación es NextAuth con credentials provider que llama al backend.
 
-7. **CORS**: `main.py` permite `localhost:3000`, `frontend:3000` y el valor de la variable `FRONTEND_URL` (para producción).
+7. **CORS**: `app/core/cors.py` solo agrega los orígenes de `localhost` (`localhost:3000`, `127.0.0.1:3000`, `frontend:3000`) cuando `ENV=development`; en producción valen únicamente `FRONTEND_URL` y `ALLOWED_ORIGINS`.
 
 8. **No hay .env comprometido** — copiar `.env.example` a `.env` antes de iniciar.
 
@@ -236,7 +316,29 @@ Importar Excel → Unidades en AVAILABLE (en bodega)
                  Vender → SOLD
 ```
 
-Cada cambio de estado genera un registro en la tabla `movements` para trazabilidad completa.
+Cada cambio de estado se refleja en `units.status` / `units.sold_date` y deja un registro en la tabla `transfers`; la trazabilidad completa se reconstruye a partir de ambos (no existe tabla `movements`).
+
+---
+
+## Módulo de importaciones (Excel del proveedor)
+
+El módulo está **completo** (FR-00…FR-10). Seguimiento local: `frontend/IMPORTS_MODULE_TASKS.md`.
+
+- **Campos canónicos**: `frame`, `motor`, `color`, `model`, `brand` — siempre `string` (preservar seriales largos, sin notación científica ni `.0`).
+- **Sinónimos del parser**: `marca`/`brand`/`品牌` → `brand`; la columna `Marca` del Excel del proveedor mapea a `brand` y si viene vacía se guarda `"Sin especificar"`.
+- **Metadata del upload**: `batch_period` (ej. `"2026-ABRIL"`) y `product_type` (opcionales). Formatos: `.xlsx`, `.xls`, `.csv`.
+- **Preview no bloquea** el import: `invalid_rows` es esperado y el import es atómico con éxito parcial (errores por fila en `import_errors`).
+- **Endpoints**: `POST /imports/preview`, `POST /imports/upload`, `GET /imports/`, `GET /imports/{id}`, `GET /imports/{id}/errors`, `DELETE /imports/{id}` (solo ADMIN); equivalencias en `/model-equivalences` (CRUD + `GET /unmapped`).
+- **Frontend**: wizard en `/imports` (archivo+metadata → preview → mapeo asistido → importar) + historial en `/imports/history` + detalle en `/imports/[id]`.
+
+---
+
+## Workflow de trabajo
+
+- **Una rama y un PR por tarea**, commits con mensajes descriptivos, tests antes de cada PR.
+- `main` está protegida: requiere PR, que pasen **Backend Tests** (pytest) y **Frontend Tests** (vitest), rama actualizada y conversaciones resueltas. **No push directo ni force-push a `main`.**
+- Frontend → Vercel (preview por PR, producción al mergear). Backend + DB → Render (push a `main`).
+- Alembic está configurado pero **el deploy no lo ejecuta**: las tablas se crean con `create_all` en el lifespan (se revirtió `alembic upgrade head` del startCommand por una migración rota).
 
 ---
 
@@ -264,14 +366,23 @@ Cada cambio de estado genera un registro en la tabla `movements` para trazabilid
 DATABASE_URL          # PostgreSQL connection string
 SECRET_KEY            # JWT signing key (obligatoria: sin ella se genera una efímera)
 ALGORITHM             # JWT algorithm (HS256)
-ACCESS_TOKEN_EXPIRE_MINUTES  # Token TTL (default 30)
+ACCESS_TOKEN_EXPIRE_MINUTES  # Token TTL (default: 60)
+REFRESH_TOKEN_EXPIRE_DAYS   # Vida del token de refresco (default: 7)
+RATE_LIMIT_LOGIN_PER_MINUTE, RATE_LIMIT_FORGOT_PASSWORD_PER_MINUTE, RATE_LIMIT_REFRESH_PER_MINUTE  # Límites por IP y por cuenta (5 / 5 / 30)
 BOOTSTRAP_ADMIN_PASSWORD      # Password inicial del admin bootstrap (opcional)
 
 # Frontend
-NEXT_PUBLIC_API_URL   # URL del backend (http://localhost:8000)
+NEXT_PUBLIC_API_URL   # URL del backend (http://localhost:8000) — llamadas del navegador
+BACKEND_URL           # URL del backend para el login server-side de NextAuth (distinta de la anterior)
 NEXTAUTH_URL          # URL del frontend (http://localhost:3000)
 NEXTAUTH_SECRET       # Secret para NextAuth
 
 # SMTP (para emails)
 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+
+# CORS
+FRONTEND_URL, ALLOWED_ORIGINS
+ENV                      # development = agrega los orígenes de localhost a la lista de CORS
 ```
+
+> Las variables viven **centralizadas en el `.env` de la raíz** (docker-compose las inyecta a postgres/backend/frontend). `backend/.env` ya no existe.

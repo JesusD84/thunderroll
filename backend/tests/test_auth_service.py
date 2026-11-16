@@ -12,6 +12,8 @@ from app.services.auth_service import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     ALGORITHM,
     SECRET_KEY,
+    TOKEN_TYPE_ACCESS,
+    TOKEN_TYPE_PASSWORD_RESET,
     authenticate_user,
     create_access_token,
     create_password_reset_token,
@@ -71,15 +73,33 @@ def test_get_password_hash_is_verifiable():
 
 
 def test_create_access_token_contains_sub():
-    """Token encodes the 'sub' claim."""
-    token = create_access_token(data={"sub": "admin"})
+    """Token encodes the 'sub' claim with the user id (not the username)."""
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    assert payload["sub"] == "admin"
+    assert payload["sub"] == "7"
+
+
+def test_create_access_token_contains_type():
+    """The token declares its own type, so it cannot be used as a reset token."""
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["typ"] == TOKEN_TYPE_ACCESS
+
+
+def test_create_access_token_contains_token_version():
+    """The token carries the revocation counter of the account."""
+    user = User(id=7, username="admin", email="admin@test.com", token_version=3)
+    token = create_access_token(user)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["ver"] == 3
 
 
 def test_create_access_token_contains_exp():
     """Token contains an expiration claim."""
-    token = create_access_token(data={"sub": "admin"})
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     assert "exp" in payload
 
@@ -87,7 +107,8 @@ def test_create_access_token_contains_exp():
 def test_create_access_token_default_expiry():
     """Default expiry is ACCESS_TOKEN_EXPIRE_MINUTES from now."""
     before = datetime.now(UTC)
-    token = create_access_token(data={"sub": "admin"})
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     after = datetime.now(UTC)
     expected_min = before + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -101,7 +122,8 @@ def test_create_access_token_default_expiry():
 def test_create_access_token_custom_expiry():
     """Custom expires_delta is respected."""
     delta = timedelta(minutes=5)
-    token = create_access_token(data={"sub": "admin"}, expires_delta=delta)
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user, expires_delta=delta)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     exp = datetime.fromtimestamp(payload["exp"], tz=UTC)
     now = datetime.now(UTC)
@@ -222,11 +244,30 @@ def test_authenticate_user_not_found():
 
 def test_create_password_reset_token():
     """Creates a valid reset token with correct claims."""
-    token = create_password_reset_token("admin@test.com")
+    token = create_password_reset_token("admin@test.com", 0)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     assert payload["sub"] == "admin@test.com"
-    assert payload["type"] == "password_reset"
+    assert payload["typ"] == TOKEN_TYPE_PASSWORD_RESET
+    assert payload["ver"] == 0
     assert "exp" in payload
+
+
+def test_create_password_reset_token_expires_in_15_minutes():
+    """The reset token keeps its 15 minutes of life."""
+    before = datetime.now(UTC)
+    token = create_password_reset_token("admin@test.com", 0)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    after = datetime.now(UTC)
+    exp = datetime.fromtimestamp(payload["exp"], tz=UTC)
+    assert before + timedelta(minutes=15) - timedelta(seconds=5) <= exp
+    assert exp <= after + timedelta(minutes=15) + timedelta(seconds=5)
+
+
+def test_create_password_reset_token_is_bound_to_the_token_version():
+    """The reset token carries the revocation counter of the account."""
+    token = create_password_reset_token("admin@test.com", 5)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["ver"] == 5
 
 
 # ---------------------------------------------------------------------------
@@ -235,15 +276,17 @@ def test_create_password_reset_token():
 
 
 def test_verify_password_reset_token_valid():
-    """Returns email for a valid reset token."""
-    token = create_password_reset_token("admin@test.com")
-    email = verify_password_reset_token(token)
-    assert email == "admin@test.com"
+    """Returns the claims of a valid reset token."""
+    token = create_password_reset_token("admin@test.com", 2)
+    claims = verify_password_reset_token(token)
+    assert claims.email == "admin@test.com"
+    assert claims.token_version == 2
 
 
 def test_verify_password_reset_token_wrong_type():
     """Raises HTTPException when token type is not 'password_reset'."""
-    token = create_access_token(data={"sub": "admin@test.com"})
+    user = User(id=7, username="admin", email="admin@test.com", token_version=0)
+    token = create_access_token(user)
     with pytest.raises(HTTPException) as exc:
         verify_password_reset_token(token)
     assert exc.value.status_code == 400
@@ -252,7 +295,12 @@ def test_verify_password_reset_token_wrong_type():
 def test_verify_password_reset_token_expired():
     """Raises HTTPException for expired token."""
     expire = datetime.now(UTC) - timedelta(minutes=1)
-    to_encode = {"sub": "admin@test.com", "type": "password_reset", "exp": expire}
+    to_encode = {
+        "sub": "admin@test.com",
+        "typ": TOKEN_TYPE_PASSWORD_RESET,
+        "ver": 0,
+        "exp": expire,
+    }
     token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     with pytest.raises(HTTPException) as exc:
         verify_password_reset_token(token)

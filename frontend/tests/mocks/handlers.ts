@@ -3,7 +3,8 @@ import { http, HttpResponse } from 'msw';
 const API = 'http://localhost:8000';
 
 export const handlers = [
-  http.post(`${API}/api/v1/auth/login`, () => HttpResponse.json({ access_token: 'mock-jwt' })),
+  http.post(`${API}/api/v1/auth/login`, () => HttpResponse.json({ access_token: 'mock-jwt', refresh_token: 'mock-refresh', token_type: 'bearer', expires_in: 3600 })),
+  http.post(`${API}/api/v1/auth/refresh`, () => HttpResponse.json({ access_token: 'mock-jwt-2', refresh_token: 'mock-refresh', token_type: 'bearer', expires_in: 3600 })),
   http.get(`${API}/api/v1/user/me`, () => HttpResponse.json({ id: 1, email: 'admin@t.com', first_name: 'Admin', last_name: 'User', role: 'admin' })),
   http.get(`${API}/api/v1/reports/dashboard`, () => HttpResponse.json({ total_units: 42, available_units: 30, sold_units: 8, in_transit_units: 4, inventory_by_location: [], sales_by_month: [], recent_transfers: [], recent_imports: [] })),
   http.get(`${API}/api/v1/units/`, () => HttpResponse.json([{ id: 1, brand: 'Honda', model: 'PCX', engine_number: 'ENG001', chassis_number: 'CHS001', color: 'Rojo', status: 'AVAILABLE', location_name: 'Bodega Central' }, { id: 2, brand: 'Yamaha', model: 'NMAX', engine_number: 'ENG002', chassis_number: 'CHS002', color: 'Azul', status: 'SOLD', location_name: 'Sucursal Norte' }])),

@@ -48,7 +48,9 @@ function LoginForm() {
         redirect: false,
       });
 
-      if (result?.error) {
+      if (result?.error === 'RateLimit') {
+        setError('Demasiados intentos. Espera un minuto antes de volver a intentarlo.');
+      } else if (result?.error) {
         setError('Credenciales inválidas. Verifica el email y contraseña.');
       } else if (result?.ok) {
         router.replace(callbackUrl);
