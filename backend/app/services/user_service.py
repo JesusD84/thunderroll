@@ -1,10 +1,18 @@
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.models import User, UserRole
-from app.schemas.user import PasswordChange, UserCreate, UserUpdate
+from app.schemas.user import PasswordChange, UserCreate, UserSelfUpdate, UserUpdate
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import get_password_hash, verify_password
+
+
+# The only attributes a user may change on their own account. ``role`` and
+# ``is_active`` are administrator-only and never appear here: the self-update
+# schema already forbids them, and this allowlist is the second line of
+# defense in case that schema is ever widened by mistake.
+SELF_UPDATE_FIELDS = frozenset({"email", "username", "first_name", "last_name"})
 
 
 class UserService:
@@ -34,8 +42,47 @@ class UserService:
         return UserRepository.create_user(db, user_data, hashed_password)
 
     @staticmethod
-    def update_current_user(db: Session, current_user: User, user_update: UserUpdate) -> User:
-        return UserRepository.update_user(db, current_user, user_update)
+    def update_current_user(
+        db: Session, current_user: User, user_update: UserSelfUpdate
+    ) -> User:
+        """Apply a self-service edit to the caller's own account.
+
+        The payload is validated against ``UserSelfUpdate``, which forbids
+        ``role``, ``is_active`` and any unknown field. On top of that, only
+        the fields in ``SELF_UPDATE_FIELDS`` are ever written, so a future
+        change to the schema cannot turn into a privilege escalation.
+        """
+        changes = {
+            field: value
+            for field, value in user_update.model_dump(exclude_unset=True).items()
+            if field in SELF_UPDATE_FIELDS
+        }
+
+        # A NOT NULL column may not be nulled out: reject it as a bad request
+        # instead of letting the ORM raise (which would surface as a 500).
+        for field, value in changes.items():
+            if value is None:
+                raise HTTPException(status_code=422, detail=f"{field} cannot be null")
+
+        # Same uniqueness rules as the admin edit flow, so a duplicate email
+        # or username is a 400 and never a 500 from the unique index.
+        if "email" in changes and changes["email"] != current_user.email:
+            if UserRepository.get_user_by_email(db, email=changes["email"]):
+                raise HTTPException(status_code=400, detail="Email already registered")
+
+        if "username" in changes and changes["username"] != current_user.username:
+            if UserRepository.get_user_by_username(db, username=changes["username"]):
+                raise HTTPException(status_code=400, detail="Username already registered")
+
+        try:
+            return UserRepository.update_user(db, current_user, user_update)
+        except IntegrityError as exc:
+            # Lost the race against a concurrent registration of the same
+            # email/username: the unique index rejected the write.
+            db.rollback()
+            raise HTTPException(
+                status_code=400, detail="Email or username already registered"
+            ) from exc
 
     @staticmethod
     def change_own_password(db: Session, current_user: User, payload: PasswordChange) -> None:
@@ -72,6 +119,12 @@ class UserService:
         # the column is ``hashed_password``.
         new_password = changes.pop("password", None)
 
+        # A NOT NULL column may not be nulled out: reject it as a bad request
+        # instead of letting the ORM raise (which would surface as a 500).
+        for field, value in changes.items():
+            if value is None and field in ("email", "username", "first_name", "last_name"):
+                raise HTTPException(status_code=422, detail=f"{field} cannot be null")
+
         # An admin cannot lock themselves out of the system.
         if db_user.id == admin.id:
             if changes.get("role", admin.role) != UserRole.ADMIN:
@@ -90,7 +143,15 @@ class UserService:
         if new_password is not None:
             db_user.hashed_password = get_password_hash(new_password)
 
-        return UserRepository.update_user(db, db_user, user_update)
+        try:
+            return UserRepository.update_user(db, db_user, user_update)
+        except IntegrityError as exc:
+            # The unique index on email/username rejected the write (a race
+            # against a concurrent registration): 400, never a 500.
+            db.rollback()
+            raise HTTPException(
+                status_code=400, detail="Email or username already registered"
+            ) from exc
 
     @staticmethod
     def delete_user(db: Session, user_id: int, admin: User) -> None:

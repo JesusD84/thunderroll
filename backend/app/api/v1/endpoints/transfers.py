@@ -43,7 +43,16 @@ def create_transfer(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    return TransferService.create_transfer(db, transfer)
+    """Dispatch a unit.
+
+    An Operator may only dispatch: the attribution of the dispatch (who sent
+    it, when) is written by the server from the session, so a body that tries
+    to set it is rejected with 422.
+    """
+    payload = transfer
+    if current_user.role == UserRole.OPERATOR:
+        payload = TransferService.restrict_create_for_operator(transfer, current_user)
+    return TransferService.create_transfer(db, payload)
 
 
 @router.post("/unit/{unit_id}")
@@ -82,7 +91,16 @@ def update_transfer(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
 ):
-    return TransferService.update_transfer(db, transfer_id, transfer_update)
+    """Update a transfer.
+
+    An Operator may only confirm the arrival: the dispatch record (who sent
+    the unit, when, from where to where) must not be rewritten by the role
+    that receives, so such a body is rejected with 422.
+    """
+    payload = transfer_update
+    if current_user.role == UserRole.OPERATOR:
+        payload = TransferService.restrict_update_for_operator(transfer_update)
+    return TransferService.update_transfer(db, transfer_id, payload)
 
 
 @router.delete("/{transfer_id}")

@@ -1,7 +1,14 @@
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.models.models import User
 from app.schemas.user import UserCreate, UserUpdate
+
+
+# Attributes that must never be written through the generic setattr loop:
+# the primary key and the password hash. Passwords are hashed and assigned
+# explicitly by the service, and ``id`` is not something a payload may move.
+PROTECTED_FIELDS = frozenset({"id", "hashed_password"})
 
 
 class UserRepository:
@@ -34,13 +41,19 @@ class UserRepository:
         return db_user
 
     @staticmethod
-    def update_user(db: Session, db_user: User, user_update: UserUpdate) -> User:
+    def update_user(db: Session, db_user: User, user_update: BaseModel) -> User:
         update_data = user_update.model_dump(exclude_unset=True)
         # ``password`` is never a column: it is hashed by the service before
         # reaching this point. Setting it here would shadow a non-mapped
         # attribute instead of updating ``hashed_password``.
         update_data.pop("password", None)
+        # Only real columns are written, and never the primary key or the
+        # password hash: this loop must not be able to reach an attribute the
+        # caller did not intend to change, whatever the schema allows.
+        writable = {column.name for column in User.__table__.columns} - PROTECTED_FIELDS
         for field, value in update_data.items():
+            if field not in writable:
+                continue
             setattr(db_user, field, value)
         db.commit()
         db.refresh(db_user)

@@ -1,15 +1,18 @@
 from datetime import datetime, UTC
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
+from app.models.models import Transfer, TransferStatus, Unit, UnitStatus, User, UserRole
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.transfer import (
     TransferCreate,
+    TransferDispatchCreate,
     TransferFilters,
+    TransferReceiveUpdate,
     TransferUpdate,
     TransferStats,
     UnitTransferRequest,
@@ -45,6 +48,60 @@ class TransferService:
             db.commit()
 
         return TransferRepository.create_transfer(db, payload)
+
+    @staticmethod
+    def restrict_create_for_operator(transfer: TransferCreate, actor: User) -> TransferCreate:
+        """Narrow an Operator's dispatch payload to what that role may write.
+
+        The attribution of a dispatch (who sent the unit, when) belongs to
+        the server: it is taken from the session, never from the request
+        body. The payload is re-validated against ``TransferDispatchCreate``,
+        so anything outside the dispatch fields is rejected with 422.
+        """
+        try:
+            dispatch = TransferDispatchCreate.model_validate(
+                transfer.model_dump(exclude_unset=True)
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Operators can only dispatch a unit: send unit_id, "
+                    "origin_location_id and destination_location_id."
+                ),
+            ) from exc
+
+        return TransferCreate(
+            unit_id=dispatch.unit_id,
+            origin_location_id=dispatch.origin_location_id,
+            destination_location_id=dispatch.destination_location_id,
+            dispatched_by_id=actor.id,
+            status=TransferStatus.PENDING,
+        )
+
+    @staticmethod
+    def restrict_update_for_operator(transfer: TransferUpdate) -> TransferUpdate:
+        """Narrow an Operator's update payload to confirming the arrival.
+
+        Rewriting the dispatch record (who dispatched the unit, when, from
+        where to where) would falsify the traceability trail, so an Operator
+        may only confirm the arrival. The payload is re-validated against
+        ``TransferReceiveUpdate``: anything else is rejected with 422.
+        """
+        try:
+            receive = TransferReceiveUpdate.model_validate(
+                transfer.model_dump(exclude_unset=True)
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Operators can only confirm the arrival of a transfer "
+                    "(status=RECEIVED)."
+                ),
+            ) from exc
+
+        return TransferUpdate(status=receive.status)
 
     @staticmethod
     def transfer_unit_with_status_update(

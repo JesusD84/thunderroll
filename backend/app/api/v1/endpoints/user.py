@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models import models
 from app.models.models import UserRole
-from app.schemas import PasswordChange, User, UserCreate, UserUpdate
+from app.schemas import PasswordChange, User, UserCreate, UserSelfUpdate, UserUpdate
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.user_service import UserService
 
@@ -37,10 +37,17 @@ async def read_users_me(current_user: models.User = Depends(get_current_active_u
 
 @router.put("/me", response_model=User)
 async def update_users_me(
-    user_update: UserUpdate,
+    user_update: UserSelfUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
+    """Update the caller's own profile.
+
+    The body is validated against ``UserSelfUpdate``, which only accepts the
+    fields a user may change on themselves. ``role`` and ``is_active`` are
+    administrator-only: sending them here is rejected with 422 instead of
+    being applied.
+    """
     return UserService.update_current_user(db, current_user, user_update)
 
 
