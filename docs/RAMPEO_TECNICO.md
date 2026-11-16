@@ -135,6 +135,23 @@ En `backend/app/main.py`, el `lifespan` corre al arrancar:
 
 Nada más. No hay ubicaciones, unidades ni usuarios de ejemplo: el cliente arma su propio inventario real.
 
+> **`create_all` no altera las tablas que ya existen.** Solo crea las que faltan. Si añades una columna
+> nueva al modelo, la base real (Neon) **no** la recibe con el deploy y la app no arranca contra ella:
+> `column users.token_version does not exist` y el deploy se queda colgado (la instancia vieja sigue
+> sirviendo, pero el código nuevo nunca entra).
+>
+> **Antes de mergear una columna nueva**, aplícala a la base con su migración real:
+>
+> ```bash
+> # La cadena de migraciones está rota antes de la 005, así que primero se marca
+> # el revision anterior y luego se aplica la que toca:
+> alembic stamp 004_lifecycle_integrity
+> alembic upgrade head
+> ```
+>
+> `backend/tmp_apply_005_neon.py` es un script que lo hace con informe previo y verificación
+> (lee la URL de Neon de `NEON_DATABASE_URL` o de `backend/.env.neon.local`).
+
 ---
 
 ## 2. Las tecnologías, explicadas por su rol **en este proyecto**
