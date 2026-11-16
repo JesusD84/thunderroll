@@ -6,7 +6,6 @@ from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 
 class UnitRepository:
-
     @staticmethod
     def _apply_filters(query, filters: UnitFilters):
         if filters.status:
@@ -22,16 +21,18 @@ class UnitRepository:
         if filters.search:
             search_term = f"%{filters.search}%"
             query = query.filter(
-                Unit.engine_number.ilike(search_term) |
-                Unit.chassis_number.ilike(search_term) |
-                Unit.model.ilike(search_term) |
-                Unit.brand.ilike(search_term)
+                Unit.engine_number.ilike(search_term)
+                | Unit.chassis_number.ilike(search_term)
+                | Unit.model.ilike(search_term)
+                | Unit.brand.ilike(search_term)
             )
 
         return query
 
     @staticmethod
-    def get_units(db: Session, filters: UnitFilters, skip: int, limit: int) -> list[Unit]:
+    def get_units(
+        db: Session, filters: UnitFilters, skip: int, limit: int
+    ) -> list[Unit]:
         query = db.query(Unit).options(selectinload(Unit.current_location))
         query = UnitRepository._apply_filters(query, filters)
         return query.order_by(Unit.id.desc()).offset(skip).limit(limit).all()
@@ -66,7 +67,10 @@ class UnitRepository:
 
     @staticmethod
     def get_by_engine_or_chassis_excluding(
-        db: Session, engine_number: str | None, chassis_number: str | None, exclude_id: int
+        db: Session,
+        engine_number: str | None,
+        chassis_number: str | None,
+        exclude_id: int,
     ) -> Unit | None:
         conditions = []
         if engine_number is not None:
@@ -76,14 +80,7 @@ class UnitRepository:
         if not conditions:
             return None
         return (
-            db.query(Unit)
-            .filter(
-                and_(
-                    Unit.id != exclude_id,
-                    or_(*conditions)
-                )
-            )
-            .first()
+            db.query(Unit).filter(and_(Unit.id != exclude_id, or_(*conditions))).first()
         )
 
     @staticmethod
@@ -100,7 +97,10 @@ class UnitRepository:
     @staticmethod
     def update_unit(db: Session, unit: Unit, unit_update: UnitUpdate) -> Unit:
         update_data = unit_update.model_dump(exclude_unset=True)
-        if "current_location_id" in update_data and update_data["current_location_id"] is None:
+        if (
+            "current_location_id" in update_data
+            and update_data["current_location_id"] is None
+        ):
             raise ValueError("current_location_id is required")
 
         for field, value in update_data.items():
@@ -118,14 +118,16 @@ class UnitRepository:
         db.commit()
 
     @staticmethod
-    def get_unit_transfers(db: Session, unit_id: int, skip: int, limit: int) -> list[Transfer]:
+    def get_unit_transfers(
+        db: Session, unit_id: int, skip: int, limit: int
+    ) -> list[Transfer]:
         return (
             db.query(Transfer)
             .options(
                 selectinload(Transfer.dispatched_by),
                 selectinload(Transfer.received_by),
                 selectinload(Transfer.origin_location),
-                selectinload(Transfer.destination_location)
+                selectinload(Transfer.destination_location),
             )
             .filter(Transfer.unit_id == unit_id)
             .order_by(Transfer.dispatched_at.desc())
@@ -137,9 +139,13 @@ class UnitRepository:
     @staticmethod
     def get_stats(db: Session) -> dict:
         total_units = db.query(Unit).count()
-        in_stock_units = db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
+        in_stock_units = (
+            db.query(Unit).filter(Unit.status == UnitStatus.AVAILABLE).count()
+        )
         sold_units = db.query(Unit).filter(Unit.status == UnitStatus.SOLD).count()
-        in_transit_units = db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
+        in_transit_units = (
+            db.query(Unit).filter(Unit.status == UnitStatus.IN_TRANSIT).count()
+        )
 
         inventory_by_location = (
             db.query(Location.name, func.count(Unit.id).label("count"))
@@ -156,5 +162,5 @@ class UnitRepository:
             "inventory_by_location": [
                 {"location": loc.name, "count": loc.count}
                 for loc in inventory_by_location
-            ]
+            ],
         }

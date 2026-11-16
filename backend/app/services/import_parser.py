@@ -192,7 +192,9 @@ def apply_manual_mapping(
     fields are re-filled so a newly mapped ``model`` column propagates its merged
     cells.
     """
-    cleaned = {col: fld for col, fld in column_to_field.items() if fld in CANONICAL_FIELDS}
+    cleaned = {
+        col: fld for col, fld in column_to_field.items() if fld in CANONICAL_FIELDS
+    }
     issues: list[ParseIssue] = []
     if not cleaned:
         return issues
@@ -420,7 +422,9 @@ def parse_sheet(raw: pd.DataFrame, sheet_name: str | None = None) -> ParsedTable
 
     # Drop fully-empty rows up front so they cannot receive a forward-filled
     # value (a blank row is not a merged cell, it is simply not a unit).
-    data = data[~data.apply(lambda r: all(_is_blank(v) for v in r.tolist()), axis=1)].copy()
+    data = data[
+        ~data.apply(lambda r: all(_is_blank(v) for v in r.tolist()), axis=1)
+    ].copy()
 
     # Forward-fill descriptive columns held in merged cells (e.g. a model that
     # only appears in the first row of its block). Never identifier columns.
@@ -483,7 +487,9 @@ def _read_raw_sheets(source: Source, filename: str) -> dict[str, pd.DataFrame]:
     """
     lower = filename.lower()
     if lower.endswith(".csv"):
-        buf = io.StringIO(source.decode("utf-8")) if isinstance(source, bytes) else source
+        buf = (
+            io.StringIO(source.decode("utf-8")) if isinstance(source, bytes) else source
+        )
         return {"csv": pd.read_csv(buf, header=None, dtype=object)}
 
     excel_source: Any = io.BytesIO(source) if isinstance(source, bytes) else source

@@ -37,14 +37,16 @@ def create_demo_data():
         password, generated = _bootstrap_admin_password()
 
         print("Creating bootstrap admin user...")
-        db.add(User(
-            email="admin@thunderoll.com",
-            username="admin",
-            first_name="Admin",
-            last_name="Usuario",
-            role=UserRole.ADMIN,
-            hashed_password=get_password_hash(password)
-        ))
+        db.add(
+            User(
+                email="admin@thunderoll.com",
+                username="admin",
+                first_name="Admin",
+                last_name="Usuario",
+                role=UserRole.ADMIN,
+                hashed_password=get_password_hash(password),
+            )
+        )
         db.commit()
         print("✅ Bootstrap admin user created successfully!")
 
@@ -61,6 +63,7 @@ def create_demo_data():
         raise
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     asyncio.run(create_demo_data())

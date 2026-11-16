@@ -7,9 +7,10 @@ from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 
 
 class LocationService:
-
     @staticmethod
-    def get_locations(db: Session, filters: LocationFilters, skip: int, limit: int) -> list[Location]:
+    def get_locations(
+        db: Session, filters: LocationFilters, skip: int, limit: int
+    ) -> list[Location]:
         return LocationRepository.get_locations(db, filters, skip, limit)
 
     @staticmethod
@@ -24,7 +25,9 @@ class LocationService:
         return LocationRepository.create_location(db, location_data)
 
     @staticmethod
-    def update_location(db: Session, location_id: int, location_update: LocationUpdate) -> Location:
+    def update_location(
+        db: Session, location_id: int, location_update: LocationUpdate
+    ) -> Location:
         db_location = LocationRepository.get_location(db, location_id)
         if not db_location:
             raise HTTPException(status_code=404, detail="Location not found")
@@ -38,7 +41,10 @@ class LocationService:
 
         unit_count = LocationRepository.count_units_at_location(db, location_id)
         if unit_count > 0:
-            raise HTTPException(status_code=400, detail=f"Cannot delete: there {'is' if unit_count == 1 else 'are'} {unit_count} unit{'s' if unit_count != 1 else ''} at this location")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete: there {'is' if unit_count == 1 else 'are'} {unit_count} unit{'s' if unit_count != 1 else ''} at this location",
+            )
 
         LocationRepository.delete_location(db, db_location)
         return {"message": "Location deleted successfully"}

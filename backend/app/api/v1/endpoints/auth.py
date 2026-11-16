@@ -1,4 +1,3 @@
-
 import logging
 from datetime import timedelta
 
@@ -24,10 +23,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.post("/login", response_model=schemas.Token)
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -42,16 +41,18 @@ async def login_for_access_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.post("/forgot-password")
 async def forgot_password(
-    request: ForgotPasswordRequest,
-    db: Session = Depends(get_db)
+    request: ForgotPasswordRequest, db: Session = Depends(get_db)
 ):
     user = get_user_by_email(db, email=request.email)
     if user:
         try:
             reset_token = create_password_reset_token(user.email)
-            await send_password_reset_email(to_email=user.email, reset_token=reset_token)
+            await send_password_reset_email(
+                to_email=user.email, reset_token=reset_token
+            )
         except Exception as exc:
             logger.exception("Failed to send password reset email to %s", user.email)
             # A broken SMTP must be visible. Answering 200 here would be
@@ -66,11 +67,9 @@ async def forgot_password(
     # whether an account exists.
     return {"message": "If that email exists, a reset link was sent."}
 
+
 @router.post("/reset-password")
-async def reset_password(
-    request: ResetPasswordRequest,
-    db: Session = Depends(get_db)
-):
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     email = verify_password_reset_token(request.token)
     user = get_user_by_email(db, email=email)
     if not user:

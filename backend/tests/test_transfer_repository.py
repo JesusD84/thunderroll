@@ -10,6 +10,7 @@ from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
 # get_transfers
 # ---------------------------------------------------------------------------
 
+
 def test_get_transfers_no_filters():
     """Returns paginated transfers without filters."""
     mock_db = MagicMock()
@@ -34,6 +35,7 @@ def test_get_transfers_with_status_filter():
 # get_transfer
 # ---------------------------------------------------------------------------
 
+
 def test_get_transfer_found():
     """Returns transfer when ID exists."""
     mock_db = MagicMock()
@@ -56,6 +58,7 @@ def test_get_transfer_not_found():
 # ---------------------------------------------------------------------------
 # create_transfer
 # ---------------------------------------------------------------------------
+
 
 def test_create_transfer_success():
     """Creates a transfer and commits."""
@@ -86,6 +89,7 @@ def test_create_transfer_does_not_null_dispatched_at():
 def test_create_transfer_keeps_provided_dispatched_at():
     """When dispatched_at is provided explicitly, it must be kept."""
     from datetime import UTC, datetime
+
     mock_db = MagicMock()
     provided_at = datetime.now(UTC)
     transfer_data = TransferCreate(unit_id=1, dispatched_at=provided_at)
@@ -99,6 +103,7 @@ def test_create_transfer_keeps_provided_dispatched_at():
 # ---------------------------------------------------------------------------
 # update_transfer
 # ---------------------------------------------------------------------------
+
 
 def test_update_transfer_success():
     """Updates transfer fields."""
@@ -117,6 +122,7 @@ def test_update_transfer_success():
 # delete_transfer
 # ---------------------------------------------------------------------------
 
+
 def test_delete_transfer_success():
     """Deletes transfer and commits."""
     mock_db = MagicMock()
@@ -132,6 +138,7 @@ def test_delete_transfer_success():
 # count_transfers
 # ---------------------------------------------------------------------------
 
+
 def test_count_transfers():
     """Returns total transfer count."""
     mock_db = MagicMock()
@@ -145,13 +152,17 @@ def test_count_transfers():
 # create_unit_transfer
 # ---------------------------------------------------------------------------
 
+
 def test_create_unit_transfer_success():
     """Creates a unit transfer record with all fields."""
     mock_db = MagicMock()
 
     result = TransferRepository.create_unit_transfer(
-        mock_db, unit_id=1, dispatched_by_id=2,
-        origin_location_id=3, destination_location_id=4,
+        mock_db,
+        unit_id=1,
+        dispatched_by_id=2,
+        origin_location_id=3,
+        destination_location_id=4,
         status=TransferStatus.IN_TRANSIT,
     )
 
@@ -168,7 +179,9 @@ def test_create_unit_transfer_defaults_dispatched_at_when_missing():
     mock_db = MagicMock()
 
     result = TransferRepository.create_unit_transfer(
-        mock_db, unit_id=1, dispatched_by_id=2,
+        mock_db,
+        unit_id=1,
+        dispatched_by_id=2,
         status=TransferStatus.PENDING,
     )
 
@@ -178,6 +191,7 @@ def test_create_unit_transfer_defaults_dispatched_at_when_missing():
 # ---------------------------------------------------------------------------
 # get_active_transfer_by_unit
 # ---------------------------------------------------------------------------
+
 
 def test_get_active_transfer_by_unit_found():
     """Returns active transfer for a unit."""

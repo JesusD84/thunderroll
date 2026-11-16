@@ -1,4 +1,3 @@
-
 from enum import StrEnum
 
 from sqlalchemy import (
@@ -22,17 +21,20 @@ class UserRole(StrEnum):
     MANAGER = "manager"
     OPERATOR = "operator"
 
+
 class UnitStatus(StrEnum):
     WAREHOUSE_UNIDENTIFIED = "WAREHOUSE_UNIDENTIFIED"
     AVAILABLE = "AVAILABLE"
     SOLD = "SOLD"
     IN_TRANSIT = "IN_TRANSIT"
 
+
 class TransferStatus(StrEnum):
     PENDING = "PENDING"
     IN_TRANSIT = "IN_TRANSIT"
     RECEIVED = "RECEIVED"
     CANCELLED = "CANCELLED"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -49,9 +51,16 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    dispatched_transfers = relationship("Transfer", foreign_keys="Transfer.dispatched_by_id", back_populates="dispatched_by")
-    received_transfers = relationship("Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by")
+    dispatched_transfers = relationship(
+        "Transfer",
+        foreign_keys="Transfer.dispatched_by_id",
+        back_populates="dispatched_by",
+    )
+    received_transfers = relationship(
+        "Transfer", foreign_keys="Transfer.received_by_id", back_populates="received_by"
+    )
     imports = relationship("Import", back_populates="user")
+
 
 class Location(Base):
     __tablename__ = "locations"
@@ -63,8 +72,17 @@ class Location(Base):
 
     # Relationships
     units = relationship("Unit", back_populates="current_location")
-    transfers_from = relationship("Transfer", foreign_keys="Transfer.origin_location_id", back_populates="origin_location")
-    transfers_to = relationship("Transfer", foreign_keys="Transfer.destination_location_id", back_populates="destination_location")
+    transfers_from = relationship(
+        "Transfer",
+        foreign_keys="Transfer.origin_location_id",
+        back_populates="origin_location",
+    )
+    transfers_to = relationship(
+        "Transfer",
+        foreign_keys="Transfer.destination_location_id",
+        back_populates="destination_location",
+    )
+
 
 class Unit(Base):
     __tablename__ = "units"
@@ -76,7 +94,9 @@ class Unit(Base):
     brand = Column(String(100), nullable=False)
     color = Column(String(100), nullable=False)
     current_location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
-    status = Column(Enum(UnitStatus), nullable=False, default=UnitStatus.WAREHOUSE_UNIDENTIFIED)
+    status = Column(
+        Enum(UnitStatus), nullable=False, default=UnitStatus.WAREHOUSE_UNIDENTIFIED
+    )
     # Batch metadata captured at import time (the supplier sends these by message,
     # not inside the file): the shipment period/batch and the product type (TR-06).
     batch_period = Column(String(100), nullable=True, index=True)
@@ -90,6 +110,7 @@ class Unit(Base):
     current_location = relationship("Location", back_populates="units")
     transfers = relationship("Transfer", back_populates="unit")
 
+
 class Transfer(Base):
     __tablename__ = "transfers"
 
@@ -99,22 +120,35 @@ class Transfer(Base):
     received_by_id = Column(Integer, ForeignKey("users.id"))
     origin_location_id = Column(Integer, ForeignKey("locations.id"))
     destination_location_id = Column(Integer, ForeignKey("locations.id"))
-    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.IN_TRANSIT)
+    status = Column(
+        Enum(TransferStatus), nullable=False, default=TransferStatus.IN_TRANSIT
+    )
     dispatched_at = Column(DateTime(timezone=True), server_default=func.now())
     received_at = Column(DateTime(timezone=True))
 
     # Relationships
     unit = relationship("Unit", back_populates="transfers")
-    dispatched_by = relationship("User", foreign_keys=[dispatched_by_id], back_populates="dispatched_transfers")
-    received_by = relationship("User", foreign_keys=[received_by_id], back_populates="received_transfers")
-    origin_location = relationship("Location", foreign_keys=[origin_location_id], back_populates="transfers_from")
-    destination_location = relationship("Location", foreign_keys=[destination_location_id], back_populates="transfers_to")
+    dispatched_by = relationship(
+        "User", foreign_keys=[dispatched_by_id], back_populates="dispatched_transfers"
+    )
+    received_by = relationship(
+        "User", foreign_keys=[received_by_id], back_populates="received_transfers"
+    )
+    origin_location = relationship(
+        "Location", foreign_keys=[origin_location_id], back_populates="transfers_from"
+    )
+    destination_location = relationship(
+        "Location",
+        foreign_keys=[destination_location_id],
+        back_populates="transfers_to",
+    )
 
     @property
     def dispatched_by_name(self) -> str | None:
         if not self.dispatched_by:
             return None
         return f"{self.dispatched_by.first_name} {self.dispatched_by.last_name}".strip()
+
 
 class ModelEquivalence(Base):
     """Manufacturer model name -> internal (client) model name.
@@ -124,6 +158,7 @@ class ModelEquivalence(Base):
     internal model when an equivalence exists; otherwise the manufacturer name is
     kept as-is so the import never blocks (TR-05).
     """
+
     __tablename__ = "model_equivalences"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -132,6 +167,7 @@ class ModelEquivalence(Base):
     notes = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 class Import(Base):
     __tablename__ = "imports"
@@ -155,6 +191,7 @@ class Import(Base):
     # Relationships
     user = relationship("User", back_populates="imports")
     import_errors = relationship("ImportError", back_populates="import_record")
+
 
 class ImportError(Base):
     __tablename__ = "import_errors"

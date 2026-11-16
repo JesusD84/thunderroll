@@ -72,7 +72,13 @@ def test_detect_header_after_junk_rows():
 def test_detect_header_chinese_labels():
     df = _df(
         [
-            [np.nan, "NO", "COLOUR", "电机Motor serial number", "车架号Frame serial number"],
+            [
+                np.nan,
+                "NO",
+                "COLOUR",
+                "电机Motor serial number",
+                "车架号Frame serial number",
+            ],
             [1.0, "TY-D530", "红RED", "YC-48V25011431", "341022025020579"],
         ]
     )
@@ -248,7 +254,13 @@ def test_field_map_sample2_with_junk_column():
 def test_field_map_sample4_chinese_headers():
     df = _df(
         [
-            [np.nan, "NO", "COLOUR", "电机Motor serial number", "车架号Frame serial number"],
+            [
+                np.nan,
+                "NO",
+                "COLOUR",
+                "电机Motor serial number",
+                "车架号Frame serial number",
+            ],
             [1.0, "TY-D530", "红RED", "YC-48V25011431", "341022025020579"],
         ]
     )
@@ -286,7 +298,9 @@ def _xlsx_bytes(sheets: dict) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for name, rows in sheets.items():
-            pd.DataFrame(rows).to_excel(writer, sheet_name=name, index=False, header=False)
+            pd.DataFrame(rows).to_excel(
+                writer, sheet_name=name, index=False, header=False
+            )
     return buf.getvalue()
 
 
@@ -294,7 +308,11 @@ def test_parse_workbook_multisheet_counts_and_origin():
     # Mirrors tricycle.xls: three data sheets, each named like a model.
     content = _xlsx_bytes(
         {
-            "X3": [["Frame", "Motor", "Color"], ["F1", "M1", "Red"], ["F2", "M2", "Black"]],
+            "X3": [
+                ["Frame", "Motor", "Color"],
+                ["F1", "M1", "Red"],
+                ["F2", "M2", "Black"],
+            ],
             "xiaodou": [["Frame", "Motor", "Color"], ["F3", "M3", "Grey"]],
             "diaoyu": [["frame number", "motor number", "Color"], ["F4", "M4", "Blue"]],
         }
@@ -305,7 +323,11 @@ def test_parse_workbook_multisheet_counts_and_origin():
     assert [len(t.rows) for t in result.tables] == [2, 1, 1]
     # Origin (sheet name) is preserved and headers resolved per sheet.
     for table in result.tables:
-        assert table.field_map == {"frame": table.columns[0], "motor": table.columns[1], "color": "Color"}
+        assert table.field_map == {
+            "frame": table.columns[0],
+            "motor": table.columns[1],
+            "color": "Color",
+        }
 
 
 def test_parse_workbook_skips_empty_and_header_only_sheets():
@@ -328,7 +350,11 @@ def test_parse_workbook_skips_empty_and_header_only_sheets():
 def test_iter_rows_flattens_across_sheets_with_origin():
     content = _xlsx_bytes(
         {
-            "X3": [["Frame", "Motor", "Color"], ["F1", "M1", "Red"], ["F2", "M2", "Black"]],
+            "X3": [
+                ["Frame", "Motor", "Color"],
+                ["F1", "M1", "Red"],
+                ["F2", "M2", "Black"],
+            ],
             "xiaodou": [["Frame", "Motor", "Color"], ["F3", "M3", "Grey"]],
         }
     )
@@ -501,11 +527,13 @@ def test_missing_optional_fields_do_not_break_parsing():
 
 def test_apply_manual_mapping_maps_unrecognized_column_to_model():
     # Sample-4 shape: the model lives under a "NO" column the parser can't resolve.
-    result = _result_from_df([
-        ["Frame", "Motor", "NO"],
-        ["F1", "M1", "X3"],
-        ["F2", "M2", "xiaodou"],
-    ])
+    result = _result_from_df(
+        [
+            ["Frame", "Motor", "NO"],
+            ["F1", "M1", "X3"],
+            ["F2", "M2", "xiaodou"],
+        ]
+    )
     table = result.tables[0]
     assert "model" not in table.field_map  # not auto-detected
 
@@ -518,22 +546,26 @@ def test_apply_manual_mapping_maps_unrecognized_column_to_model():
 
 
 def test_apply_manual_mapping_forward_fills_merged_model_column():
-    result = _result_from_df([
-        ["Frame", "Motor", "NO"],
-        ["F1", "M1", "X3"],
-        ["F2", "M2", None],  # merged cell under the manually mapped model column
-        ["F3", "M3", None],
-    ])
+    result = _result_from_df(
+        [
+            ["Frame", "Motor", "NO"],
+            ["F1", "M1", "X3"],
+            ["F2", "M2", None],  # merged cell under the manually mapped model column
+            ["F3", "M3", None],
+        ]
+    )
     apply_manual_mapping(result, {"NO": "model"})
     models = [r.canonical()["model"] for r in result.iter_rows()]
     assert models == ["X3", "X3", "X3"]
 
 
 def test_apply_manual_mapping_reassigns_a_column_to_one_field():
-    result = _result_from_df([
-        ["Frame", "Motor"],
-        ["F1", "M1"],
-    ])
+    result = _result_from_df(
+        [
+            ["Frame", "Motor"],
+            ["F1", "M1"],
+        ]
+    )
     # Reassign the auto-detected frame column to model; it must not stay as frame.
     apply_manual_mapping(result, {"Frame": "model"})
     fm = result.tables[0].field_map
@@ -542,10 +574,12 @@ def test_apply_manual_mapping_reassigns_a_column_to_one_field():
 
 
 def test_apply_manual_mapping_ignores_unknown_field_and_missing_column():
-    result = _result_from_df([
-        ["Frame", "Motor"],
-        ["F1", "M1"],
-    ])
+    result = _result_from_df(
+        [
+            ["Frame", "Motor"],
+            ["F1", "M1"],
+        ]
+    )
     before = dict(result.tables[0].field_map)
     apply_manual_mapping(result, {"Motor": "bogus", "DoesNotExist": "model"})
     assert result.tables[0].field_map == before

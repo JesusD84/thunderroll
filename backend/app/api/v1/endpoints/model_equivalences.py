@@ -1,6 +1,5 @@
 """Admin CRUD for manufacturer->internal model equivalences (TR-05)."""
 
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 

@@ -31,8 +31,10 @@ class UnitBase(BaseModel):
     def strip_and_upper(cls, v: str) -> str:
         return v.strip().upper()
 
+
 class UnitCreate(UnitBase):
     pass
+
 
 class UnitUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
@@ -62,6 +64,7 @@ class UnitUpdate(BaseModel):
             return v
         return v.strip().upper()
 
+
 class UnitSell(BaseModel):
     notes: str | None = Field(None, max_length=500)
 
@@ -70,6 +73,7 @@ class UnitFilters(BaseModel):
     status: UnitStatus | None = None
     location_id: int | None = None
     search: str | None = None
+
 
 class Unit(UnitBase):
     id: int

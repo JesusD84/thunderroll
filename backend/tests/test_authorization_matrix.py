@@ -231,7 +231,9 @@ CASES: tuple[EndpointCase, ...] = (
     EndpointCase("GET", "/api/v1/locations/"),
     EndpointCase("POST", "/api/v1/locations/", body=_new_location_body),
     EndpointCase("GET", "/api/v1/locations/{location_id}"),
-    EndpointCase("PUT", "/api/v1/locations/{location_id}", body={"name": "Matrix Renombrada"}),
+    EndpointCase(
+        "PUT", "/api/v1/locations/{location_id}", body={"name": "Matrix Renombrada"}
+    ),
     EndpointCase("DELETE", "/api/v1/locations/{empty_location_id}"),
     # --- imports -----------------------------------------------------------
     EndpointCase("GET", "/api/v1/imports/"),
@@ -243,7 +245,12 @@ CASES: tuple[EndpointCase, ...] = (
     # --- model equivalences ------------------------------------------------
     EndpointCase("GET", "/api/v1/model-equivalences/"),
     EndpointCase("GET", "/api/v1/model-equivalences/unmapped"),
-    EndpointCase("POST", "/api/v1/model-equivalences/", success_status=201, body=_new_equivalence_body),
+    EndpointCase(
+        "POST",
+        "/api/v1/model-equivalences/",
+        success_status=201,
+        body=_new_equivalence_body,
+    ),
     EndpointCase("GET", "/api/v1/model-equivalences/{equivalence_id}"),
     EndpointCase(
         "PUT",
@@ -289,7 +296,9 @@ def _build_context() -> dict:
         admin = db.query(User).filter(User.username == "admin").first()
 
         location = Location(name=f"Matrix Bodega {suffix}", address="Calle Matrix")
-        empty_location = Location(name=f"Matrix Sucursal {suffix}", address="Calle Matrix")
+        empty_location = Location(
+            name=f"Matrix Sucursal {suffix}", address="Calle Matrix"
+        )
         db.add_all([location, empty_location])
         db.commit()
         db.refresh(location)
@@ -403,9 +412,11 @@ def _snapshot_shared_users() -> dict:
     """Read the shared accounts in their current state."""
     db = TestingSessionLocal()
     try:
-        accounts = db.query(User).filter(
-            User.username.in_(["admin", "gerente", "inventario"])
-        ).all()
+        accounts = (
+            db.query(User)
+            .filter(User.username.in_(["admin", "gerente", "inventario"]))
+            .all()
+        )
         return {
             account.id: {
                 "email": account.email,

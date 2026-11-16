@@ -12,6 +12,7 @@ from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 # get_units
 # ---------------------------------------------------------------------------
 
+
 def test_get_units_no_filters():
     """Returns paginated units, ordered newest-first, excluding sold units by default."""
     mock_db = MagicMock()
@@ -46,6 +47,7 @@ def test_get_units_with_search_filter():
 # count_units
 # ---------------------------------------------------------------------------
 
+
 def test_count_units_no_filters():
     """Counts all units without filters."""
     mock_db = MagicMock()
@@ -70,6 +72,7 @@ def test_count_units_with_filters():
 # get_unit
 # ---------------------------------------------------------------------------
 
+
 def test_get_unit_found():
     """Returns unit with location eager-loaded."""
     mock_db = MagicMock()
@@ -93,6 +96,7 @@ def test_get_unit_not_found():
 # get_by_engine_or_chassis
 # ---------------------------------------------------------------------------
 
+
 def test_get_by_engine_or_chassis_found():
     """Returns unit matching engine number."""
     mock_db = MagicMock()
@@ -114,12 +118,16 @@ def test_get_by_engine_or_chassis_both_none():
 # create_unit
 # ---------------------------------------------------------------------------
 
+
 def test_create_unit_success():
     """Creates a unit and returns it with eager-loaded relations."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderoll", color="Red",
-        current_location_id=1, engine_number="ENG1",
+        model="TR",
+        brand="Thunderoll",
+        color="Red",
+        current_location_id=1,
+        engine_number="ENG1",
     )
     mock_unit = Unit(id=1, model="TR")
     mock_db.query.return_value.options.return_value.filter.return_value.one_or_none.return_value = mock_unit
@@ -135,8 +143,11 @@ def test_create_unit_missing_location():
     """Raises ValueError when current_location_id is None."""
     mock_db = MagicMock()
     unit_data = UnitCreate(
-        model="TR", brand="Thunderoll", color="Red",
-        current_location_id=1, engine_number="ENG1",
+        model="TR",
+        brand="Thunderoll",
+        color="Red",
+        current_location_id=1,
+        engine_number="ENG1",
     )
     unit_data.current_location_id = None
 
@@ -147,6 +158,7 @@ def test_create_unit_missing_location():
 # ---------------------------------------------------------------------------
 # update_unit
 # ---------------------------------------------------------------------------
+
 
 def test_update_unit_success():
     """Updates unit fields and returns refreshed unit."""
@@ -166,6 +178,7 @@ def test_update_unit_success():
 # delete_unit
 # ---------------------------------------------------------------------------
 
+
 def test_delete_unit_cascades_transfers():
     """Deletes unit and its transfers, then commits."""
     mock_db = MagicMock()
@@ -179,6 +192,7 @@ def test_delete_unit_cascades_transfers():
 # ---------------------------------------------------------------------------
 # get_stats
 # ---------------------------------------------------------------------------
+
 
 def test_get_stats():
     """Returns stats dict with expected keys."""

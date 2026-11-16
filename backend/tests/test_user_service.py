@@ -13,6 +13,7 @@ from app.services.user_service import UserService
 # create_user
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.user_service.UserRepository")
 @patch("app.services.user_service.get_password_hash")
 def test_create_user_success(mock_hash, mock_repo):
@@ -134,6 +135,7 @@ def test_create_user_manager_cannot_create_manager(mock_repo):
 # ---------------------------------------------------------------------------
 # update_current_user
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.user_service.UserRepository")
 def test_update_current_user_success(mock_repo):

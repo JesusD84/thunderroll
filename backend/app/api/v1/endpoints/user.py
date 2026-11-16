@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -11,20 +10,26 @@ from app.services.user_service import UserService
 
 router = APIRouter()
 
+
 @router.get("/", response_model=list[User])
 def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
     return db.query(models.User).offset(skip).limit(limit).all()
+
 
 @router.post("/", response_model=User, status_code=201)
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
+    current_user: models.User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER])
+    ),
 ):
     return UserService.create_user(db, user, current_user)
 
@@ -38,7 +43,7 @@ async def read_users_me(current_user: models.User = Depends(get_current_active_u
 async def update_users_me(
     user_update: UserSelfUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
     """Update the caller's own profile.
 
@@ -54,7 +59,7 @@ async def update_users_me(
 def change_own_password(
     payload: PasswordChange,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
     """Change the caller's own password. Requires the current password."""
     UserService.change_own_password(db, current_user, payload)
@@ -65,7 +70,7 @@ def update_user(
     user_id: int,
     user_update: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN])),
 ):
     return UserService.update_user(db, user_id, user_update, current_user)
 
@@ -74,6 +79,6 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.ADMIN]))
+    current_user: models.User = Depends(require_role([UserRole.ADMIN])),
 ):
     UserService.delete_user(db, user_id, current_user)

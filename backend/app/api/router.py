@@ -6,9 +6,11 @@ router = APIRouter()
 
 router.include_router(v1_router, prefix="/api/v1")
 
+
 @router.get("/")
 def read_root():
     return {"message": "Thunderoll Inventory API"}
+
 
 @router.get("/health")
 def health_check():

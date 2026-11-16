@@ -13,6 +13,7 @@ from app.services.location_service import LocationService
 # get_locations
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.location_service.LocationRepository")
 def test_get_locations_delegates(mock_repo):
     """Delegates to LocationRepository.get_locations."""
@@ -29,6 +30,7 @@ def test_get_locations_delegates(mock_repo):
 # ---------------------------------------------------------------------------
 # get_location_by_id
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.location_service.LocationRepository")
 def test_get_location_by_id_found(mock_repo):
@@ -56,6 +58,7 @@ def test_get_location_by_id_not_found(mock_repo):
 # create_location
 # ---------------------------------------------------------------------------
 
+
 @patch("app.services.location_service.LocationRepository")
 def test_create_location_success(mock_repo):
     """Delegates to LocationRepository.create_location."""
@@ -73,6 +76,7 @@ def test_create_location_success(mock_repo):
 # ---------------------------------------------------------------------------
 # update_location
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.location_service.LocationRepository")
 def test_update_location_success(mock_repo):
@@ -103,6 +107,7 @@ def test_update_location_not_found(mock_repo):
 # ---------------------------------------------------------------------------
 # delete_location
 # ---------------------------------------------------------------------------
+
 
 @patch("app.services.location_service.LocationRepository")
 def test_delete_location_empty(mock_repo):

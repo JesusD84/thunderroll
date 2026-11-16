@@ -17,6 +17,7 @@ from app.services.report import ReportService
 # get_dashboard_stats
 # ---------------------------------------------------------------------------
 
+
 def test_get_dashboard_stats():
     """Returns dashboard stats with all expected keys."""
     mock_db = MagicMock()
@@ -62,6 +63,7 @@ def test_get_dashboard_stats_empty_db():
 # get_inventory_report
 # ---------------------------------------------------------------------------
 
+
 def test_get_inventory_report_no_filters():
     """Returns inventory report without filters."""
     mock_db = MagicMock()
@@ -78,10 +80,18 @@ def test_get_inventory_report_no_filters():
 def test_get_inventory_report_with_filters():
     """Applies filters to inventory query."""
     mock_db = MagicMock()
-    unit = Unit(id=1, brand="Thunderoll", model="TR", color="Red",
-                status=UnitStatus.AVAILABLE, engine_number="E1")
+    unit = Unit(
+        id=1,
+        brand="Thunderoll",
+        model="TR",
+        color="Red",
+        status=UnitStatus.AVAILABLE,
+        engine_number="E1",
+    )
     unit.current_location = Location(id=1, name="Bodega")
-    mock_db.query.return_value.options.return_value.filter.return_value.filter.return_value.all.return_value = [unit]
+    mock_db.query.return_value.options.return_value.filter.return_value.filter.return_value.all.return_value = [
+        unit
+    ]
 
     result = ReportService.get_inventory_report(
         mock_db, brand="Thunderoll", status=UnitStatus.AVAILABLE
@@ -105,6 +115,7 @@ def test_get_inventory_report_no_results():
 # ---------------------------------------------------------------------------
 # get_transfers_report
 # ---------------------------------------------------------------------------
+
 
 def test_get_transfers_report():
     """Returns transfers report with pagination."""
@@ -142,6 +153,7 @@ def test_get_transfers_report_pagination():
 # get_sales_report
 # ---------------------------------------------------------------------------
 
+
 def test_get_sales_report():
     """Returns sales report."""
     mock_db = MagicMock()
@@ -168,15 +180,18 @@ def test_get_sales_report_by_location():
 # _prepare_df_for_excel
 # ---------------------------------------------------------------------------
 
+
 def test_prepare_df_for_excel_strips_timezone():
     """Removes timezone info from datetime columns."""
-    df = pd.DataFrame({
-        "name": ["A", "B"],
-        "created_at": [
-            datetime(2025, 1, 1, tzinfo=UTC),
-            datetime(2025, 6, 1, tzinfo=UTC),
-        ],
-    })
+    df = pd.DataFrame(
+        {
+            "name": ["A", "B"],
+            "created_at": [
+                datetime(2025, 1, 1, tzinfo=UTC),
+                datetime(2025, 6, 1, tzinfo=UTC),
+            ],
+        }
+    )
 
     result = ReportService._prepare_df_for_excel(df)
 
@@ -195,6 +210,7 @@ def test_prepare_df_for_excel_no_datetime_columns():
 # ---------------------------------------------------------------------------
 # export_inventory_excel
 # ---------------------------------------------------------------------------
+
 
 @patch.object(ReportService, "get_inventory_report")
 def test_export_inventory_excel(mock_report):
@@ -215,6 +231,7 @@ def test_export_inventory_excel(mock_report):
 # ---------------------------------------------------------------------------
 # export_sales_excel
 # ---------------------------------------------------------------------------
+
 
 @patch.object(ReportService, "get_sales_report")
 def test_export_sales_excel(mock_report):

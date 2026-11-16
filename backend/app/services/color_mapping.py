@@ -6,7 +6,6 @@ Known foreign-language names are translated to the Spanish name the app uses
 else, including Spanish names, is kept exactly as the supplier wrote it.
 """
 
-
 # Canonical Spanish name (uppercase, as the app stores colors) -> lowercase
 # aliases in other languages.
 _COLOR_ALIASES: dict[str, tuple[str, ...]] = {

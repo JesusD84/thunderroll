@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -20,8 +19,7 @@ router = APIRouter()
 
 @router.get("/stats", response_model=TransferStats)
 def get_transfer_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     return TransferService.get_transfer_stats(db)
 
@@ -32,7 +30,7 @@ def get_transfers(
     limit: int = Query(100, ge=1, le=1000),
     filters: TransferFilters = Depends(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     return TransferService.get_transfers(db, filters, skip, limit)
 
@@ -41,7 +39,9 @@ def get_transfers(
 def create_transfer(
     transfer: TransferCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR])
+    ),
 ):
     """Dispatch a unit.
 
@@ -60,17 +60,21 @@ def transfer_unit(
     unit_id: int,
     transfer: UnitTransferRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR])
+    ),
 ):
     """Dispatch (or sell, when no destination) a single unit from its detail page."""
-    return TransferService.transfer_unit_with_status_update(db, unit_id, transfer, current_user.id)
+    return TransferService.transfer_unit_with_status_update(
+        db, unit_id, transfer, current_user.id
+    )
 
 
 @router.get("/unit/{unit_id}/active", response_model=Transfer)
 def get_active_transfer_for_unit(
     unit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     return TransferService.get_active_transfer_for_unit(db, unit_id)
 
@@ -79,7 +83,7 @@ def get_active_transfer_for_unit(
 def get_transfer(
     transfer_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     return TransferService.get_transfer_by_id(db, transfer_id)
 
@@ -89,7 +93,9 @@ def update_transfer(
     transfer_id: int,
     transfer_update: TransferUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR]))
+    current_user: User = Depends(
+        require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR])
+    ),
 ):
     """Update a transfer.
 
@@ -107,6 +113,6 @@ def update_transfer(
 def delete_transfer(
     transfer_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN]))
+    current_user: User = Depends(require_role([UserRole.ADMIN])),
 ):
     return TransferService.delete_transfer(db, transfer_id)

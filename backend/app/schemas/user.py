@@ -1,4 +1,3 @@
-
 """User schemas."""
 
 from datetime import datetime
@@ -23,6 +22,7 @@ class UserCreate(UserBase):
     last_name: str
     role: UserRole
     password: str = Field(..., min_length=8, max_length=100)
+
 
 class UserUpdate(BaseModel):
     """Admin edit payload (PUT /user/{user_id}).
@@ -84,12 +84,14 @@ class PasswordChange(BaseModel):
     current_password: str = Field(..., min_length=1, max_length=100)
     new_password: str = Field(..., min_length=8, max_length=100)
 
+
 class User(UserBase):
     id: int
     is_active: bool
     created_at: datetime
     updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class UserFilters(BaseModel):
     email: str | None = None
