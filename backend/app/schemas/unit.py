@@ -33,7 +33,7 @@ class UnitCreate(UnitBase):
     pass
 
 class UnitUpdate(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
     engine_number: Optional[str] = Field(None, max_length=100)
     chassis_number: Optional[str] = Field(None, max_length=100)

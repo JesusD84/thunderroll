@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Filter, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -80,7 +80,7 @@ const colorLabels: Record<string, string> = {
 
 function UnitsPageContent() {
   const { data: session } = useSession();
-  const { manageUnits } = useAuth();
+  const { manageUnits, deleteUnit } = useAuth();
   const searchParams = useSearchParams();
   const [units, setUnits] = useState<Unit[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -154,6 +154,32 @@ function UnitsPageContent() {
     fetchUnits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, page, searchTerm, statusFilter, locationFilter]);
+
+  // Deleting a unit is admin-only on the API (DELETE /units/{id}), so the
+  // button only shows up for that role.
+  const handleDeleteUnit = async (unitId: number) => {
+    if (!confirm('¿Seguro que deseas eliminar esta unidad? Esta acción no se puede deshacer.')) return;
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    try {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setError(typeof err.detail === 'string' ? err.detail : 'Error eliminando unidad');
+        return;
+      }
+      setUnits(prev => prev.filter(u => u.id !== unitId));
+      setTotalCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Error deleting unit:', err);
+      setError('Error de conexión');
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -294,9 +320,21 @@ function UnitsPageContent() {
                       </TableCell>
                       <TableCell>{unit.current_location?.name || '-'}</TableCell>
                       <TableCell>
-                        <Link href={`/units/${unit.id}`}>
-                          <Button variant="outline" size="sm">Ver Detalle</Button>
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/units/${unit.id}`}>
+                            <Button variant="outline" size="sm">Ver Detalle</Button>
+                          </Link>
+                          {deleteUnit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Eliminar unidad ${unit.id}`}
+                              onClick={() => handleDeleteUnit(unit.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

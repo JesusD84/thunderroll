@@ -64,7 +64,7 @@ const emptyEditUser = {
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { manageUsers, isAdmin } = useAuth();
+  const { manageUsers, isAdmin, deleteLocation } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -630,6 +630,8 @@ export default function SettingsPage() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
+                                  disabled={!deleteLocation}
+                                  title={deleteLocation ? undefined : 'Solo un administrador puede eliminar ubicaciones'}
                                   onClick={() => handleDeleteLocation(location.id)}
                                 >
                                   <Trash2 className="h-4 w-4" />

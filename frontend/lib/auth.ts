@@ -26,6 +26,9 @@ export interface Permissions {
   viewImports: boolean;
   viewReports: boolean;
   manageUnits: boolean;
+  deleteUnit: boolean;
+  deleteTransfer: boolean;
+  deleteLocation: boolean;
   manageUsers: boolean;
 }
 
@@ -42,6 +45,12 @@ export function getPermissions(role: unknown): Permissions {
     viewImports: isAdmin || isManager,
     viewReports: isAdmin || isManager,
     manageUnits: isAdmin || isManager,
+    // The destructive endpoints are admin-only on the API
+    // (DELETE /units/{id}, DELETE /transfers/{id}, DELETE /locations/{id}),
+    // so the UI must not offer them to anyone else.
+    deleteUnit: isAdmin,
+    deleteTransfer: isAdmin,
+    deleteLocation: isAdmin,
     manageUsers: isAdmin || isManager,
   };
 }

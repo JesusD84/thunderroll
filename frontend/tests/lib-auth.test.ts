@@ -34,6 +34,9 @@ describe('getPermissions', () => {
       viewImports: true,
       viewReports: true,
       manageUnits: true,
+      deleteUnit: true,
+      deleteTransfer: true,
+      deleteLocation: true,
       manageUsers: true,
     });
   });
@@ -48,6 +51,9 @@ describe('getPermissions', () => {
       viewImports: true,
       viewReports: true,
       manageUnits: true,
+      deleteUnit: false,
+      deleteTransfer: false,
+      deleteLocation: false,
       manageUsers: true,
     });
   });
@@ -62,6 +68,9 @@ describe('getPermissions', () => {
       viewImports: false,
       viewReports: false,
       manageUnits: false,
+      deleteUnit: false,
+      deleteTransfer: false,
+      deleteLocation: false,
       manageUsers: false,
     };
     expect(getPermissions('operator')).toEqual(operatorPermissions);
@@ -77,6 +86,9 @@ describe('getPermissions', () => {
       viewImports: false,
       viewReports: false,
       manageUnits: false,
+      deleteUnit: false,
+      deleteTransfer: false,
+      deleteLocation: false,
       manageUsers: false,
     };
     expect(getPermissions('')).toEqual(none);

@@ -18,7 +18,12 @@ class LocationCreate(LocationBase):
 
 
 class LocationUpdate(BaseModel):
-    """Location update schema."""
+    """Location update schema.
+
+    ``extra="forbid"``: only the fields declared here are accepted.
+    """
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     address: Optional[str] = None
 

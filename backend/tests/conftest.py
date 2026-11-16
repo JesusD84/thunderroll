@@ -108,6 +108,16 @@ def test_users(db_session: Session):
             hashed_password=Security.get_password_hash("testpass123"),
             role=UserRole.OPERATOR,
         ),
+        # Appended last on purpose: other fixtures index this list by
+        # position (test_users[0] is the admin).
+        User(
+            first_name="Test",
+            last_name="Gerente",
+            username="gerente",
+            email="gerente@test.com",
+            hashed_password=Security.get_password_hash("testpass123"),
+            role=UserRole.MANAGER,
+        ),
     ]
     for user in users:
         db_session.add(user)
@@ -117,13 +127,37 @@ def test_users(db_session: Session):
     return users
 
 
+async def _login(client: AsyncClient, username: str, password: str = "testpass123") -> dict:
+    """Log in and return the Authorization header for that session."""
+    response = await client.post(
+        "/api/v1/auth/login", data={"username": username, "password": password}
+    )
+    assert response.status_code == 200, f"Login failed for {username}: {response.text}"
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
 @pytest.fixture
 async def auth_headers(client: AsyncClient, test_users):
-    login_data = {"username": "admin", "password": "testpass123"}
-    response = await client.post("/api/v1/auth/login", data=login_data)
-    assert response.status_code == 200, f"Login failed: {response.text}"
-    token_data = response.json()
-    return {"Authorization": f"Bearer {token_data['access_token']}"}
+    """Admin session (historical name, kept so existing tests keep working)."""
+    return await _login(client, "admin")
+
+
+@pytest.fixture
+async def admin_headers(client: AsyncClient, test_users):
+    """Session for the ADMIN role."""
+    return await _login(client, "admin")
+
+
+@pytest.fixture
+async def manager_headers(client: AsyncClient, test_users):
+    """Session for the MANAGER role."""
+    return await _login(client, "gerente")
+
+
+@pytest.fixture
+async def operator_headers(client: AsyncClient, test_users):
+    """Session for the OPERATOR role."""
+    return await _login(client, "inventario")
 
 
 @pytest.fixture

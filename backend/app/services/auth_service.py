@@ -122,6 +122,10 @@ def require_role(required_roles: list):
                 detail="Not enough permissions"
             )
         return current_user
+
+    # Introspection hook: the authorization-matrix test reads the roles a
+    # route requires from here, instead of hardcoding them in the test.
+    role_checker.required_roles = tuple(required_roles)
     return role_checker
 
 def create_password_reset_token(email: str) -> str:

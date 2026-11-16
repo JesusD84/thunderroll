@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, CheckCircle, ArrowRight, Eye, Package, Plus } from 'lucide-react';
+import { Truck, CheckCircle, ArrowRight, Eye, Package, Plus, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -58,6 +59,7 @@ const statusLabels: Record<string, string> = {
 
 export default function TransfersPage() {
   const { data: session } = useSession();
+  const { deleteTransfer } = useAuth();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,8 +180,33 @@ export default function TransfersPage() {
     }
   };
 
+  // Deleting a transfer is admin-only on the API (DELETE /transfers/{id}),
+  // so the button only shows up for that role.
+  const handleDeleteTransfer = async (transferId: number) => {
+    if (!confirm('¿Seguro que deseas eliminar esta transferencia? Se pierde su registro de trazabilidad.')) return;
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    try {
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${transferId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        setTransfers(prev => prev.filter(t => t.id !== transferId));
+      } else {
+        const err = await res.json();
+        console.error('Error deleting transfer:', err);
+      }
+    } catch (err) {
+      console.error('Error deleting transfer:', err);
+    }
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
+
     return new Date(dateStr).toLocaleDateString('es-MX', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     });
@@ -381,6 +408,16 @@ export default function TransfersPage() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
+                          {deleteTransfer && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`Eliminar transferencia ${transfer.id}`}
+                              onClick={() => handleDeleteTransfer(transfer.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

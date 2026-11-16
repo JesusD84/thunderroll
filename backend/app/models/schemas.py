@@ -26,6 +26,8 @@ class LocationCreate(LocationBase):
     pass
 
 class LocationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     address: Optional[str] = None
 
@@ -51,7 +53,7 @@ class UnitCreate(UnitBase):
     pass
 
 class UnitUpdate(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
@@ -88,7 +90,7 @@ class TransferBase(BaseModel):
     received_at: Optional[datetime] = None
 
 class TransferCreate(TransferBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 class Transfer(TransferBase):
     id: int
@@ -129,7 +131,7 @@ class ModelEquivalenceCreate(ModelEquivalenceBase):
     pass
 
 class ModelEquivalenceUpdate(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
     manufacturer_model: Optional[str] = None
     internal_model: Optional[str] = None
