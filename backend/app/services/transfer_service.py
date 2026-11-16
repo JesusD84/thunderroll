@@ -1,23 +1,35 @@
+"""Transfers between locations, and the state changes they cause.
+
+The rules of the lifecycle live in ``app.services.lifecycle``; this module
+applies them. Two invariants shape every method here:
+
+* a unit and its transfer are written in a **single transaction**, so the
+  trail never shows a unit in transit without the transfer that says so;
+* the unit row is **locked** (``SELECT ... FOR UPDATE`` on PostgreSQL) while
+  it is being checked and written, so two concurrent dispatches of the same
+  unit cannot both pass the checks.
+"""
+
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer, TransferStatus, Unit, UnitStatus, User
+from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
-from app.repositories.user_repository import UserRepository
 from app.schemas.transfer import (
     TransferCreate,
-    TransferDispatchCreate,
     TransferFilters,
     TransferReceiveUpdate,
     TransferStats,
     TransferUpdate,
     UnitTransferRequest,
 )
+from app.services import lifecycle
+from app.services.sale_service import SaleService
 
 
 class TransferService:
@@ -35,53 +47,72 @@ class TransferService:
         return transfer
 
     @staticmethod
-    def create_transfer(db: Session, transfer_data: TransferCreate) -> Transfer:
-        TransferService._validate_relations(db, transfer_data)
-        payload = transfer_data.model_copy(deep=True)
-        if payload.dispatched_at is None:
-            payload.dispatched_at = datetime.now(UTC)
-        if payload.status == TransferStatus.RECEIVED and payload.received_at is None:
-            payload.received_at = datetime.now(UTC)
+    def create_transfer(
+        db: Session, transfer_data: TransferCreate, actor_id: int
+    ) -> Transfer:
+        """Dispatch a unit to another location (POST /transfers/).
 
-        # Update unit status based on transfer
-        unit = UnitRepository.get_unit(db, transfer_data.unit_id)
-        if unit and transfer_data.destination_location_id:
-            unit.status = UnitStatus.IN_TRANSIT
-            db.commit()
-
-        return TransferRepository.create_transfer(db, payload)
-
-    @staticmethod
-    def restrict_create_for_operator(
-        transfer: TransferCreate, actor: User
-    ) -> TransferCreate:
-        """Narrow an Operator's dispatch payload to what that role may write.
-
-        The attribution of a dispatch (who sent the unit, when) belongs to
-        the server: it is taken from the session, never from the request
-        body. The payload is re-validated against ``TransferDispatchCreate``,
-        so anything outside the dispatch fields is rejected with 422.
+        The state of the transfer is the server's: a dispatch always starts
+        as PENDING. The state of the unit comes out of the transfer, so a
+        dispatch leaves the unit IN_TRANSIT towards the destination.
         """
-        try:
-            dispatch = TransferDispatchCreate.model_validate(
-                transfer.model_dump(exclude_unset=True)
-            )
-        except ValidationError as exc:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "Operators can only dispatch a unit: send unit_id, "
-                    "origin_location_id and destination_location_id."
-                ),
-            ) from exc
+        unit = UnitRepository.get_unit_for_update(db, transfer_data.unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
 
-        return TransferCreate(
-            unit_id=dispatch.unit_id,
-            origin_location_id=dispatch.origin_location_id,
-            destination_location_id=dispatch.destination_location_id,
-            dispatched_by_id=actor.id,
-            status=TransferStatus.PENDING,
+        if unit.status == UnitStatus.SOLD:
+            raise HTTPException(
+                status_code=409, detail="A sold unit cannot be dispatched"
+            )
+
+        origin_location_id = (
+            transfer_data.origin_location_id or unit.current_location_id
         )
+        if origin_location_id != unit.current_location_id:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Unit {unit.id} is not at location {origin_location_id}: "
+                    f"it is at location {unit.current_location_id}"
+                ),
+            )
+
+        destination_location_id = transfer_data.destination_location_id
+        if destination_location_id is None:
+            raise HTTPException(
+                status_code=422, detail="destination_location_id is required"
+            )
+        if destination_location_id == origin_location_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Origin and destination locations must be different",
+            )
+        if not LocationRepository.get_location(db, destination_location_id):
+            raise HTTPException(
+                status_code=404, detail="Destination location not found"
+            )
+
+        TransferService._ensure_no_active_transfer(db, unit.id)
+
+        transfer_status = TransferStatus.PENDING
+        new_unit_status = lifecycle.unit_status_for_transfer(transfer_status)
+        TransferService._ensure_unit_transition(unit.status, new_unit_status)
+
+        now = datetime.now(UTC)
+        unit.status = new_unit_status
+        transfer = TransferRepository.build_transfer(
+            unit_id=unit.id,
+            status=transfer_status,
+            origin_location_id=origin_location_id,
+            destination_location_id=destination_location_id,
+            dispatched_by_id=actor_id,
+            dispatched_at=now,
+        )
+        db.add(transfer)
+        db.commit()
+        db.refresh(transfer)
+
+        return transfer
 
     @staticmethod
     def restrict_update_for_operator(transfer: TransferUpdate) -> TransferUpdate:
@@ -114,69 +145,75 @@ class TransferService:
         transfer_data: UnitTransferRequest,
         user_id: int,
     ) -> Unit:
-        unit = UnitRepository.get_unit(db, unit_id)
+        """Dispatch a unit from its detail page (POST /transfers/unit/{id}).
+
+        Without a destination this is a sale, and it goes through the sale
+        service: there is only one way to sell a unit.
+        """
+        unit = UnitRepository.get_unit_for_update(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
-        from_location_id = transfer_data.from_location_id
-        to_location_id = transfer_data.to_location_id
+        if unit.status == UnitStatus.SOLD:
+            raise HTTPException(
+                status_code=409, detail="A sold unit cannot be dispatched"
+            )
 
-        if from_location_id is None:
-            from_location_id = unit.current_location_id
+        if unit.status == UnitStatus.IN_TRANSIT:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Unit is already in transit: the active transfer has to be "
+                    "closed before the unit can be dispatched again"
+                ),
+            )
 
-        if from_location_id and to_location_id and from_location_id == to_location_id:
+        origin_location_id = transfer_data.from_location_id or unit.current_location_id
+        if origin_location_id != unit.current_location_id:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Unit {unit.id} is not at location {origin_location_id}: "
+                    f"it is at location {unit.current_location_id}"
+                ),
+            )
+
+        destination_location_id = transfer_data.to_location_id
+        if destination_location_id is None:
+            # No destination: this is a sale.
+            return SaleService.sell_unit(db, unit_id, user_id, transfer_data.notes)
+
+        if destination_location_id == origin_location_id:
             raise HTTPException(
                 status_code=400,
                 detail="Origin and destination locations must be different",
             )
+        if not LocationRepository.get_location(db, destination_location_id):
+            raise HTTPException(
+                status_code=404, detail="Destination location not found"
+            )
 
-        if to_location_id is not None:
-            transfer_status = TransferStatus.IN_TRANSIT
-            unit.status = UnitStatus.IN_TRANSIT
-        else:
-            transfer_status = TransferStatus.RECEIVED
-            unit.status = UnitStatus.SOLD
-            unit.sold_date = datetime.now(UTC)
+        TransferService._ensure_no_active_transfer(db, unit.id)
 
+        transfer_status = TransferStatus.PENDING
+        new_unit_status = lifecycle.unit_status_for_transfer(transfer_status)
+        TransferService._ensure_unit_transition(unit.status, new_unit_status)
+
+        now = datetime.now(UTC)
+        unit.status = new_unit_status
+        transfer = TransferRepository.build_transfer(
+            unit_id=unit.id,
+            status=transfer_status,
+            origin_location_id=origin_location_id,
+            destination_location_id=destination_location_id,
+            dispatched_by_id=user_id,
+            dispatched_at=now,
+        )
+        db.add(transfer)
         db.commit()
         db.refresh(unit)
 
-        TransferRepository.create_unit_transfer(
-            db=db,
-            unit_id=unit_id,
-            dispatched_by_id=user_id,
-            origin_location_id=from_location_id,
-            destination_location_id=to_location_id,
-            status=transfer_status,
-            dispatched_at=datetime.now(UTC),
-            received_at=datetime.now(UTC)
-            if transfer_status == TransferStatus.RECEIVED
-            else None,
-        )
-
-        return UnitRepository.get_unit(db, unit.id)
-
-    @staticmethod
-    def create_unit_transfer_record(
-        db: Session,
-        unit_id: int,
-        user_id: int,
-        origin_location_id: int | None = None,
-        destination_location_id: int | None = None,
-        status: TransferStatus = TransferStatus.PENDING,
-        dispatched_at: datetime | None = None,
-        received_at: datetime | None = None,
-    ) -> Transfer:
-        return TransferRepository.create_unit_transfer(
-            db=db,
-            unit_id=unit_id,
-            dispatched_by_id=user_id,
-            origin_location_id=origin_location_id,
-            destination_location_id=destination_location_id,
-            status=status,
-            dispatched_at=dispatched_at,
-            received_at=received_at,
-        )
+        return unit
 
     @staticmethod
     def get_active_transfer_for_unit(db: Session, unit_id: int) -> Transfer:
@@ -192,58 +229,62 @@ class TransferService:
 
     @staticmethod
     def update_transfer(
-        db: Session, transfer_id: int, transfer_update: TransferUpdate
+        db: Session,
+        transfer_id: int,
+        transfer_update: TransferUpdate,
+        actor_id: int,
     ) -> Transfer:
+        """Close a transfer: RECEIVED (the unit arrived) or CANCELLED.
+
+        Only the status may change. The unit follows the transfer: receiving
+        it leaves the unit AVAILABLE at the destination, cancelling it brings
+        the unit back to AVAILABLE at the origin. Both happen in a single
+        transaction, together with the transfer itself.
+        """
         db_transfer = TransferRepository.get_transfer(db, transfer_id)
         if not db_transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")
 
-        merged_data = TransferCreate(
-            unit_id=transfer_update.unit_id
-            if transfer_update.unit_id is not None
-            else db_transfer.unit_id,
-            dispatched_by_id=transfer_update.dispatched_by_id
-            if transfer_update.dispatched_by_id is not None
-            else db_transfer.dispatched_by_id,
-            received_by_id=transfer_update.received_by_id
-            if transfer_update.received_by_id is not None
-            else db_transfer.received_by_id,
-            origin_location_id=transfer_update.origin_location_id
-            if transfer_update.origin_location_id is not None
-            else db_transfer.origin_location_id,
-            destination_location_id=transfer_update.destination_location_id
-            if transfer_update.destination_location_id is not None
-            else db_transfer.destination_location_id,
-            status=transfer_update.status
-            if transfer_update.status is not None
-            else db_transfer.status,
-            dispatched_at=transfer_update.dispatched_at
-            if transfer_update.dispatched_at is not None
-            else db_transfer.dispatched_at,
-            received_at=transfer_update.received_at
-            if transfer_update.received_at is not None
-            else db_transfer.received_at,
-        )
-        TransferService._validate_relations(db, merged_data)
+        target_status = transfer_update.status
+        try:
+            lifecycle.ensure_transfer_transition(db_transfer.status, target_status)
+        except lifecycle.InvalidTransition as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-        update_payload = transfer_update.model_copy(deep=True)
-        if (
-            update_payload.status == TransferStatus.RECEIVED
-            and update_payload.received_at is None
-        ):
-            update_payload.received_at = datetime.now(UTC)
+        unit = UnitRepository.get_unit_for_update(db, db_transfer.unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found")
 
-        # When marking as RECEIVED, update unit status and location
-        if update_payload.status == TransferStatus.RECEIVED:
-            unit = UnitRepository.get_unit(db, db_transfer.unit_id)
-            if unit:
-                unit.status = UnitStatus.AVAILABLE
-                dest = merged_data.destination_location_id
-                if dest:
-                    unit.current_location_id = dest
-                db.commit()
+        now = datetime.now(UTC)
 
-        return TransferRepository.update_transfer(db, db_transfer, update_payload)
+        if target_status == TransferStatus.RECEIVED:
+            if unit.status == UnitStatus.SOLD:
+                raise HTTPException(
+                    status_code=409,
+                    detail=("The unit was sold: a sold unit cannot be received again"),
+                )
+            destination_location_id = db_transfer.destination_location_id
+            if destination_location_id is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="The transfer has no destination to receive the unit at",
+                )
+            unit.status = UnitStatus.AVAILABLE
+            unit.current_location_id = destination_location_id
+        elif target_status == TransferStatus.CANCELLED:
+            unit.status = UnitStatus.AVAILABLE
+            origin_location_id = (
+                db_transfer.origin_location_id or unit.current_location_id
+            )
+            unit.current_location_id = origin_location_id
+
+        db_transfer.status = target_status
+        db_transfer.received_by_id = actor_id
+        db_transfer.received_at = now
+        db.commit()
+        db.refresh(db_transfer)
+
+        return db_transfer
 
     @staticmethod
     def delete_transfer(db: Session, transfer_id: int) -> dict:
@@ -279,43 +320,28 @@ class TransferService:
             recent_transfers=recent_transfers,
         )
 
+    # ------------------------------------------------------------------
+    # The rules the services above share
+    # ------------------------------------------------------------------
+
     @staticmethod
-    def _validate_relations(db: Session, transfer_data: TransferCreate) -> None:
-        if not UnitRepository.get_unit(db, transfer_data.unit_id):
-            raise HTTPException(status_code=404, detail="Unit not found")
-
-        if transfer_data.dispatched_by_id and not UserRepository.get_user_by_id(
-            db, transfer_data.dispatched_by_id
-        ):
-            raise HTTPException(status_code=404, detail="Dispatching user not found")
-
-        if transfer_data.received_by_id and not UserRepository.get_user_by_id(
-            db, transfer_data.received_by_id
-        ):
-            raise HTTPException(status_code=404, detail="Receiving user not found")
-
-        if transfer_data.origin_location_id and not LocationRepository.get_location(
-            db, transfer_data.origin_location_id
-        ):
-            raise HTTPException(status_code=404, detail="Origin location not found")
-
-        if (
-            transfer_data.destination_location_id
-            and not LocationRepository.get_location(
-                db, transfer_data.destination_location_id
-            )
-        ):
+    def _ensure_no_active_transfer(db: Session, unit_id: int) -> None:
+        """A unit may have at most one active transfer at a time."""
+        active_transfer = TransferRepository.get_active_transfer_by_unit(db, unit_id)
+        if active_transfer:
             raise HTTPException(
-                status_code=404, detail="Destination location not found"
+                status_code=409,
+                detail=(
+                    f"Unit {unit_id} already has an active transfer "
+                    f"(id {active_transfer.id}): close it before dispatching "
+                    "the unit again"
+                ),
             )
 
-        if (
-            transfer_data.origin_location_id
-            and transfer_data.destination_location_id
-            and transfer_data.origin_location_id
-            == transfer_data.destination_location_id
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Origin and destination locations must be different",
-            )
+    @staticmethod
+    def _ensure_unit_transition(current: UnitStatus, target: UnitStatus) -> None:
+        """The unit may only change into a state the lifecycle allows."""
+        try:
+            lifecycle.ensure_unit_transition(current, target)
+        except lifecycle.InvalidTransition as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc

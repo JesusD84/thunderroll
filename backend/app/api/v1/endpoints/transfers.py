@@ -45,14 +45,11 @@ def create_transfer(
 ):
     """Dispatch a unit.
 
-    An Operator may only dispatch: the attribution of the dispatch (who sent
-    it, when) is written by the server from the session, so a body that tries
-    to set it is rejected with 422.
+    The dispatch record (who sent it, when) is written by the server from
+    the session, so a body that tries to set it is rejected with 422. The
+    state of the unit comes out of the state of the transfer.
     """
-    payload = transfer
-    if current_user.role == UserRole.OPERATOR:
-        payload = TransferService.restrict_create_for_operator(transfer, current_user)
-    return TransferService.create_transfer(db, payload)
+    return TransferService.create_transfer(db, transfer, current_user.id)
 
 
 @router.post("/unit/{unit_id}")
@@ -97,7 +94,7 @@ def update_transfer(
         require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR])
     ),
 ):
-    """Update a transfer.
+    """Close a transfer: RECEIVED (the unit arrived) or CANCELLED.
 
     An Operator may only confirm the arrival: the dispatch record (who sent
     the unit, when, from where to where) must not be rewritten by the role
@@ -106,7 +103,7 @@ def update_transfer(
     payload = transfer_update
     if current_user.role == UserRole.OPERATOR:
         payload = TransferService.restrict_update_for_operator(transfer_update)
-    return TransferService.update_transfer(db, transfer_id, payload)
+    return TransferService.update_transfer(db, transfer_id, payload, current_user.id)
 
 
 @router.delete("/{transfer_id}")

@@ -37,6 +37,14 @@ class UnitCreate(UnitBase):
 
 
 class UnitUpdate(BaseModel):
+    """Payload for PUT /units/{id}: the descriptive fields of a unit.
+
+    The state of a unit is not editable here. ``status``, ``sold_date`` and
+    ``current_location_id`` are absent on purpose: they only change through
+    a transfer (dispatch, reception or cancellation) or through a sale, and
+    ``extra="forbid"`` rejects a body that tries to set them with 422.
+    """
+
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
     engine_number: str | None = Field(None, max_length=100)
@@ -44,9 +52,6 @@ class UnitUpdate(BaseModel):
     model: str | None = Field(None, min_length=1, max_length=100)
     brand: str | None = Field(None, min_length=1, max_length=100)
     color: str | None = Field(None, min_length=1, max_length=100)
-    current_location_id: int | None = Field(None, gt=0)
-    status: UnitStatus | None = None
-    sold_date: datetime | None = None
     notes: str | None = None
 
     @field_validator("engine_number", "chassis_number", mode="before")

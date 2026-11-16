@@ -173,10 +173,12 @@ async def test_get_unit_transfers(
 
 
 @pytest.mark.asyncio
-async def test_sell_unit_marks_sold_without_transfer(
+async def test_sell_unit_marks_sold_and_records_the_sale(
     client: AsyncClient, auth_headers, test_users, test_locations
 ):
-    """POST /units/{id}/sell sets SOLD, stamps sold_date, keeps location and creates no transfer."""
+    """POST /units/{id}/sell sets SOLD, stamps sold_date, keeps the location
+    and writes the record of the sale in the history.
+    """
     create_resp = await client.post(
         "/api/v1/units/",
         json={
@@ -206,14 +208,17 @@ async def test_sell_unit_marks_sold_without_transfer(
     transfers = await client.get("/api/v1/transfers/", headers=auth_headers)
     assert transfers.status_code == 200
     matching = [t for t in transfers.json() if t["unit_id"] == unit_id]
-    assert matching == []
+    assert len(matching) == 1
+    assert matching[0]["status"] == "RECEIVED"
+    assert matching[0]["destination_location_id"] is None
+    assert matching[0]["origin_location_id"] == test_locations[0].id
 
 
 @pytest.mark.asyncio
-async def test_sell_unit_twice_returns_400(
+async def test_sell_unit_twice_returns_409(
     client: AsyncClient, auth_headers, test_users, test_locations
 ):
-    """Selling an already sold unit is rejected."""
+    """Selling an already sold unit is a conflict."""
     create_resp = await client.post(
         "/api/v1/units/",
         json={
@@ -233,7 +238,7 @@ async def test_sell_unit_twice_returns_400(
     second = await client.post(
         f"/api/v1/units/{unit_id}/sell", json={}, headers=auth_headers
     )
-    assert second.status_code == 400
+    assert second.status_code == 409
 
 
 @pytest.mark.asyncio

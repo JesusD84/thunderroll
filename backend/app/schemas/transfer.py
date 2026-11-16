@@ -7,39 +7,38 @@ from app.models.models import TransferStatus
 
 
 class TransferBase(BaseModel):
-    unit_id: int = Field(..., gt=0)
-    dispatched_by_id: int | None = Field(None, gt=0)
-    received_by_id: int | None = Field(None, gt=0)
-    origin_location_id: int | None = Field(None, gt=0)
-    destination_location_id: int | None = Field(None, gt=0)
-    status: TransferStatus = TransferStatus.PENDING
+    """A transfer, as the API returns it.
+
+    This is the *record* of a movement: who dispatched it, who received it
+    and when. Those fields are written by the server, never by a client.
+    """
+
+    unit_id: int
+    dispatched_by_id: int | None = None
+    received_by_id: int | None = None
+    origin_location_id: int | None = None
+    destination_location_id: int | None = None
+    status: TransferStatus
     dispatched_at: datetime | None = None
     received_at: datetime | None = None
 
 
-class TransferCreate(TransferBase):
+class TransferCreate(BaseModel):
     """Dispatch payload (POST /transfers/).
 
-    ``extra="forbid"``: only the fields declared here are accepted.
-    """
+    The attribution of a dispatch belongs to the server: who sent the unit
+    and when are taken from the session and from the server clock, so they
+    are not part of this schema and ``extra="forbid"`` rejects them with 422.
 
-    model_config = ConfigDict(extra="forbid")
-
-
-class TransferDispatchCreate(BaseModel):
-    """Payload an Operator may send to POST /transfers/.
-
-    The Operator role dispatches units; it does not author the dispatch
-    record. ``dispatched_by_id``/``dispatched_at`` (who sent it, when) and
-    the reception fields belong to the server, so they are not part of this
-    schema and ``extra="forbid"`` rejects them with 422.
+    The status is the server's too: a dispatch always starts as PENDING, and
+    the state of the unit follows the transfer.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     unit_id: int = Field(..., gt=0)
     origin_location_id: int | None = Field(None, gt=0)
-    destination_location_id: int | None = Field(None, gt=0)
+    destination_location_id: int = Field(..., gt=0)
 
 
 class TransferReceiveUpdate(BaseModel):
@@ -59,9 +58,9 @@ class TransferReceiveUpdate(BaseModel):
 class UnitTransferRequest(BaseModel):
     """Body for the unit-detail-page "Transferir"/"Vender" action.
 
-    `to_location_id` present -> dispatch the unit to that location (IN_TRANSIT).
-    `to_location_id` absent -> sell the unit (SOLD), per
-    TransferService.transfer_unit_with_status_update.
+    `to_location_id` present -> dispatch the unit to that location.
+    `to_location_id` absent -> sell the unit, through the sale service, so
+    there is only one way to sell a unit.
     """
 
     from_location_id: int | None = Field(None, gt=0)
@@ -72,19 +71,15 @@ class UnitTransferRequest(BaseModel):
 class TransferUpdate(BaseModel):
     """Transfer update payload (PUT /transfers/{id}).
 
-    ``extra="forbid"``: only the fields declared here are accepted.
+    Only the status may change: a transfer is closed as RECEIVED (the unit
+    arrived) or CANCELLED (it never left). Rewriting who dispatched it,
+    when, or the route would falsify the trail, so those fields are not
+    part of this schema and ``extra="forbid"`` rejects them with 422.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    unit_id: int | None = Field(None, gt=0)
-    dispatched_by_id: int | None = Field(None, gt=0)
-    received_by_id: int | None = Field(None, gt=0)
-    origin_location_id: int | None = Field(None, gt=0)
-    destination_location_id: int | None = Field(None, gt=0)
-    status: TransferStatus | None = None
-    dispatched_at: datetime | None = None
-    received_at: datetime | None = None
+    status: TransferStatus
 
 
 class TransferFilters(BaseModel):

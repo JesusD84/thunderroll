@@ -104,6 +104,53 @@ async def test_update_location_not_found(
 
 
 @pytest.mark.asyncio
+async def test_create_location_with_a_taken_name_is_a_conflict(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """The name identifies the location: it cannot be shared."""
+    name = "Nombre Unico de Prueba"
+
+    first = await client.post(
+        "/api/v1/locations/", json={"name": name}, headers=auth_headers
+    )
+    assert first.status_code == 200, first.text
+
+    second = await client.post(
+        "/api/v1/locations/", json={"name": name}, headers=auth_headers
+    )
+    assert second.status_code == 409, second.text
+
+
+@pytest.mark.asyncio
+async def test_update_location_to_a_taken_name_is_a_conflict(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """Renaming a location to the name of another one is refused."""
+    name = "Otro Nombre Unico"
+    created = await client.post(
+        "/api/v1/locations/", json={"name": name}, headers=auth_headers
+    )
+    assert created.status_code == 200, created.text
+    created_id = created.json()["id"]
+
+    other = await client.post(
+        "/api/v1/locations/", json={"name": "Tercer Nombre Unico"}, headers=auth_headers
+    )
+    assert other.status_code == 200, other.text
+
+    renamed = await client.put(
+        f"/api/v1/locations/{other.json()['id']}",
+        json={"name": name},
+        headers=auth_headers,
+    )
+    assert renamed.status_code == 409, renamed.text
+
+    # The location that was not renamed keeps its name.
+    kept = await client.get(f"/api/v1/locations/{created_id}", headers=auth_headers)
+    assert kept.json()["name"] == name
+
+
+@pytest.mark.asyncio
 async def test_delete_location_empty(
     client: AsyncClient, auth_headers, test_users, test_locations
 ):

@@ -21,6 +21,11 @@ class LocationRepository:
         return db.query(Location).filter(Location.id == location_id).first()
 
     @staticmethod
+    def get_location_by_name(db: Session, name: str) -> Location | None:
+        """The location with this exact name, if there is one."""
+        return db.query(Location).filter(Location.name == name).first()
+
+    @staticmethod
     def create_location(db: Session, location_data: LocationCreate) -> Location:
         db_location = Location(**location_data.model_dump())
         db.add(db_location)

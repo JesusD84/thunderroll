@@ -188,28 +188,20 @@ export default function UnitDetailPage() {
     setActionLoading(true);
     setActionError(null);
     try {
-      let res;
-      if (activeTransferId) {
-        // Complete the Transfer record
-        res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'RECEIVED' }),
-        });
-      } else {
-        // Legacy: no Transfer record, just update unit status. Editing a unit
-        // is reserved to admins and managers, so an operator has no legal way
-        // to close this one: say it instead of letting the API answer 403.
-        if (!manageUnits) {
-          setActionError('Esta unidad no tiene una transferencia activa. Pide a un administrador que confirme la llegada.');
-          return;
-        }
-        res = await sessionAwareFetch(`${API_URL}/api/v1/units/${unitId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'AVAILABLE' }),
-        });
+      if (!activeTransferId) {
+        // The state of a unit comes from its transfer: a unit that is on the
+        // road always has an active transfer, so there is nothing to close
+        // here. Say it instead of pretending the unit can be edited.
+        setActionError('Esta unidad no tiene una transferencia activa. Pide a un administrador que revise la unidad.');
+        return;
       }
+      // Complete the Transfer record: the unit becomes AVAILABLE at the
+      // destination.
+      const res = await sessionAwareFetch(`${API_URL}/api/v1/transfers/${activeTransferId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'RECEIVED' }),
+      });
       if (res.ok) {
         await refreshData(token);
       } else {
@@ -503,7 +495,6 @@ export default function UnitDetailPage() {
                       engine_number: editForm.engine_number || null,
                       chassis_number: editForm.chassis_number || null,
                       notes: editForm.notes || null,
-                      status: (editForm.engine_number && editForm.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
                     }),
                   });
                   if (res.ok) {

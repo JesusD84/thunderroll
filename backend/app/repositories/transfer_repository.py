@@ -53,6 +53,34 @@ class TransferRepository:
         return db_transfer
 
     @staticmethod
+    def build_transfer(
+        unit_id: int,
+        status: TransferStatus,
+        origin_location_id: int | None = None,
+        destination_location_id: int | None = None,
+        dispatched_by_id: int | None = None,
+        received_by_id: int | None = None,
+        dispatched_at: datetime | None = None,
+        received_at: datetime | None = None,
+    ) -> Transfer:
+        """Build a transfer row without touching the database.
+
+        The caller decides when it is written: a transfer that goes together
+        with a change of the unit is written in the same transaction, so the
+        trail can never show one without the other.
+        """
+        return Transfer(
+            unit_id=unit_id,
+            dispatched_by_id=dispatched_by_id,
+            received_by_id=received_by_id,
+            origin_location_id=origin_location_id,
+            destination_location_id=destination_location_id,
+            status=status,
+            dispatched_at=dispatched_at or datetime.now(UTC),
+            received_at=received_at,
+        )
+
+    @staticmethod
     def update_transfer(
         db: Session, db_transfer: Transfer, transfer_update: TransferUpdate
     ) -> Transfer:
@@ -96,13 +124,13 @@ class TransferRepository:
         dispatched_at: datetime | None = None,
         received_at: datetime | None = None,
     ) -> Transfer:
-        db_transfer = Transfer(
+        db_transfer = TransferRepository.build_transfer(
             unit_id=unit_id,
-            dispatched_by_id=dispatched_by_id,
+            status=status,
             origin_location_id=origin_location_id,
             destination_location_id=destination_location_id,
-            status=status,
-            dispatched_at=dispatched_at or datetime.now(UTC),
+            dispatched_by_id=dispatched_by_id,
+            dispatched_at=dispatched_at,
             received_at=received_at,
         )
         db.add(db_transfer)

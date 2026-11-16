@@ -22,6 +22,7 @@ class LocationService:
 
     @staticmethod
     def create_location(db: Session, location_data: LocationCreate) -> Location:
+        LocationService._ensure_name_is_free(db, location_data.name)
         return LocationRepository.create_location(db, location_data)
 
     @staticmethod
@@ -31,6 +32,10 @@ class LocationService:
         db_location = LocationRepository.get_location(db, location_id)
         if not db_location:
             raise HTTPException(status_code=404, detail="Location not found")
+        if location_update.name is not None:
+            LocationService._ensure_name_is_free(
+                db, location_update.name, excluding_id=location_id
+            )
         return LocationRepository.update_location(db, db_location, location_update)
 
     @staticmethod
@@ -48,3 +53,18 @@ class LocationService:
 
         LocationRepository.delete_location(db, db_location)
         return {"message": "Location deleted successfully"}
+
+    @staticmethod
+    def _ensure_name_is_free(
+        db: Session, name: str, excluding_id: int | None = None
+    ) -> None:
+        """The name identifies the location, so it cannot be shared.
+
+        The database refuses it too (unique constraint), but a conflict
+        answered with a 409 is a far better answer than a 500.
+        """
+        taken = LocationRepository.get_location_by_name(db, name)
+        if taken and taken.id != excluding_id:
+            raise HTTPException(
+                status_code=409, detail=f"A location named '{name}' already exists"
+            )
