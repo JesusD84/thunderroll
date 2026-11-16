@@ -18,8 +18,20 @@ services:
         sync: false
       - key: ALGORITHM
         value: HS256
+      # Vida del token de acceso, en minutos. Tiene que coincidir con el
+      # default del código (60): el blueprint pisa lo que haya en el
+      # dashboard, así que dejarlo en 30 hacía que producción corriera con
+      # tokens más cortos de lo previsto.
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "30"
+        value: "60"
+      # Vida del token de refresco, en días: es lo que permite renovar la
+      # sesión sin volver a pedir la contraseña.
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      # Entorno: solo "development" agrega los orígenes de localhost a la
+      # lista de CORS. En producción valen FRONTEND_URL y ALLOWED_ORIGINS.
+      - key: ENV
+        value: production
       - key: FRONTEND_URL
         value: https://thunderroll.vercel.app
       - key: SMTP_HOST
