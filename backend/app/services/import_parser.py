@@ -21,14 +21,31 @@ import io
 import numbers
 import re
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-# Source can be a filesystem path or the raw bytes of an uploaded file.
-Source = str | bytes
+from app.services.upload_service import (
+    TooManyRowsError,
+    TooManySheetsError,
+    UnreadableFileError,
+    max_rows_per_sheet,
+    max_sheets,
+)
 
+# Source can be a filesystem path or the raw bytes of an uploaded file.
+Source = str | bytes | Path
+
+# Filas que se leen por encima del límite de filas por hoja.
+#
+# El margen cubre dos cosas: una fila para el encabezado y un par más para
+# poder distinguir "la hoja termina aquí" de "la hoja se truncó". Si la
+# lectura se saturó (llegó al tope) puede haber filas que no se leyeron, así
+# que la hoja se rechaza en vez de importarse truncada.
+ROWS_READ_SLACK = 3
 # Minimal keyword set used only to tell a header row apart from a data row.
 # The full multilingual synonym -> canonical-field mapping lands in TR-04b;
 # here we just need enough signal to locate (or rule out) a header row.
@@ -480,26 +497,134 @@ def parse_sheet(raw: pd.DataFrame, sheet_name: str | None = None) -> ParsedTable
     )
 
 
+def _source_bytes(source: Source) -> bytes:
+    """Return the raw bytes of ``source`` (bytes or a path on disk)."""
+    if isinstance(source, bytes):
+        return source
+    with open(source, "rb") as handle:
+        return handle.read()
+
+
+@contextmanager
+def _binary_stream(source: Source):
+    """Open ``source`` as a fresh binary stream (a new one on every call)."""
+    if isinstance(source, bytes):
+        yield io.BytesIO(source)
+    else:
+        with open(source, "rb") as handle:
+            yield handle
+
+
+def decode_csv_bytes(data: bytes) -> str:
+    """Decode CSV bytes the way Excel writes them.
+
+    Excel in Spanish saves CSVs as ``cp1252`` and often adds a UTF-8 BOM.
+    ``utf-8-sig`` strips the BOM when there is one and leaves BOM-less files
+    untouched, so the first header is not corrupted; if the bytes are not
+    valid UTF-8 we fall back to ``cp1252`` (the Spanish Excel default) and
+    finally to ``latin-1``, which never fails and keeps the file readable.
+    """
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    try:
+        return data.decode("cp1252")
+    except UnicodeDecodeError:
+        pass
+    return data.decode("latin-1")
+
+
+# Separators tried when reading a CSV, in order. Excel in Spanish exports with
+# ";", so a file that only yields one column with "," is retried with the
+# others before giving up.
+CSV_SEPARATORS: tuple[str, ...] = (",", ";", "\t", "|")
+
+
+def _read_csv_frame(data: bytes, max_rows: int) -> pd.DataFrame:
+    """Read a CSV into a raw (header-less) DataFrame, guessing the separator."""
+    text = decode_csv_bytes(data)
+    fallback: pd.DataFrame | None = None
+    for separator in CSV_SEPARATORS:
+        try:
+            frame = pd.read_csv(
+                io.StringIO(text),
+                header=None,
+                dtype=object,
+                sep=separator,
+                nrows=max_rows + ROWS_READ_SLACK,
+            )
+        except ValueError:
+            # ParserError/EmptyDataError: this separator does not fit the file.
+            continue
+        if fallback is None:
+            fallback = frame
+        if frame.shape[1] > 1:
+            return frame
+    if fallback is None:
+        raise UnreadableFileError(
+            "No se pudo leer el archivo CSV. Revisa que no esté vacío ni corrupto."
+        )
+    return fallback
+
+
+def _list_excel_sheet_names(source: Source, filename: str) -> list[str]:
+    """Return the sheet names of an Excel file without loading the data.
+
+    The count is checked *before* reading any cell, so a workbook with a
+    crazy number of sheets cannot exhaust the memory first.
+    """
+    engine = excel_engine_for(filename)
+    if engine == "xlrd":
+        import xlrd
+
+        book = xlrd.open_workbook(file_contents=_source_bytes(source), on_demand=True)
+        try:
+            return list(book.sheet_names())
+        finally:
+            book.release_resources()
+
+    import openpyxl
+
+    with _binary_stream(source) as stream:
+        workbook = openpyxl.load_workbook(stream, read_only=True, data_only=True)
+        try:
+            return list(workbook.sheetnames)
+        finally:
+            workbook.close()
+
+
 def _read_raw_sheets(source: Source, filename: str) -> dict[str, pd.DataFrame]:
     """Read every sheet of a file as raw (header-less) DataFrames.
 
     CSV files are exposed as a single pseudo-sheet named ``"csv"``.
+
+    The sheet count and the number of rows per sheet are capped: an oversized
+    file is rejected with a typed error instead of being loaded whole.
     """
     lower = filename.lower()
-    if lower.endswith(".csv"):
-        buf = (
-            io.StringIO(source.decode("utf-8")) if isinstance(source, bytes) else source
-        )
-        return {"csv": pd.read_csv(buf, header=None, dtype=object)}
+    max_rows = max_rows_per_sheet()
 
-    excel_source: Any = io.BytesIO(source) if isinstance(source, bytes) else source
-    sheets = pd.read_excel(
-        excel_source,
-        engine=excel_engine_for(filename),
-        sheet_name=None,
-        header=None,
-        dtype=object,
-    )
+    if lower.endswith(".csv"):
+        return {"csv": _read_csv_frame(_source_bytes(source), max_rows)}
+
+    names = _list_excel_sheet_names(source, filename)
+    sheet_limit = max_sheets()
+    if len(names) > sheet_limit:
+        raise TooManySheetsError(len(names), sheet_limit)
+
+    # `nrows` deja margen para el encabezado y para detectar que la hoja se
+    # truncó; una hoja con más filas de las permitidas se rechaza después de
+    # parsearla (ver `parse_workbook`).
+    with _binary_stream(source) as stream:
+        sheets = pd.read_excel(
+            stream,
+            engine=excel_engine_for(filename),
+            sheet_name=None,
+            header=None,
+            dtype=object,
+            nrows=max_rows + ROWS_READ_SLACK,
+        )
     return sheets
 
 
@@ -510,9 +635,14 @@ def parse_workbook(source: Source, filename: str) -> WorkbookParseResult:
     with an info issue. Each surviving sheet keeps its name as ``ParsedTable.sheet``
     so the origin is available to downstream model resolution (TR-05). Use
     ``WorkbookParseResult.iter_rows()`` for a flattened, origin-tagged view.
+
+    A file with too many rows in a sheet or too many sheets is rejected with a
+    typed error (``TooManyRowsError`` / ``TooManySheetsError``) instead of being
+    loaded whole.
     """
     result = WorkbookParseResult()
     raw_sheets = _read_raw_sheets(source, filename)
+    row_limit = max_rows_per_sheet()
 
     for sheet_name, raw in raw_sheets.items():
         if raw is None or raw.empty:
@@ -525,6 +655,11 @@ def parse_workbook(source: Source, filename: str) -> WorkbookParseResult:
             )
             continue
         table = parse_sheet(raw, sheet_name=sheet_name)
+        # The sheet is rejected if it has more data rows than allowed, but also
+        # if the read hit the cap: in that case there may be rows we never
+        # saw, and importing the file would silently drop them.
+        if len(raw) >= row_limit + ROWS_READ_SLACK or len(table.rows) > row_limit:
+            raise TooManyRowsError(sheet_name, row_limit)
         if not table.rows:
             # A sheet with only blank rows (or a header and no data) carries no
             # units; treat it like an empty sheet so it is not processed.

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.models.models import TransferStatus, UnitStatus
 from app.schemas.user import User
@@ -134,6 +134,12 @@ class Import(ImportBase):
     import_date: datetime
     completed_at: datetime | None = None
     user: User | None = None
+    # In the database `filename` holds the name of the stored file (server
+    # side). The API must not expose where the file lives, so the field is
+    # filled with the original upload name instead.
+    filename: str = Field(
+        validation_alias=AliasChoices("original_filename", "filename")
+    )
     model_config = ConfigDict(from_attributes=True)
 
 

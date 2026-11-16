@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads
+# Create the directory where the uploaded files are stored. It is NOT served by
+# the API: see app/services/upload_service.py.
+RUN mkdir -p var/imports
 
 # Expose port
 EXPOSE 8000
