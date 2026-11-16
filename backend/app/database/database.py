@@ -1,22 +1,13 @@
-import os
-
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-load_dotenv()
+from app.core.config import require_database_url
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    # Sin DATABASE_URL se usa un placeholder local. Es preferible fallar en
-    # la conexión (con un mensaje claro) que apuntar a una credencial fija
-    # publicada en el repo.
-    print(
-        "⚠️  DATABASE_URL no está definida: se usa el placeholder local "
-        "postgresql://thunderoll:change-me@localhost:5432/thunderoll.",
-        flush=True,
-    )
-    DATABASE_URL = "postgresql://thunderoll:change-me@localhost:5432/thunderoll"
+# La URL de la base de datos viene solo del entorno. Sin ella la app no
+# arranca: un default fijo en el código publicaría una credencial y apuntaría
+# a una base que no es la de producción. En los tests, `tests/conftest.py`
+# define una URL de SQLite antes de importar la app.
+DATABASE_URL = require_database_url()
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

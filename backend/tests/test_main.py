@@ -30,6 +30,9 @@ def test_importing_app_main_does_not_connect_to_db():
         "PATH": "/usr/bin:/bin:/usr/local/bin",
         # Unroutable address: any real connection attempt fails fast / hangs.
         "DATABASE_URL": "postgresql://u:p@192.0.2.1:5432/nope",
+        # La app exige una SECRET_KEY válida para arrancar (ver
+        # app/core/config.py): aquí solo importa que la validación pase.
+        "SECRET_KEY": "test-secret-key-for-the-startup-regression-test",
     }
     # No SMTP_* and no FRONTEND_URL on purpose.
 

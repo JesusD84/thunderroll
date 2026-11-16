@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Import your models
 from app.database.database import Base
+from app.core.config import require_database_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -31,11 +32,14 @@ target_metadata = Base.metadata
 # ... etc.
 
 def get_url():
-    """Get database URL from environment or config."""
-    url = os.getenv("DATABASE_URL")
-    if url:
-        return url
-    return config.get_main_option("sqlalchemy.url")
+    """Get the database URL from the environment.
+
+    There is no fallback: `app.database.database` (imported above) already
+    fails with a clear error when DATABASE_URL is missing, so a placeholder
+    here would never be reached — it would only be a second, wrong database
+    waiting to be used. The same validation the app uses at startup.
+    """
+    return require_database_url()
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

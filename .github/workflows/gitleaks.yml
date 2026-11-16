@@ -1,0 +1,39 @@
+name: Secret Detection
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# El scanner solo lee el repositorio: no necesita escribir nada en él.
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historial completo: un secreto puede haberse filtrado hace meses y
+          # seguir siendo válido hoy. Con un checkout shallow solo se
+          # escanearía el último commit.
+          fetch-depth: 0
+
+      # Se usa la imagen oficial fijada a una versión (no `latest`) para que
+      # el resultado del escaneo no dependa de cuándo corra el workflow.
+      # `--redact` evita que un secreto real se imprima en los logs de CI.
+      - name: Run gitleaks
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/repo \
+            zricethezav/gitleaks:v8.30.1 \
+            detect \
+            --source=/repo \
+            --config=/repo/.gitleaks.toml \
+            --redact \
+            --no-banner \
+            --verbose

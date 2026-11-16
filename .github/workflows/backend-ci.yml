@@ -40,7 +40,9 @@ jobs:
         run: pytest tests/ -v --tb=short
         env:
           DATABASE_URL: sqlite:///./test.db
-          SECRET_KEY: test-secret-key-ci
+          # La app exige una SECRET_KEY de 32 caracteres o más (ver
+          # app/core/config.py): esta es de prueba y solo vive en CI.
+          SECRET_KEY: test-secret-key-for-the-backend-ci-run-only
           ALGORITHM: HS256
           ACCESS_TOKEN_EXPIRE_MINUTES: 30
           SMTP_HOST: localhost
@@ -139,7 +141,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/thunderoll_test
           RUN_POSTGRES_MATRIX: '1'
-          SECRET_KEY: test-secret-key-ci
+          # La app exige una SECRET_KEY de 32 caracteres o más (ver
+          # app/core/config.py): esta es de prueba y solo vive en CI.
+          SECRET_KEY: test-secret-key-for-the-backend-ci-run-only
           ALGORITHM: HS256
           ACCESS_TOKEN_EXPIRE_MINUTES: 30
           SMTP_HOST: localhost
