@@ -29,3 +29,61 @@ jobs:
 
       - name: Run unit/integration tests
         run: npm test
+
+  e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # Los tres navegadores que define playwright.config.ts. --with-deps
+      # instala también las librerías del sistema que necesitan.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      # Los e2e interceptan la API con mocks (page.route): no hacen falta
+      # backend ni base de datos. El job es el navegador real contra la UI
+      # real, compilada en modo producción.
+      #
+      # NEXT_PUBLIC_API_URL apunta al MISMO origen que la app a propósito:
+      # si la API viviera en otro origen, el navegador haría un preflight
+      # CORS contra él antes de cada petición mockeada, y en firefox/webkit
+      # ese preflight falla (la petición nunca sale y la respuesta del mock
+      # se pierde). Con un solo origen no hay preflight y los mocks mandan.
+      - name: Run Playwright tests
+        run: npx playwright test
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      # Trazas y capturas de los tests que fallaron: para depurar sin
+      # tener que reproducirlos en local.
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7
