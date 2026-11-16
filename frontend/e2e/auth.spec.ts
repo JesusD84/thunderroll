@@ -13,9 +13,14 @@ const mockDashboard = {
   recent_transfers: [], recent_imports: [],
 };
 
+// The API always returns ``color`` (NOT NULL in the model, required in the
+// response schema), and the units page reads it without a guard:
+// ``unit.color.toLowerCase()``. A mock without that field crashes the page
+// with "Application error" and makes this spec flaky, because the crash can
+// land before or after the assertion runs.
 const mockUnits = [
-  { id: 1, brand: 'Honda', model: 'PCX', engine_number: 'ENG001', status: 'AVAILABLE', location_name: 'Bodega Central' },
-  { id: 2, brand: 'Yamaha', model: 'NMAX', engine_number: 'ENG002', status: 'SOLD', location_name: 'Sucursal Norte' },
+  { id: 1, brand: 'Honda', model: 'PCX', engine_number: 'ENG001', chassis_number: 'CHS001', color: 'Rojo', status: 'AVAILABLE', location_name: 'Bodega Central' },
+  { id: 2, brand: 'Yamaha', model: 'NMAX', engine_number: 'ENG002', chassis_number: 'CHS002', color: 'Azul', status: 'SOLD', location_name: 'Sucursal Norte' },
 ];
 
 async function setupMocks(page: any) {
