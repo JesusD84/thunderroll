@@ -1,29 +1,28 @@
 """Unit tests for auth service functions."""
 
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta, UTC
-from jose import jwt
 from fastapi import HTTPException
+from jose import jwt
 
-from app.services.auth_service import (
-    verify_password,
-    get_password_hash,
-    create_access_token,
-    get_user_by_username,
-    get_user_by_email,
-    authenticate_user,
-    create_password_reset_token,
-    verify_password_reset_token,
-    get_current_user,
-    get_current_active_user,
-    require_role,
-    SECRET_KEY,
-    ALGORITHM,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-)
 from app.models.models import User, UserRole
-
+from app.services.auth_service import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    ALGORITHM,
+    SECRET_KEY,
+    authenticate_user,
+    create_access_token,
+    create_password_reset_token,
+    get_current_active_user,
+    get_password_hash,
+    get_user_by_email,
+    get_user_by_username,
+    require_role,
+    verify_password,
+    verify_password_reset_token,
+)
 
 # ---------------------------------------------------------------------------
 # verify_password

@@ -1,15 +1,15 @@
-from typing import List
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.models.models import UserRole, User
+from app.models.models import User, UserRole
 from app.schemas.transfer import (
     Transfer,
     TransferCreate,
     TransferFilters,
-    TransferUpdate,
     TransferStats,
+    TransferUpdate,
     UnitTransferRequest,
 )
 from app.services.auth_service import get_current_active_user, require_role
@@ -26,7 +26,7 @@ def get_transfer_stats(
     return TransferService.get_transfer_stats(db)
 
 
-@router.get("/", response_model=List[Transfer])
+@router.get("/", response_model=list[Transfer])
 def get_transfers(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

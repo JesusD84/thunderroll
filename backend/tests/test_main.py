@@ -50,6 +50,7 @@ def test_importing_app_main_does_not_connect_to_db():
 def test_create_all_not_called_at_module_import():
     """``create_all`` must live in the lifespan, not at module top-level (TR-11)."""
     import inspect
+
     import app.main as main
 
     source = inspect.getsource(main)

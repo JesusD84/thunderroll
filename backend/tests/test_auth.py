@@ -2,8 +2,9 @@
 
 import pytest
 from httpx import AsyncClient
-from app.models.models import User, UserRole
+
 from app.core.security import Security
+from app.models.models import User, UserRole
 
 
 @pytest.mark.asyncio

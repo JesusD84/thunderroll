@@ -3,13 +3,20 @@
 
 import io
 from datetime import datetime, timedelta
-from typing import Optional
-import pandas as pd
-from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, desc, or_, and_, cast, String
-from fastapi import Response
 
-from app.models.models import Unit, Location, Transfer, Import, UnitStatus, TransferStatus
+import pandas as pd
+from fastapi import Response
+from sqlalchemy import String, and_, cast, desc, func, or_
+from sqlalchemy.orm import Session, selectinload
+
+from app.models.models import (
+    Import,
+    Location,
+    Transfer,
+    TransferStatus,
+    Unit,
+    UnitStatus,
+)
 
 
 class ReportService:
@@ -113,13 +120,13 @@ class ReportService:
     @staticmethod
     def get_inventory_report(
         db: Session,
-        brand: Optional[str] = None,
-        model: Optional[str] = None,
-        color: Optional[str] = None,
-        location_id: Optional[int] = None,
-        status: Optional[UnitStatus] = None,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
+        brand: str | None = None,
+        model: str | None = None,
+        color: str | None = None,
+        location_id: int | None = None,
+        status: UnitStatus | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> dict:
         query = db.query(Unit).options(selectinload(Unit.current_location))
 
@@ -174,10 +181,10 @@ class ReportService:
     @staticmethod
     def get_transfers_report(
         db: Session,
-        user_id: Optional[int] = None,
-        location_id: Optional[int] = None,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
+        user_id: int | None = None,
+        location_id: int | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> dict:
@@ -252,9 +259,9 @@ class ReportService:
     @staticmethod
     def get_sales_report(
         db: Session,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
-        location_id: Optional[int] = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        location_id: int | None = None,
     ) -> dict:
         query = db.query(Unit).options(
             selectinload(Unit.current_location)
@@ -309,10 +316,10 @@ class ReportService:
     @staticmethod
     def export_inventory_excel(
         db: Session,
-        brand: Optional[str] = None,
-        model: Optional[str] = None,
-        location_id: Optional[int] = None,
-        status: Optional[UnitStatus] = None,
+        brand: str | None = None,
+        model: str | None = None,
+        location_id: int | None = None,
+        status: UnitStatus | None = None,
     ) -> Response:
         report_data = ReportService.get_inventory_report(
             db, brand=brand, model=model, location_id=location_id, status=status
@@ -340,8 +347,8 @@ class ReportService:
     @staticmethod
     def export_transfers_excel(
         db: Session,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> Response:
         report_data = ReportService.get_transfers_report(
             db, date_from=date_from, date_to=date_to, limit=10000
@@ -363,9 +370,9 @@ class ReportService:
     @staticmethod
     def export_sales_excel(
         db: Session,
-        date_from: Optional[datetime] = None,
-        date_to: Optional[datetime] = None,
-        location_id: Optional[int] = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        location_id: int | None = None,
     ) -> Response:
         report_data = ReportService.get_sales_report(
             db, date_from=date_from, date_to=date_to, location_id=location_id

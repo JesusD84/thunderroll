@@ -1,7 +1,6 @@
 """Unit tests for email service."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def test_get_mail_config_builds_without_smtp_envs(monkeypatch):

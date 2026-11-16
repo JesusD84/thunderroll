@@ -10,24 +10,23 @@ Matching is case-insensitive and whitespace-normalized so noisy supplier labels
 ("X3", "x3 ", "X3\n") resolve to the same equivalence.
 """
 
-from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.models import ModelEquivalence, Unit
 from app.models import schemas
+from app.models.models import ModelEquivalence, Unit
 
 
-def normalize_model(value: Optional[str]) -> str:
+def normalize_model(value: str | None) -> str:
     """Collapse whitespace/newlines and strip. Empty for blank input."""
     if value is None:
         return ""
     return " ".join(str(value).split()).strip()
 
 
-def resolve_internal_model(db: Session, manufacturer_model: Optional[str]) -> Optional[str]:
+def resolve_internal_model(db: Session, manufacturer_model: str | None) -> str | None:
     """Return the internal model for a manufacturer model, or ``None``.
 
     ``None`` means "no equivalence" (or blank input); the import keeps the
@@ -61,7 +60,7 @@ def get_equivalence(db: Session, equivalence_id: int) -> ModelEquivalence:
     return record
 
 
-def _find_by_manufacturer(db: Session, manufacturer_model: str) -> Optional[ModelEquivalence]:
+def _find_by_manufacturer(db: Session, manufacturer_model: str) -> ModelEquivalence | None:
     return (
         db.query(ModelEquivalence)
         .filter(func.lower(ModelEquivalence.manufacturer_model) == manufacturer_model.lower())

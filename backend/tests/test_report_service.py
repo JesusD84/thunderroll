@@ -1,14 +1,17 @@
 """Unit tests for ReportService."""
 
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
+
 import pandas as pd
 from fastapi import Response
 
+from app.models.models import (
+    Location,
+    Unit,
+    UnitStatus,
+)
 from app.services.report import ReportService
-from app.models.models import Unit, Location, Transfer, Import, UnitStatus, TransferStatus
-
 
 # ---------------------------------------------------------------------------
 # get_dashboard_stats
@@ -170,8 +173,8 @@ def test_prepare_df_for_excel_strips_timezone():
     df = pd.DataFrame({
         "name": ["A", "B"],
         "created_at": [
-            datetime(2025, 1, 1, tzinfo=timezone.utc),
-            datetime(2025, 6, 1, tzinfo=timezone.utc),
+            datetime(2025, 1, 1, tzinfo=UTC),
+            datetime(2025, 6, 1, tzinfo=UTC),
         ],
     })
 

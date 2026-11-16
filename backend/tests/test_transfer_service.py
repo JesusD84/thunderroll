@@ -1,12 +1,18 @@
 """Unit tests for TransferService."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException
-from app.services.transfer_service import TransferService
-from app.models.models import Transfer, Unit, Location, User, TransferStatus, UnitStatus
-from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate, UnitTransferRequest
 
+import pytest
+from fastapi import HTTPException
+
+from app.models.models import Location, Transfer, TransferStatus, Unit, UnitStatus
+from app.schemas.transfer import (
+    TransferCreate,
+    TransferFilters,
+    TransferUpdate,
+    UnitTransferRequest,
+)
+from app.services.transfer_service import TransferService
 
 # ---------------------------------------------------------------------------
 # get_transfers

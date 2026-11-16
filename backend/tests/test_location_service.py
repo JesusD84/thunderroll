@@ -1,12 +1,13 @@
 """Unit tests for LocationService."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import HTTPException
-from app.services.location_service import LocationService
+
 from app.models.models import Location
 from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
-
+from app.services.location_service import LocationService
 
 # ---------------------------------------------------------------------------
 # get_locations

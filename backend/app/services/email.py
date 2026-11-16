@@ -1,7 +1,7 @@
 import os
 from functools import lru_cache
 
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 
 # A syntactically valid fallback sender so the config can always be built, even
 # with no SMTP envs (e.g. when running tests). Real delivery still requires

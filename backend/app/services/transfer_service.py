@@ -1,9 +1,10 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer, TransferStatus, Unit, UnitStatus, User, UserRole
+from app.models.models import Transfer, TransferStatus, Unit, UnitStatus, User
 from app.repositories.location_repository import LocationRepository
 from app.repositories.transfer_repository import TransferRepository
 from app.repositories.unit_repository import UnitRepository
@@ -13,8 +14,8 @@ from app.schemas.transfer import (
     TransferDispatchCreate,
     TransferFilters,
     TransferReceiveUpdate,
-    TransferUpdate,
     TransferStats,
+    TransferUpdate,
     UnitTransferRequest,
 )
 

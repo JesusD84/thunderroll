@@ -1,9 +1,11 @@
 
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Optional, List
-from app.models.models import UnitStatus, TransferStatus
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.models.models import TransferStatus, UnitStatus
 from app.schemas.user import User
+
 
 # Auth Schemas
 class Token(BaseModel):
@@ -11,7 +13,7 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    username: str | None = None
 
 class LoginRequest(BaseModel):
     username: str
@@ -20,7 +22,7 @@ class LoginRequest(BaseModel):
 # Location Schemas
 class LocationBase(BaseModel):
     name: str
-    address: Optional[str] = None
+    address: str | None = None
 
 class LocationCreate(LocationBase):
     pass
@@ -28,8 +30,8 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Optional[str] = None
-    address: Optional[str] = None
+    name: str | None = None
+    address: str | None = None
 
 class Location(LocationBase):
     id: int
@@ -40,14 +42,14 @@ class Location(LocationBase):
 class UnitBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
-    engine_number: Optional[str] = None
-    chassis_number: Optional[str] = None
+    engine_number: str | None = None
+    chassis_number: str | None = None
     model: str
     brand: str
     color: str
     current_location_id: int
     status: UnitStatus = UnitStatus.WAREHOUSE_UNIDENTIFIED
-    notes: Optional[str] = None
+    notes: str | None = None
 
 class UnitCreate(UnitBase):
     pass
@@ -55,39 +57,39 @@ class UnitCreate(UnitBase):
 class UnitUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
-    engine_number: Optional[str] = None
-    chassis_number: Optional[str] = None
-    model: Optional[str] = None
-    brand: Optional[str] = None
-    color: Optional[str] = None
-    current_location_id: Optional[int] = None
-    status: Optional[UnitStatus] = None
-    sold_date: Optional[datetime] = None
-    notes: Optional[str] = None
+    engine_number: str | None = None
+    chassis_number: str | None = None
+    model: str | None = None
+    brand: str | None = None
+    color: str | None = None
+    current_location_id: int | None = None
+    status: UnitStatus | None = None
+    sold_date: datetime | None = None
+    notes: str | None = None
 
 class Unit(UnitBase):
     id: int
-    sold_date: Optional[datetime] = None
+    sold_date: datetime | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    model: Optional[str] = None
-    brand: Optional[str] = None
-    color: Optional[str] = None
-    batch_period: Optional[str] = None
-    product_type: Optional[str] = None
-    current_location: Optional[Location] = None
+    updated_at: datetime | None = None
+    model: str | None = None
+    brand: str | None = None
+    color: str | None = None
+    batch_period: str | None = None
+    product_type: str | None = None
+    current_location: Location | None = None
     model_config = ConfigDict(from_attributes=True)
 
 # Transfer Schemas
 class TransferBase(BaseModel):
     unit_id: int
-    dispatched_by_id: Optional[int] = None
-    received_by_id: Optional[int] = None
-    origin_location_id: Optional[int] = None
-    destination_location_id: Optional[int] = None
+    dispatched_by_id: int | None = None
+    received_by_id: int | None = None
+    origin_location_id: int | None = None
+    destination_location_id: int | None = None
     status: TransferStatus = TransferStatus.PENDING
-    dispatched_at: Optional[datetime] = None
-    received_at: Optional[datetime] = None
+    dispatched_at: datetime | None = None
+    received_at: datetime | None = None
 
 class TransferCreate(TransferBase):
     model_config = ConfigDict(extra="forbid")
@@ -101,7 +103,7 @@ class ImportBase(BaseModel):
     filename: str
     original_filename: str
     total_records: int
-    notes: Optional[str] = None
+    notes: str | None = None
 
 class ImportCreate(ImportBase):
     pass
@@ -112,11 +114,11 @@ class Import(ImportBase):
     failed_imports: int
     user_id: int
     status: str
-    batch_period: Optional[str] = None
-    product_type: Optional[str] = None
+    batch_period: str | None = None
+    product_type: str | None = None
     import_date: datetime
-    completed_at: Optional[datetime] = None
-    user: Optional[User] = None
+    completed_at: datetime | None = None
+    user: User | None = None
     model_config = ConfigDict(from_attributes=True)
 
 # Model Equivalence Schemas (manufacturer model -> internal model)
@@ -125,7 +127,7 @@ class ModelEquivalenceBase(BaseModel):
 
     manufacturer_model: str
     internal_model: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 class ModelEquivalenceCreate(ModelEquivalenceBase):
     pass
@@ -133,14 +135,14 @@ class ModelEquivalenceCreate(ModelEquivalenceBase):
 class ModelEquivalenceUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
-    manufacturer_model: Optional[str] = None
-    internal_model: Optional[str] = None
-    notes: Optional[str] = None
+    manufacturer_model: str | None = None
+    internal_model: str | None = None
+    notes: str | None = None
 
 class ModelEquivalence(ModelEquivalenceBase):
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 # File Upload Schema
@@ -157,7 +159,7 @@ class PaginationParams(BaseModel):
     limit: int = Field(100, ge=1, le=1000)
 
 class PaginatedResponse(BaseModel):
-    items: List[dict]
+    items: list[dict]
     total: int
     skip: int
     limit: int

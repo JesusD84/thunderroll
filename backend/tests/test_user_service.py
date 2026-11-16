@@ -1,12 +1,13 @@
 """Unit tests for UserService."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import HTTPException
-from app.services.user_service import UserService
+
 from app.models.models import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
-
+from app.services.user_service import UserService
 
 # ---------------------------------------------------------------------------
 # create_user
