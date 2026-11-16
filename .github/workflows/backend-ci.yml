@@ -90,3 +90,61 @@ jobs:
       # solo avisa si un archivo quedó fuera del formato canónico.
       - name: Check ruff format
         run: ruff format --check app/ tests/
+
+  matrix-postgres:
+    name: Backend Matrix (Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    # La matriz de autorización también corre contra el PostgreSQL real, que
+    # es lo que usa producción y es más estricto que el SQLite en memoria
+    # (tipos enum, comparaciones de texto, transacciones).
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: thunderoll_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thunderoll_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx pytest-mock
+
+      # La suite se niega a correr contra una base que no sea de pruebas: el
+      # nombre de la base tiene que contener "test" (además de pedir
+      # RUN_POSTGRES_MATRIX=1 explícitamente). Borra unidades, transferencias,
+      # importaciones, equivalencias y usuarios.
+      - name: Run the authorization matrix against PostgreSQL
+        run: pytest tests/test_authorization_matrix_postgres.py -v --tb=short
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/thunderoll_test
+          RUN_POSTGRES_MATRIX: '1'
+          SECRET_KEY: test-secret-key-ci
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES: 30
+          SMTP_HOST: localhost
+          SMTP_PORT: "587"
+          SMTP_USER: test@example.com
+          SMTP_PASSWORD: test-password
+          SMTP_FROM: test@example.com
+          FRONTEND_URL: http://localhost:3000
