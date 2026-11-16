@@ -256,42 +256,97 @@ async def test_operator_can_still_update_own_name(
 
 
 # ---------------------------------------------------------------------------
-# Duplicate email / username on a self-update: 400, never a 500
+# The account identifiers are administrator-only
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_self_update_duplicate_email_returns_400(
+async def test_self_update_rejects_email(
     client: AsyncClient, test_users, test_locations
 ):
-    """Taking another account's email is a 400, not a 500 from the index."""
+    """``email`` is administrator-only: /me refuses it and nothing changes."""
     headers = await _login(client, "inventario")
     before = _user_state("inventario")
 
     response = await client.put(
-        "/api/v1/user/me", json={"email": "admin@test.com"}, headers=headers
+        "/api/v1/user/me", json={"email": "inventario.nuevo@test.com"}, headers=headers
     )
 
-    assert response.status_code == 400, response.text
-    assert "Email already registered" in response.json()["detail"]
+    assert response.status_code == 422, response.text
     assert _user_state("inventario") == before
 
 
 @pytest.mark.asyncio
-async def test_self_update_duplicate_username_returns_400(
+async def test_self_update_rejects_username(
     client: AsyncClient, test_users, test_locations
 ):
-    """Taking another account's username is a 400, not a 500 from the index."""
+    """``username`` is administrator-only: /me refuses it and nothing changes."""
     headers = await _login(client, "inventario")
     before = _user_state("inventario")
 
     response = await client.put(
-        "/api/v1/user/me", json={"username": "admin"}, headers=headers
+        "/api/v1/user/me", json={"username": "inventario_nuevo"}, headers=headers
+    )
+
+    assert response.status_code == 422, response.text
+    assert _user_state("inventario") == before
+
+
+@pytest.mark.asyncio
+async def test_admin_can_still_change_another_user_email(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """The capability did not disappear: an admin edits the identifiers."""
+    target_id = _create_user("email_target")
+
+    response = await client.put(
+        f"/api/v1/user/{target_id}",
+        json={"email": "email_target.nuevo@test.com"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+
+    db = TestingSessionLocal()
+    try:
+        target = db.query(User).filter(User.id == target_id).first()
+        assert target.email == "email_target.nuevo@test.com"
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_duplicate_email_returns_400(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """The uniqueness rule keeps guarding the admin flow."""
+    target_id = _create_user("email_dup_target")
+
+    response = await client.put(
+        f"/api/v1/user/{target_id}",
+        json={"email": "admin@test.com"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400, response.text
+    assert "Email already registered" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_duplicate_username_returns_400(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """The uniqueness rule keeps guarding the admin flow."""
+    target_id = _create_user("username_dup_target")
+
+    response = await client.put(
+        f"/api/v1/user/{target_id}",
+        json={"username": "admin"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 400, response.text
     assert "Username already registered" in response.json()["detail"]
-    assert _user_state("inventario") == before
 
 
 @pytest.mark.asyncio
@@ -308,22 +363,6 @@ async def test_self_update_with_null_name_returns_422(
 
     assert response.status_code == 422, response.text
     assert _user_state("inventario") == before
-
-
-@pytest.mark.asyncio
-async def test_operator_can_change_own_email_to_a_free_one(
-    client: AsyncClient, test_users, test_locations
-):
-    """A free email is accepted; the uniqueness rule does not block it."""
-    headers = await _login(client, "inventario")
-    new_email = "inventario.nuevo@test.com"
-
-    response = await client.put(
-        "/api/v1/user/me", json={"email": new_email}, headers=headers
-    )
-
-    assert response.status_code == 200, response.text
-    assert _user_state("inventario")["email"] == new_email
 
 
 # ---------------------------------------------------------------------------
