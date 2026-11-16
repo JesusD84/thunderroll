@@ -76,3 +76,53 @@ async def test_get_current_user_unauthorized(client: AsyncClient):
     """Test get current user without token."""
     response = await client.get("/api/v1/user/me")
     assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# forgot-password: el fallo de SMTP debe ser visible
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_forgot_password_reports_smtp_failure(client, test_users, test_locations):
+    """A broken SMTP answers 503 instead of a silent 200.
+
+    A 200 would be indistinguishable from a successful send, and this is the
+    only self-service way back into an account.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    with patch(
+        "app.api.v1.endpoints.auth.send_password_reset_email",
+        new=AsyncMock(side_effect=RuntimeError("SMTP unreachable")),
+    ):
+        response = await client.post(
+            "/api/v1/auth/forgot-password", json={"email": "admin@test.com"}
+        )
+
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_succeeds_when_email_is_sent(client, test_users, test_locations):
+    """When the email goes out, the endpoint answers 200 as before."""
+    from unittest.mock import AsyncMock, patch
+
+    with patch(
+        "app.api.v1.endpoints.auth.send_password_reset_email",
+        new=AsyncMock(return_value=None),
+    ):
+        response = await client.post(
+            "/api/v1/auth/forgot-password", json={"email": "admin@test.com"}
+        )
+
+    assert response.status_code == 200
+    assert "access_token" not in response.json()
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_does_not_leak_user_existence(client, test_users, test_locations):
+    """An unknown email still answers 200: no account enumeration."""
+    response = await client.post(
+        "/api/v1/auth/forgot-password", json={"email": "nadie-aqui@test.com"}
+    )
+    assert response.status_code == 200

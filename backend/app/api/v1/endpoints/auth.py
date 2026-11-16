@@ -50,8 +50,18 @@ async def forgot_password(
         try:
             reset_token = create_password_reset_token(user.email)
             await send_password_reset_email(to_email=user.email, reset_token=reset_token)
-        except Exception:
+        except Exception as exc:
             logger.exception("Failed to send password reset email to %s", user.email)
+            # A broken SMTP must be visible. Answering 200 here would be
+            # indistinguishable from a successful send, and this endpoint is
+            # the only self-service way back into an account: a silent failure
+            # would leave the user locked out with no clue why.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not send the reset email. Try again later.",
+            ) from exc
+    # A non-existent email still answers 200: the response must not reveal
+    # whether an account exists.
     return {"message": "If that email exists, a reset link was sent."}
 
 @router.post("/reset-password")
