@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.models.models import Location, Unit, UnitStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
@@ -138,81 +139,31 @@ def test_get_unit_by_id_not_found(mock_repo):
 # ---------------------------------------------------------------------------
 
 
-@patch("app.services.unit_service.TransferService")
 @patch("app.services.unit_service.UnitRepository")
 @patch("app.services.unit_service.LocationRepository")
-def test_update_unit_success(mock_loc_repo, mock_unit_repo, mock_transfer_svc):
-    """Updates unit fields without triggering transfers."""
+def test_update_unit_success(mock_loc_repo, mock_unit_repo):
+    """Updates unit fields without touching its state."""
     mock_db = MagicMock()
     unit = Unit(id=1, model="Old", current_location_id=1, status=UnitStatus.AVAILABLE)
     mock_unit_repo.get_unit.return_value = unit
     update_data = UnitUpdate(model="New")
     mock_unit_repo.update_unit.return_value = unit
 
-    result = UnitService.update_unit(mock_db, 1, update_data, user_id=1)
+    result = UnitService.update_unit(mock_db, 1, update_data)
     assert result is unit
-    mock_transfer_svc.create_unit_transfer_record.assert_not_called()
 
 
-@patch("app.services.unit_service.TransferService")
-@patch("app.services.unit_service.UnitRepository")
-@patch("app.services.unit_service.LocationRepository")
-def test_update_unit_location_change_creates_transfer(
-    mock_loc_repo, mock_unit_repo, mock_transfer_svc
-):
-    """Changing location creates a transfer record."""
-    mock_db = MagicMock()
-    unit = Unit(id=1, model="TR", current_location_id=1, status=UnitStatus.AVAILABLE)
-    mock_unit_repo.get_unit.return_value = unit
-    mock_loc_repo.get_location.return_value = Location(id=2, name="Taller")
-    mock_unit_repo.update_unit.return_value = unit
-
-    update_data = UnitUpdate(current_location_id=2)
-    UnitService.update_unit(mock_db, 1, update_data, user_id=1)
-
-    mock_transfer_svc.create_unit_transfer_record.assert_called_once()
-
-
-@patch("app.services.unit_service.TransferService")
-@patch("app.services.unit_service.UnitRepository")
-@patch("app.services.unit_service.LocationRepository")
-def test_update_unit_status_to_sold_creates_transfer(
-    mock_loc_repo, mock_unit_repo, mock_transfer_svc
-):
-    """Changing status to SOLD creates a RECEIVED transfer record."""
-    mock_db = MagicMock()
-    unit = Unit(id=1, model="TR", current_location_id=1, status=UnitStatus.AVAILABLE)
-    mock_unit_repo.get_unit.return_value = unit
-    mock_unit_repo.update_unit.return_value = unit
-
-    update_data = UnitUpdate(status=UnitStatus.SOLD)
-    UnitService.update_unit(mock_db, 1, update_data, user_id=1)
-
-    mock_transfer_svc.create_unit_transfer_record.assert_called_once()
-
-
-@patch("app.services.unit_service.TransferService")
-@patch("app.services.unit_service.UnitRepository")
-@patch("app.services.unit_service.LocationRepository")
-def test_update_unit_status_change_transfer_has_dispatched_at_and_location(
-    mock_loc_repo, mock_unit_repo, mock_transfer_svc
-):
-    """Regression: a status-only change must still populate dispatched_at
-    and origin/destination location on the generated transfer record, so
-    'Fecha' and 'Ruta' never render empty in the frontend grid.
+def test_update_unit_rejects_the_state_fields():
+    """The state of a unit is not editable: status, sold_date and
+    current_location_id belong to the transfers and to the sales.
     """
-    mock_db = MagicMock()
-    unit = Unit(id=1, model="TR", current_location_id=5, status=UnitStatus.AVAILABLE)
-    mock_unit_repo.get_unit.return_value = unit
-    mock_unit_repo.update_unit.return_value = unit
-
-    update_data = UnitUpdate(status=UnitStatus.SOLD)
-    UnitService.update_unit(mock_db, 1, update_data, user_id=1)
-
-    _, kwargs = mock_transfer_svc.create_unit_transfer_record.call_args
-    assert kwargs["dispatched_at"] is not None
-    assert kwargs["origin_location_id"] == 5
-    assert kwargs["destination_location_id"] == 5
+    for field, value in (
+        ("status", "SOLD"),
+        ("sold_date", "2026-01-01T00:00:00"),
+        ("current_location_id", 7),
+    ):
+        with pytest.raises(ValidationError):
+            UnitUpdate(**{field: value})
 
 
 @patch("app.services.unit_service.UnitRepository")
@@ -222,7 +173,7 @@ def test_update_unit_not_found(mock_repo):
     mock_repo.get_unit.return_value = None
 
     with pytest.raises(HTTPException) as exc:
-        UnitService.update_unit(mock_db, 999, UnitUpdate(model="X"), user_id=1)
+        UnitService.update_unit(mock_db, 999, UnitUpdate(model="X"))
     assert exc.value.status_code == 404
 
 
@@ -233,10 +184,11 @@ def test_update_unit_not_found(mock_repo):
 
 @patch("app.services.unit_service.UnitRepository")
 def test_delete_unit_success(mock_repo):
-    """Deletes a unit that is not in transit."""
+    """Deletes a unit that has no history."""
     mock_db = MagicMock()
     unit = Unit(id=1, status=UnitStatus.AVAILABLE)
     mock_repo.get_unit.return_value = unit
+    mock_repo.count_transfers_for_unit.return_value = 0
 
     result = UnitService.delete_unit(mock_db, 1)
     mock_repo.delete_unit.assert_called_once_with(mock_db, 1)
@@ -244,15 +196,29 @@ def test_delete_unit_success(mock_repo):
 
 
 @patch("app.services.unit_service.UnitRepository")
+def test_delete_unit_with_history_is_rejected(mock_repo):
+    """A unit with transfers is never deleted: the trail is preserved."""
+    mock_db = MagicMock()
+    unit = Unit(id=1, status=UnitStatus.AVAILABLE)
+    mock_repo.get_unit.return_value = unit
+    mock_repo.count_transfers_for_unit.return_value = 3
+
+    with pytest.raises(HTTPException) as exc:
+        UnitService.delete_unit(mock_db, 1)
+    assert exc.value.status_code == 409
+    mock_repo.delete_unit.assert_not_called()
+
+
+@patch("app.services.unit_service.UnitRepository")
 def test_delete_unit_in_transit(mock_repo):
-    """Raises 400 when unit is in transit."""
+    """Raises 409 when unit is in transit."""
     mock_db = MagicMock()
     unit = Unit(id=1, status=UnitStatus.IN_TRANSIT)
     mock_repo.get_unit.return_value = unit
 
     with pytest.raises(HTTPException) as exc:
         UnitService.delete_unit(mock_db, 1)
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 409
 
 
 @patch("app.services.unit_service.UnitRepository")

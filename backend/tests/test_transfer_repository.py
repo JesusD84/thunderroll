@@ -63,7 +63,7 @@ def test_get_transfer_not_found():
 def test_create_transfer_success():
     """Creates a transfer and commits."""
     mock_db = MagicMock()
-    transfer_data = TransferCreate(unit_id=1)
+    transfer_data = TransferCreate(unit_id=1, destination_location_id=2)
 
     result = TransferRepository.create_transfer(mock_db, transfer_data)
 
@@ -78,7 +78,7 @@ def test_create_transfer_does_not_null_dispatched_at():
     otherwise it overrides the DB server_default=func.now().
     """
     mock_db = MagicMock()
-    transfer_data = TransferCreate(unit_id=1)
+    transfer_data = TransferCreate(unit_id=1, destination_location_id=2)
 
     TransferRepository.create_transfer(mock_db, transfer_data)
 
@@ -87,17 +87,51 @@ def test_create_transfer_does_not_null_dispatched_at():
 
 
 def test_create_transfer_keeps_provided_dispatched_at():
-    """When dispatched_at is provided explicitly, it must be kept."""
-    from datetime import UTC, datetime
-
+    """The dispatch moment is written by the server, never by a client:
+    the row must not carry a null dispatched_at that would override the
+    DB default.
+    """
     mock_db = MagicMock()
-    provided_at = datetime.now(UTC)
-    transfer_data = TransferCreate(unit_id=1, dispatched_at=provided_at)
+    transfer_data = TransferCreate(unit_id=1, destination_location_id=2)
 
     TransferRepository.create_transfer(mock_db, transfer_data)
 
     created_transfer = mock_db.add.call_args[0][0]
-    assert created_transfer.dispatched_at == provided_at
+    assert "dispatched_at" not in created_transfer.__dict__
+
+
+def test_build_transfer_does_not_write_to_the_database():
+    """build_transfer only builds the row: the caller decides when it is
+    written, so a unit and its transfer can share one transaction.
+    """
+    transfer = TransferRepository.build_transfer(
+        unit_id=1,
+        status=TransferStatus.PENDING,
+        origin_location_id=2,
+        destination_location_id=3,
+        dispatched_by_id=4,
+    )
+
+    assert transfer.unit_id == 1
+    assert transfer.status == TransferStatus.PENDING
+    assert transfer.origin_location_id == 2
+    assert transfer.destination_location_id == 3
+    assert transfer.dispatched_by_id == 4
+    assert transfer.dispatched_at is not None
+
+
+def test_build_transfer_defaults_dispatched_at():
+    """Regression: dispatched_at must default to now(), never stay None,
+    since this Transfer() is a plain in-memory object with no way for the
+    DB server_default to apply once a value (even None) is already set.
+    """
+    transfer = TransferRepository.build_transfer(
+        unit_id=1,
+        status=TransferStatus.PENDING,
+        dispatched_by_id=2,
+    )
+
+    assert transfer.dispatched_at is not None
 
 
 # ---------------------------------------------------------------------------

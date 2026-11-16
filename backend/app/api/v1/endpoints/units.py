@@ -6,6 +6,7 @@ from app.models import models, schemas
 from app.models.models import UserRole
 from app.schemas.unit import Unit, UnitCreate, UnitFilters, UnitSell, UnitUpdate
 from app.services.auth_service import get_current_active_user, require_role
+from app.services.sale_service import SaleService
 from app.services.unit_service import UnitService
 
 router = APIRouter()
@@ -61,7 +62,12 @@ def update_unit(
         require_role([UserRole.ADMIN, UserRole.MANAGER])
     ),
 ):
-    return UnitService.update_unit(db, unit_id, unit_update, current_user.id)
+    """Edit the descriptive fields of a unit.
+
+    The state of a unit (status, sold_date, location) does not change here:
+    it belongs to the transfers and to the sales.
+    """
+    return UnitService.update_unit(db, unit_id, unit_update)
 
 
 @router.delete("/{unit_id}")
@@ -93,5 +99,11 @@ def sell_unit(
         require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR])
     ),
 ):
+    """Sell a unit.
+
+    This is the only door to a sale: it stamps ``sold_date``, writes the
+    record of the sale in the history and refuses a unit that is already
+    sold or that is still on the road.
+    """
     notes = payload.notes if payload else None
-    return UnitService.sell_unit(db, unit_id, current_user.id, notes)
+    return SaleService.sell_unit(db, unit_id, current_user.id, notes)

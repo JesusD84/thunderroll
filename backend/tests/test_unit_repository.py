@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.models.models import Unit, UnitStatus
+from app.models.models import Transfer, Unit, UnitStatus
 from app.repositories.unit_repository import UnitRepository
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
@@ -179,14 +179,29 @@ def test_update_unit_success():
 # ---------------------------------------------------------------------------
 
 
-def test_delete_unit_cascades_transfers():
-    """Deletes unit and its transfers, then commits."""
+def test_delete_unit_keeps_the_transfers():
+    """The unit row is deleted, but its transfers are not: the trail of a
+    unit is what makes the inventory trustworthy, and the service refuses
+    to delete a unit that has history.
+    """
     mock_db = MagicMock()
 
     UnitRepository.delete_unit(mock_db, 1)
 
-    assert mock_db.query.call_count >= 2
+    queried = [call.args[0] for call in mock_db.query.call_args_list]
+    assert Transfer not in queried
+    assert Unit in queried
     mock_db.commit.assert_called_once()
+
+
+def test_count_transfers_for_unit():
+    """Counts how many transfers the unit has in its history."""
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.count.return_value = 4
+
+    result = UnitRepository.count_transfers_for_unit(mock_db, 1)
+
+    assert result == 4
 
 
 # ---------------------------------------------------------------------------

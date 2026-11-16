@@ -1,19 +1,23 @@
 """Unit management service."""
 
-from datetime import UTC, datetime
-
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
+from app.models.models import Transfer, Unit, UnitStatus
 from app.repositories.location_repository import LocationRepository
 from app.repositories.unit_repository import UnitRepository
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
-from app.services.transfer_service import TransferService
 
 
 class UnitService:
-    """Service for unit operations."""
+    """Service for unit operations.
+
+    A unit is a piece of inventory whose state is owned by the lifecycle:
+    it changes through a transfer (dispatch, reception, cancellation) or
+    through a sale. Editing a unit here only touches its descriptive
+    fields; nothing in this module writes ``status``, ``sold_date`` or
+    ``current_location_id``.
+    """
 
     @staticmethod
     def get_units(
@@ -51,23 +55,17 @@ class UnitService:
         return unit
 
     @staticmethod
-    def update_unit(
-        db: Session, unit_id: int, unit_update: UnitUpdate, user_id: int
-    ) -> Unit:
+    def update_unit(db: Session, unit_id: int, unit_update: UnitUpdate) -> Unit:
+        """Edit the descriptive fields of a unit.
+
+        The state of the unit is not touched: it belongs to the transfers
+        and to the sales.
+        """
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
         update_data = unit_update.model_dump(exclude_unset=True)
-        if "current_location_id" in update_data:
-            if update_data["current_location_id"] is None:
-                raise HTTPException(
-                    status_code=422, detail="current_location_id is required"
-                )
-            if not LocationRepository.get_location(
-                db, update_data["current_location_id"]
-            ):
-                raise HTTPException(status_code=404, detail="Location not found")
 
         if "engine_number" in update_data or "chassis_number" in update_data:
             engine_check = update_data.get("engine_number", unit.engine_number)
@@ -81,62 +79,37 @@ class UnitService:
                     detail="Another unit with this engine number or chassis number already exists",
                 )
 
-        old_location_id = unit.current_location_id
-        old_status = unit.status
-
         try:
-            updated_unit = UnitRepository.update_unit(db, unit, unit_update)
+            return UnitRepository.update_unit(db, unit, unit_update)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-        if (
-            "current_location_id" in update_data
-            and update_data["current_location_id"] != old_location_id
-        ):
-            TransferService.create_unit_transfer_record(
-                db=db,
-                unit_id=unit.id,
-                user_id=user_id,
-                origin_location_id=old_location_id,
-                destination_location_id=update_data["current_location_id"],
-                status=TransferStatus.IN_TRANSIT,
-                dispatched_at=datetime.now(UTC),
-            )
-
-        if "status" in update_data and update_data["status"] != old_status:
-            transfer_status = (
-                TransferStatus.RECEIVED
-                if update_data["status"] == UnitStatus.SOLD
-                else TransferStatus.PENDING
-            )
-            current_location_id = update_data.get(
-                "current_location_id", old_location_id
-            )
-            TransferService.create_unit_transfer_record(
-                db=db,
-                unit_id=unit.id,
-                user_id=user_id,
-                origin_location_id=current_location_id,
-                destination_location_id=current_location_id,
-                status=transfer_status,
-                dispatched_at=datetime.now(UTC),
-                received_at=datetime.now(UTC)
-                if transfer_status == TransferStatus.RECEIVED
-                else None,
-            )
-
-        return updated_unit
-
     @staticmethod
     def delete_unit(db: Session, unit_id: int) -> dict:
+        """Delete a unit that has no history.
+
+        A unit with transfers is never deleted: the trail is what makes the
+        inventory trustworthy, so the request is rejected with 409 and the
+        transfers stay untouched.
+        """
         unit = UnitRepository.get_unit(db, unit_id)
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
         if unit.status == UnitStatus.IN_TRANSIT:
             raise HTTPException(
-                status_code=400,
+                status_code=409,
                 detail="Cannot delete unit in transit. The transit should be completed first.",
+            )
+
+        transfer_count = UnitRepository.count_transfers_for_unit(db, unit_id)
+        if transfer_count:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Cannot delete a unit with {transfer_count} transfer(s) in "
+                    "its history: the traceability trail must be preserved"
+                ),
             )
 
         UnitRepository.delete_unit(db, unit_id)
@@ -154,33 +127,3 @@ class UnitService:
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
         return UnitRepository.get_unit_transfers(db, unit_id, skip, limit)
-
-    @staticmethod
-    def sell_unit(
-        db: Session, unit_id: int, user_id: int, notes: str | None = None
-    ) -> Unit:
-        """Mark a unit as SOLD and stamp sold_date. Location and transfers are untouched."""
-        unit = UnitRepository.get_unit(db, unit_id)
-        if not unit:
-            raise HTTPException(status_code=404, detail="Unit not found")
-
-        if unit.status == UnitStatus.SOLD:
-            raise HTTPException(status_code=400, detail="Unit is already sold")
-
-        if unit.status == UnitStatus.IN_TRANSIT:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot sell unit in transit. The transit should be completed first.",
-            )
-
-        now = datetime.now(UTC)
-
-        unit.status = UnitStatus.SOLD
-        unit.sold_date = now
-        if notes and notes.strip():
-            sale_note = f"Venta: {notes.strip()}"
-            unit.notes = f"{unit.notes}\n{sale_note}" if unit.notes else sale_note
-        db.commit()
-        db.refresh(unit)
-
-        return UnitRepository.get_unit(db, unit.id)

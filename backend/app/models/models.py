@@ -66,7 +66,9 @@ class Location(Base):
     __tablename__ = "locations"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
+    # The name identifies the location in the whole system (it is what the
+    # user picks in every screen), so two locations cannot share it.
+    name = Column(String(100), nullable=False, unique=True)
     address = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -115,7 +117,8 @@ class Transfer(Base):
     __tablename__ = "transfers"
 
     id = Column(Integer, primary_key=True, index=True)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False)
+    # Indexed because the history of a unit is always read by unit_id.
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=False, index=True)
     dispatched_by_id = Column(Integer, ForeignKey("users.id"))
     received_by_id = Column(Integer, ForeignKey("users.id"))
     origin_location_id = Column(Integer, ForeignKey("locations.id"))

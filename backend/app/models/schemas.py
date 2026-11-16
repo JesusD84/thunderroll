@@ -63,6 +63,12 @@ class UnitCreate(UnitBase):
 
 
 class UnitUpdate(BaseModel):
+    """Payload for PUT /units/{id}: the descriptive fields of a unit.
+
+    ``status``, ``sold_date`` and ``current_location_id`` are absent on
+    purpose: the state of a unit only changes through a transfer or a sale.
+    """
+
     model_config = ConfigDict(protected_namespaces=(), extra="forbid")
 
     engine_number: str | None = None
@@ -70,9 +76,6 @@ class UnitUpdate(BaseModel):
     model: str | None = None
     brand: str | None = None
     color: str | None = None
-    current_location_id: int | None = None
-    status: UnitStatus | None = None
-    sold_date: datetime | None = None
     notes: str | None = None
 
 
@@ -102,8 +105,18 @@ class TransferBase(BaseModel):
     received_at: datetime | None = None
 
 
-class TransferCreate(TransferBase):
+class TransferCreate(BaseModel):
+    """Dispatch payload (POST /transfers/).
+
+    The actor and the clock belong to the server: they are not part of this
+    schema and ``extra="forbid"`` rejects them with 422.
+    """
+
     model_config = ConfigDict(extra="forbid")
+
+    unit_id: int
+    origin_location_id: int | None = None
+    destination_location_id: int
 
 
 class Transfer(TransferBase):

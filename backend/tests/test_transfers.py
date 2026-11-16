@@ -85,12 +85,13 @@ async def test_create_transfer_populates_dispatched_at(
 
 
 @pytest.mark.asyncio
-async def test_status_change_creates_transfer_with_location_and_date(
+async def test_status_cannot_be_changed_through_the_unit(
     client: AsyncClient, auth_headers, test_users, test_locations
 ):
-    """Regression: a pure status change (e.g. marking a unit SOLD) must
-    still generate a transfer record with dispatched_at and a route
-    (origin/destination), instead of the '-' shown in the Kanban bug.
+    """The state of a unit does not change through PUT /units/{id}.
+
+    It belongs to the transfers and to the sales, so a body that tries to
+    set it is rejected with 422 and the unit keeps its state.
     """
     unit_data = {
         "model": "TR-StatusChg",
@@ -107,16 +108,11 @@ async def test_status_change_creates_transfer_with_location_and_date(
     update_resp = await client.put(
         f"/api/v1/units/{unit_id}", json={"status": "SOLD"}, headers=auth_headers
     )
-    assert update_resp.status_code == 200
+    assert update_resp.status_code == 422, update_resp.text
 
-    transfers_resp = await client.get("/api/v1/transfers/", headers=auth_headers)
-    assert transfers_resp.status_code == 200
-    matching = [t for t in transfers_resp.json() if t["unit_id"] == unit_id]
-    assert matching
-    latest = matching[0]
-    assert latest["dispatched_at"] is not None
-    assert latest["origin_location_id"] is not None
-    assert latest["destination_location_id"] is not None
+    unit_resp = await client.get(f"/api/v1/units/{unit_id}", headers=auth_headers)
+    assert unit_resp.json()["status"] != "SOLD"
+    assert unit_resp.json()["sold_date"] is None
 
 
 @pytest.mark.asyncio
@@ -138,12 +134,16 @@ async def test_transfer_includes_dispatched_by_name(
     )
     unit_id = create_resp.json()["id"]
 
-    update_resp = await client.put(
-        f"/api/v1/units/{unit_id}",
-        json={"current_location_id": test_locations[1].id},
+    dispatch_resp = await client.post(
+        "/api/v1/transfers/",
+        json={
+            "unit_id": unit_id,
+            "origin_location_id": test_locations[0].id,
+            "destination_location_id": test_locations[1].id,
+        },
         headers=auth_headers,
     )
-    assert update_resp.status_code == 200
+    assert dispatch_resp.status_code == 200, dispatch_resp.text
 
     response = await client.get("/api/v1/transfers/", headers=auth_headers)
     assert response.status_code == 200

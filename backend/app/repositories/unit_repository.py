@@ -53,6 +53,24 @@ class UnitRepository:
         )
 
     @staticmethod
+    def get_unit_for_update(db: Session, unit_id: int) -> Unit | None:
+        """The unit, locked until the transaction ends.
+
+        On PostgreSQL the row is locked with ``SELECT ... FOR UPDATE``, so two
+        concurrent dispatches of the same unit cannot both pass the checks:
+        the second one waits for the first transaction to finish and then
+        sees the state the first one left behind.
+
+        SQLite (the database the tests run on) has no row locks: there the
+        statement is simply not emitted, and the checks in the services are
+        what protects the data.
+        """
+        query = db.query(Unit).filter(Unit.id == unit_id)
+        if db.get_bind().dialect.name == "postgresql":
+            query = query.with_for_update()
+        return query.one_or_none()
+
+    @staticmethod
     def get_by_engine_or_chassis(
         db: Session, engine_number: str | None, chassis_number: str | None
     ) -> Unit | None:
@@ -112,8 +130,19 @@ class UnitRepository:
         return UnitRepository.get_unit(db, unit.id)
 
     @staticmethod
+    def count_transfers_for_unit(db: Session, unit_id: int) -> int:
+        """How many transfers the unit has in its history."""
+        return db.query(Transfer).filter(Transfer.unit_id == unit_id).count()
+
+    @staticmethod
     def delete_unit(db: Session, unit_id: int) -> None:
-        db.query(Transfer).filter(Transfer.unit_id == unit_id).delete()
+        """Delete the unit row.
+
+        The transfers of the unit are *not* deleted with it: the trail of a
+        unit is what makes the inventory trustworthy. The service refuses to
+        delete a unit that has history, and this method is the last line of
+        defence for the rows that slip through.
+        """
         db.query(Unit).filter(Unit.id == unit_id).delete()
         db.commit()
 

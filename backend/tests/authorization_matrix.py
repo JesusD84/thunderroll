@@ -194,7 +194,7 @@ def _new_equivalence_body(ctx: dict) -> dict:
 
 def _new_transfer_body(ctx: dict) -> dict:
     return {
-        "unit_id": ctx["unit_id"],
+        "unit_id": ctx["plain_unit_id"],
         "origin_location_id": ctx["location_id"],
         "destination_location_id": ctx["destination_location_id"],
     }
@@ -223,16 +223,18 @@ CASES: tuple[EndpointCase, ...] = (
     EndpointCase("POST", "/api/v1/units/", body=_new_unit_body),
     EndpointCase("GET", "/api/v1/units/stats"),
     EndpointCase("GET", "/api/v1/units/{unit_id}"),
-    EndpointCase("PUT", "/api/v1/units/{unit_id}", body={"notes": "matrix"}),
-    EndpointCase("DELETE", "/api/v1/units/{unit_id}"),
+    EndpointCase("PUT", "/api/v1/units/{plain_unit_id}", body={"notes": "matrix"}),
+    EndpointCase("DELETE", "/api/v1/units/{plain_unit_id}"),
     EndpointCase("GET", "/api/v1/units/{unit_id}/transfers"),
-    EndpointCase("POST", "/api/v1/units/{unit_id}/sell"),
+    EndpointCase("POST", "/api/v1/units/{plain_unit_id}/sell"),
     # --- locations ---------------------------------------------------------
     EndpointCase("GET", "/api/v1/locations/"),
     EndpointCase("POST", "/api/v1/locations/", body=_new_location_body),
     EndpointCase("GET", "/api/v1/locations/{location_id}"),
     EndpointCase(
-        "PUT", "/api/v1/locations/{location_id}", body={"name": "Matrix Renombrada"}
+        "PUT",
+        "/api/v1/locations/{location_id}",
+        body=lambda ctx: {"name": f"Matrix Renombrada {ctx['suffix']}"},
     ),
     EndpointCase("DELETE", "/api/v1/locations/{empty_location_id}"),
     # --- imports -----------------------------------------------------------
@@ -262,7 +264,7 @@ CASES: tuple[EndpointCase, ...] = (
     EndpointCase("GET", "/api/v1/transfers/stats"),
     EndpointCase("GET", "/api/v1/transfers/"),
     EndpointCase("POST", "/api/v1/transfers/", body=_new_transfer_body),
-    EndpointCase("POST", "/api/v1/transfers/unit/{unit_id}", body=_transfer_unit_body),
+    EndpointCase("POST", "/api/v1/transfers/unit/{plain_unit_id}", body=_transfer_unit_body),
     EndpointCase("GET", "/api/v1/transfers/unit/{unit_id}/active"),
     EndpointCase("GET", "/api/v1/transfers/{transfer_id}"),
     EndpointCase("PUT", "/api/v1/transfers/{transfer_id}", body={"status": "RECEIVED"}),
@@ -317,9 +319,22 @@ def build_context(session_factory) -> dict:
             current_location_id=location.id,
             status=UnitStatus.AVAILABLE,
         )
-        db.add(unit)
+        # A second unit, without any transfer in its history: a unit that has
+        # history cannot be deleted, and a unit that is already in transit
+        # cannot be dispatched or sold again.
+        plain_unit = Unit(
+            engine_number=f"MTX-PLAIN-ENG-{suffix}",
+            chassis_number=f"MTX-PLAIN-CHS-{suffix}",
+            model="MatrixModel",
+            brand="MatrixBrand",
+            color="ROJO",
+            current_location_id=location.id,
+            status=UnitStatus.AVAILABLE,
+        )
+        db.add_all([unit, plain_unit])
         db.commit()
         db.refresh(unit)
+        db.refresh(plain_unit)
 
         transfer = Transfer(
             unit_id=unit.id,
@@ -361,6 +376,7 @@ def build_context(session_factory) -> dict:
             "empty_location_id": empty_location.id,
             "destination_location_id": empty_location.id,
             "unit_id": unit.id,
+            "plain_unit_id": plain_unit.id,
             "transfer_id": transfer.id,
             "target_user_id": target_user.id,
             "equivalence_id": equivalence.id,

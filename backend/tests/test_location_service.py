@@ -65,12 +65,26 @@ def test_create_location_success(mock_repo):
     mock_db = MagicMock()
     loc_data = LocationCreate(name="New", address="123 St")
     mock_loc = Location(id=2, name="New")
+    mock_repo.get_location_by_name.return_value = None
     mock_repo.create_location.return_value = mock_loc
 
     result = LocationService.create_location(mock_db, loc_data)
 
     mock_repo.create_location.assert_called_once_with(mock_db, loc_data)
     assert result is mock_loc
+
+
+@patch("app.services.location_service.LocationRepository")
+def test_create_location_with_a_taken_name(mock_repo):
+    """The name identifies the location: it cannot be shared."""
+    mock_db = MagicMock()
+    mock_repo.get_location_by_name.return_value = Location(id=1, name="New")
+
+    with pytest.raises(HTTPException) as exc:
+        LocationService.create_location(mock_db, LocationCreate(name="New"))
+
+    assert exc.value.status_code == 409
+    mock_repo.create_location.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -85,12 +99,42 @@ def test_update_location_success(mock_repo):
     existing = Location(id=1, name="Old")
     update_data = LocationUpdate(name="New")
     mock_repo.get_location.return_value = existing
+    mock_repo.get_location_by_name.return_value = None
     mock_repo.update_location.return_value = existing
 
     result = LocationService.update_location(mock_db, 1, update_data)
 
     mock_repo.update_location.assert_called_once_with(mock_db, existing, update_data)
     assert result is existing
+
+
+@patch("app.services.location_service.LocationRepository")
+def test_update_location_to_a_taken_name(mock_repo):
+    """Renaming a location to the name of another one is a conflict."""
+    mock_db = MagicMock()
+    mock_repo.get_location.return_value = Location(id=1, name="Old")
+    mock_repo.get_location_by_name.return_value = Location(id=2, name="New")
+
+    with pytest.raises(HTTPException) as exc:
+        LocationService.update_location(mock_db, 1, LocationUpdate(name="New"))
+
+    assert exc.value.status_code == 409
+    mock_repo.update_location.assert_not_called()
+
+
+@patch("app.services.location_service.LocationRepository")
+def test_update_location_keeps_its_own_name(mock_repo):
+    """A location may keep the name it already has."""
+    mock_db = MagicMock()
+    existing = Location(id=1, name="Old")
+    mock_repo.get_location.return_value = existing
+    mock_repo.get_location_by_name.return_value = existing
+    mock_repo.update_location.return_value = existing
+
+    result = LocationService.update_location(mock_db, 1, LocationUpdate(name="Old"))
+
+    assert result is existing
+    mock_repo.update_location.assert_called_once()
 
 
 @patch("app.services.location_service.LocationRepository")
