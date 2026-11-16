@@ -1,5 +1,4 @@
 import os
-import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -8,35 +7,17 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.core.config import require_secret_key
 from app.core.security import Security
 from app.database.database import get_db
 from app.models.models import User
 from app.models.schemas import TokenData
 
-
-def _resolve_secret_key() -> str:
-    """Resolve the key used to sign and verify JWTs.
-
-    ``SECRET_KEY`` must be provided by the environment. There is deliberately
-    no hardcoded fallback: a shared, publicly known signing key would let
-    anyone forge access tokens. When the variable is missing (local dev, tests)
-    an ephemeral per-process key is generated instead, so tokens stop
-    validating after a restart, and a warning makes the misconfiguration
-    visible in the logs.
-    """
-    key = os.getenv("SECRET_KEY", "").strip()
-    if key:
-        return key
-
-    print(
-        "⚠️  SECRET_KEY no está definida: se genera una clave efímera para este "
-        "proceso. Los JWT dejarán de validar al reiniciar.",
-        flush=True,
-    )
-    return secrets.token_urlsafe(32)
-
-
-SECRET_KEY = _resolve_secret_key()
+# La clave de firma de los JWT viene solo del entorno. Si falta o es corta,
+# `require_secret_key` lanza ConfigurationError y la app no arranca: una clave
+# fija en el código (o una clave corta) dejaría firmar tokens a cualquiera que
+# lea el repositorio.
+SECRET_KEY = require_secret_key()
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = 15

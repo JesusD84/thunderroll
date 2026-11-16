@@ -5,6 +5,7 @@ Sync engine matches production (app uses sync SQLAlchemy).
 """
 
 import asyncio
+import os
 from collections.abc import Generator
 from datetime import datetime
 
@@ -13,6 +14,23 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+
+# La app exige configuración válida al importar (ver app/core/config.py):
+# SECRET_KEY de 32 caracteres o más y DATABASE_URL. Se definen aquí, ANTES de
+# importar nada de `app`, para que la suite siempre pueda arrancar.
+#
+# Estas variables tienen prioridad sobre el `.env` local del desarrollador:
+# `load_dotenv` no sobrescribe lo que ya está en el entorno.
+TEST_SECRET_KEY = "thunderoll-test-secret-key-only-for-the-test-suite"
+
+os.environ["SECRET_KEY"] = TEST_SECRET_KEY
+
+# La URL que usa el motor real de la app (app.database.database). En la suite
+# normal también es SQLite: los tests nunca deben tocar la base de datos real.
+# La matriz de autorización contra PostgreSQL (RUN_POSTGRES_MATRIX=1) sí
+# necesita la URL real del entorno, y en ese caso se respeta.
+if os.getenv("RUN_POSTGRES_MATRIX") != "1" or not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from app.core.security import Security
 from app.database.database import Base, get_db

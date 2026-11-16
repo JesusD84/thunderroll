@@ -35,6 +35,10 @@ Requisitos: **Docker** y **Docker Compose**.
 
 ### 1. Crear el archivo `.env` en la raíz
 
+```bash
+cp .env.example .env
+```
+
 `docker-compose.yml` lee estas variables para el backend:
 
 ```bash
@@ -47,6 +51,16 @@ FRONTEND_URL=http://localhost:3000
 ```
 
 > Los valores SMTP pueden ser placeholders; el backend arranca igual, solo no enviará emails reales.
+
+Además, genera la **clave de firma de los JWT** (`SECRET_KEY`) y ponla en el `.env`:
+
+```bash
+openssl rand -hex 32
+```
+
+Copia el resultado (64 caracteres hexadecimales) como valor de `SECRET_KEY`. Es obligatoria: si falta o tiene menos de 32 caracteres, el backend **no arranca** y lo dice con un error claro. No hay valor de respaldo en el código, justamente para que nadie pueda firmar tokens con una clave que ya esté publicada en el repositorio.
+
+`DATABASE_URL` también es obligatoria (la compose la arma con `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`; si corres el backend sin Docker, define la tuya).
 
 ### 2. Levantar todo
 
@@ -84,11 +98,16 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Variables de entorno del backend (en `backend/.env` o exportadas):
+Variables de entorno del backend (en el `.env` de la raíz o exportadas):
 
 ```bash
+# Obligatoria: sin ella el backend no arranca.
 DATABASE_URL=postgresql://thunderoll:change-me@localhost:5432/thunderoll
-SECRET_KEY=tu-secret-key
+
+# Obligatoria: valor aleatorio de 32 caracteres o más.
+# Genera una con: openssl rand -hex 32
+SECRET_KEY=64-caracteres-hexadecimales-generados-con-openssl-rand-hex-32
+
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 SMTP_HOST=smtp.gmail.com
@@ -136,16 +155,36 @@ npm test            # unit/integration (Vitest)
 npm run test:e2e    # end-to-end (Playwright)
 ```
 
+## Secretos y variables obligatorias
+
+El backend **no arranca** con una configuración insegura o incompleta. Las dos variables que lo bloquean:
+
+| Variable | Regla | Cómo obtenerla |
+|---|---|---|
+| `SECRET_KEY` | Aleatoria, de 32 caracteres o más. Sin valor de respaldo en el código. | `openssl rand -hex 32` |
+| `DATABASE_URL` | Obligatoria, sin valor de respaldo en el código. | La de tu Postgres (local, o la de Neon en producción) |
+
+Ambas se validan al arrancar (`backend/app/core/config.py`). Si algo falta o es inválido, el proceso termina con un `ConfigurationError` que dice qué falta y cómo resolverlo, en lugar de seguir adelante con un valor por defecto —que es justamente lo que hace que un secreto publicado en el repositorio pueda firmar tokens de cualquier persona.
+
+En producción, `SECRET_KEY` y `DATABASE_URL` se gestionan en el dashboard de Render (Environment) y nunca en `render.yaml`.
+
+### Detección de secretos en CI
+
+Cada Pull Request hacia `main` y cada push a `main` corre **gitleaks** (`.github/workflows/gitleaks.yml`), que escanea el historial de commits en busca de credenciales filtradas. Si encuentra una, el check falla y el PR no se puede mergear.
+
+Si el scanner marca algo que no es un secreto (un placeholder, un valor de ejemplo), se permite explícitamente en `.gitleaks.toml` con un comentario que explique por qué. Lo contrario —relajar las reglas para que pase— no es una opción: si un secreto real llega al repositorio, hay que **rotarlo** en su origen (cambiar la contraseña en la base de datos, en el gestor de secretos, etc.), no esconderlo del scanner.
+
 ## CI/CD
 
 ### Integración continua (GitHub Actions)
 
-En cada Pull Request hacia `main` corren dos checks:
+En cada Pull Request hacia `main` corren tres checks:
 
 - **Backend Tests** (`.github/workflows/backend-ci.yml`) — ejecuta `pytest`.
 - **Frontend Tests** (`.github/workflows/frontend-ci.yml`) — ejecuta `vitest`.
+- **Secret Detection** (`.github/workflows/gitleaks.yml`) — ejecuta `gitleaks` sobre el historial de commits.
 
-`main` está protegida: se requiere PR y que ambos checks pasen antes de mergear.
+`main` está protegida: se requiere PR y que todos los checks pasen antes de mergear.
 
 ### Despliegue continuo
 
@@ -223,6 +262,9 @@ Pégala en el **SQL Editor de Neon** (Console → SQL Editor) y ejecuta. Despué
 
 ## Troubleshooting
 
+- **El backend no arranca con "SECRET_KEY no está definida"**: la variable falta o está vacía. Genera una con `openssl rand -hex 32` y ponla en el `.env` (o en las variables de entorno del servicio). Tiene que tener 32 caracteres o más.
+- **El backend no arranca con "SECRET_KEY es demasiado corta"**: la clave existe pero es demasiado fácil de adivinar. Genera una nueva con `openssl rand -hex 32`.
+- **El backend no arranca con "DATABASE_URL no está definida"**: define la URL de la base de datos en el `.env` (con Docker Compose se arma sola a partir de `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`).
 - **El backend no conecta a la DB localmente**: verifica que PostgreSQL esté arriba y que `DATABASE_URL` apunte al host correcto. Con Docker Compose se gestiona solo.
 - **Login da "Credenciales inválidas" en producción**: asegúrate de que `BACKEND_URL` (no solo `NEXT_PUBLIC_API_URL`) esté configurada en Vercel apuntando al backend de Render.
 - **Errores de CORS desde el navegador**: el backend permite el origen de `FRONTEND_URL`; verifica que esa variable tenga el dominio correcto del frontend.

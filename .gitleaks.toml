@@ -1,0 +1,32 @@
+# Configuración de gitleaks (detección de secretos en CI).
+#
+# Reglas: las de por defecto de gitleaks, sin excepciones. Lo único que se
+# permite son hallazgos ya conocidos, documentados y con su SHA completo.
+#
+# Si gitleaks marca algo que no es un secreto (un placeholder, un valor de
+# ejemplo), se permite aquí con un comentario que explique por qué. Si marca
+# un secreto real, la respuesta es rotarlo en su origen, no esconderlo del
+# scanner.
+
+title = "Thunderoll — gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Incidente conocido: el archivo frontend/app/.env estuvo commiteado entre
+agosto de 2025 y abril de 2026 con un NEXTAUTH_SECRET real (y la URL de la
+base de datos). Ese secreto hay que darlo de baja rotándolo; esconderlo del
+scanner no lo vuelve seguro. Ya no existe en el árbol actual: solo queda en el
+historial, y por eso se permiten únicamente esos commits concretos.
+
+Commits permitidos:
+- 793187a235146d706ce513969ac52ac52fe61208 (Initial Commit)
+- 4e4bd46c2ba3b6d89fa7fa158fa09f822d5d7c4f (frontend run succesfully)
+"""
+
+commits = [
+    "793187a235146d706ce513969ac52ac52fe61208",
+    "4e4bd46c2ba3b6d89fa7fa158fa09f822d5d7c4f",
+]

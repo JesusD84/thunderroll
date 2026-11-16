@@ -59,7 +59,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/**/*" = ["B018", "S101", "ARG", "FBT"]
+# E402: los tests tienen que definir SECRET_KEY y DATABASE_URL antes de
+# importar la app, porque la app exige esa configuración para arrancar.
+"tests/**/*" = ["B018", "S101", "ARG", "FBT", "E402"]
 
 [tool.black]
 line-length = 88
