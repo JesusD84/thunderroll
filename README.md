@@ -168,6 +168,7 @@ thunderroll/
 │   │   ├── services/     # Lógica de negocio
 │   │   └── main.py       # App FastAPI (CORS, lifespan, routers)
 │   ├── tests/            # pytest (SQLite en memoria)
+│   ├── scripts/          # Scripts operativos (break-glass de contraseñas)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -192,9 +193,38 @@ thunderroll/
 4. **Recibir** la transferencia en destino.
 5. **Vender** la unidad → queda registrada con fecha de venta.
 
+## Recuperación de acceso (break-glass)
+
+Hay tres formas de recuperar una contraseña, en orden de preferencia:
+
+1. **El usuario la cambia desde la app** — Configuración → Mi cuenta. Exige la contraseña actual.
+2. **Un admin la restablece** — Configuración → Usuarios → editar usuario → *Nueva contraseña*. No necesita la contraseña anterior. Solo ADMIN.
+3. **Directo en la base** — para el caso en que **todos** los admins están bloqueados y nadie puede entrar a la app a restablecerla.
+
+La opción 3 es la que evita un lockout total. No toca la base de datos desde el script: este solo genera el hash y la sentencia SQL, y tú la pegas.
+
+```bash
+cd backend
+python scripts/reset_password_sql.py admin2@thunderoll.com
+```
+
+El script pide la contraseña nueva sin mostrarla en pantalla, la hashea con bcrypt (el mismo esquema que la app) e imprime la sentencia:
+
+```sql
+UPDATE users SET hashed_password = '$2b$12$...' WHERE email = 'admin2@thunderoll.com';
+```
+
+Pégala en el **SQL Editor de Neon** (Console → SQL Editor) y ejecuta. Después:
+
+1. Inicia sesión en la app con la contraseña nueva.
+2. Cámbiala desde Configuración → Mi cuenta para que solo tú la conozcas.
+
+> El script no se conecta a ninguna base de datos y nunca imprime la contraseña. Si un usuario tiene transferencias o imports registrados, **no lo borres**: desactívalo en vez de eliminarlo, para no romper la trazabilidad.
+
 ## Troubleshooting
 
 - **El backend no conecta a la DB localmente**: verifica que PostgreSQL esté arriba y que `DATABASE_URL` apunte al host correcto. Con Docker Compose se gestiona solo.
 - **Login da "Credenciales inválidas" en producción**: asegúrate de que `BACKEND_URL` (no solo `NEXT_PUBLIC_API_URL`) esté configurada en Vercel apuntando al backend de Render.
 - **Errores de CORS desde el navegador**: el backend permite el origen de `FRONTEND_URL`; verifica que esa variable tenga el dominio correcto del frontend.
 - **Backend lento en el primer request**: el plan free de Render duerme el servicio tras inactividad; el primer request puede tardar ~30-50s en despertar.
+- **"Olvidé mi contraseña" devuelve 503**: el correo de reset no se pudo enviar. Revisa `SMTP_PASSWORD` y `SMTP_USER` en Render → Environment, y que `SMTP_HOST`/`SMTP_PORT` sean los del proveedor. El 503 es intencional: si el envío falla, hay que verlo, no fingir que salió.
