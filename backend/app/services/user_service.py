@@ -8,11 +8,12 @@ from app.repositories.user_repository import UserRepository
 from app.services.auth_service import get_password_hash, verify_password
 
 
-# The only attributes a user may change on their own account. ``role`` and
-# ``is_active`` are administrator-only and never appear here: the self-update
-# schema already forbids them, and this allowlist is the second line of
-# defense in case that schema is ever widened by mistake.
-SELF_UPDATE_FIELDS = frozenset({"email", "username", "first_name", "last_name"})
+# The only attributes a user may change on their own account. The account
+# identifiers (email/username) and the role flags (role/is_active) are
+# administrator-only: the self-update schema already forbids them, and this
+# allowlist is the second line of defense in case that schema is ever
+# widened by mistake.
+SELF_UPDATE_FIELDS = frozenset({"first_name", "last_name"})
 
 
 class UserService:
@@ -47,14 +48,28 @@ class UserService:
     ) -> User:
         """Apply a self-service edit to the caller's own account.
 
-        The payload is validated against ``UserSelfUpdate``, which forbids
-        ``role``, ``is_active`` and any unknown field. On top of that, only
-        the fields in ``SELF_UPDATE_FIELDS`` are ever written, so a future
-        change to the schema cannot turn into a privilege escalation.
+        The payload is validated against ``UserSelfUpdate``, which only
+        accepts the fields a user may change on themselves. On top of that,
+        only the fields in ``SELF_UPDATE_FIELDS`` are ever written, so a
+        future change to the schema cannot turn into a privilege escalation.
         """
+        payload = user_update.model_dump(exclude_unset=True)
+
+        # The identifiers are administrator-only, so the schema already
+        # refuses them. They are checked here as well because this service
+        # is the last boundary before the write: a duplicate email/username
+        # must be a 400, never a 500 from the unique index.
+        if payload.get("email") and payload["email"] != current_user.email:
+            if UserRepository.get_user_by_email(db, email=payload["email"]):
+                raise HTTPException(status_code=400, detail="Email already registered")
+
+        if payload.get("username") and payload["username"] != current_user.username:
+            if UserRepository.get_user_by_username(db, username=payload["username"]):
+                raise HTTPException(status_code=400, detail="Username already registered")
+
         changes = {
             field: value
-            for field, value in user_update.model_dump(exclude_unset=True).items()
+            for field, value in payload.items()
             if field in SELF_UPDATE_FIELDS
         }
 
@@ -63,16 +78,6 @@ class UserService:
         for field, value in changes.items():
             if value is None:
                 raise HTTPException(status_code=422, detail=f"{field} cannot be null")
-
-        # Same uniqueness rules as the admin edit flow, so a duplicate email
-        # or username is a 400 and never a 500 from the unique index.
-        if "email" in changes and changes["email"] != current_user.email:
-            if UserRepository.get_user_by_email(db, email=changes["email"]):
-                raise HTTPException(status_code=400, detail="Email already registered")
-
-        if "username" in changes and changes["username"] != current_user.username:
-            if UserRepository.get_user_by_username(db, username=changes["username"]):
-                raise HTTPException(status_code=400, detail="Username already registered")
 
         try:
             return UserRepository.update_user(db, current_user, user_update)

@@ -46,19 +46,19 @@ class UserSelfUpdate(BaseModel):
     """Self-service edit payload (PUT /user/me).
 
     Only the fields a user may change on their own account are accepted:
-    ``first_name``/``last_name`` and the account identifiers ``email``/
-    ``username`` (the account owner is the one who can correct them).
+    ``first_name`` and ``last_name``.
 
-    ``role`` and ``is_active`` are administrator-only and are deliberately
-    absent here. ``extra="forbid"`` turns any attempt to set them - or to
-    send a field that does not exist at all - into a 422, instead of letting
-    it reach the setattr-based persistence layer.
+    The account identifiers (``email``, ``username``) are administrator-only
+    too: they are what the account signs in with, and correcting them
+    invalidates the session (the JWT carries the username). ``role`` and
+    ``is_active`` are administrator-only as well. ``extra="forbid"`` turns
+    any attempt to set them - or to send a field that does not exist at all
+    - into a 422, instead of letting it reach the setattr-based persistence
+    layer.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    email: Optional[EmailStr] = None
-    username: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
 
@@ -69,7 +69,7 @@ class UserSelfUpdate(BaseModel):
         Without this, ``{"first_name": null}`` would reach the ORM and fail as
         an IntegrityError (500) instead of a validation error (422).
         """
-        for field in ("email", "username", "first_name", "last_name"):
+        for field in ("first_name", "last_name"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self
