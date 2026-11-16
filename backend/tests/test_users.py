@@ -285,7 +285,7 @@ async def test_admin_cannot_delete_self(client: AsyncClient, auth_headers, test_
 @pytest.mark.asyncio
 async def test_delete_user_with_transfers_is_blocked(client: AsyncClient, auth_headers, test_users, test_locations):
     """A user referenced by transfers/imports cannot be hard-deleted (409)."""
-    from app.models.models import Transfer, Unit, UnitStatus, Location
+    from app.models.models import Location, Transfer, Unit, UnitStatus
 
     user_id = _create_db_user("deletable3")
     db = TestingSessionLocal()

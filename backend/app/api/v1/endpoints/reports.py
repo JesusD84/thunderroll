@@ -1,6 +1,5 @@
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -25,13 +24,13 @@ def get_dashboard_stats(
 
 @router.get("/inventory")
 def get_inventory_report(
-    brand: Optional[str] = None,
-    model: Optional[str] = None,
-    color: Optional[str] = None,
-    location_id: Optional[int] = None,
-    status: Optional[UnitStatus] = None,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    brand: str | None = None,
+    model: str | None = None,
+    color: str | None = None,
+    location_id: int | None = None,
+    status: UnitStatus | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
@@ -50,10 +49,10 @@ def get_inventory_report(
 
 @router.get("/transfers")
 def get_transfers_report(
-    user_id: Optional[int] = None,
-    location_id: Optional[int] = None,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    user_id: int | None = None,
+    location_id: int | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -73,9 +72,9 @@ def get_transfers_report(
 
 @router.get("/sales")
 def get_sales_report(
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
-    location_id: Optional[int] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    location_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
@@ -90,10 +89,10 @@ def get_sales_report(
 
 @router.get("/export/inventory")
 def export_inventory_excel(
-    brand: Optional[str] = None,
-    model: Optional[str] = None,
-    location_id: Optional[int] = None,
-    status: Optional[UnitStatus] = None,
+    brand: str | None = None,
+    model: str | None = None,
+    location_id: int | None = None,
+    status: UnitStatus | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
@@ -109,8 +108,8 @@ def export_inventory_excel(
 
 @router.get("/export/transfers")
 def export_transfers_excel(
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
@@ -124,9 +123,9 @@ def export_transfers_excel(
 
 @router.get("/export/sales")
 def export_sales_excel(
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
-    location_id: Optional[int] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    location_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):

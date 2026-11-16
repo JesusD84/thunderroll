@@ -1,17 +1,22 @@
 
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.database.database import get_db
-from app.models.models import UserRole, User
-from app.schemas.location import Location, LocationCreate, LocationFilters, LocationUpdate
+from app.models.models import User, UserRole
+from app.schemas.location import (
+    Location,
+    LocationCreate,
+    LocationFilters,
+    LocationUpdate,
+)
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.location_service import LocationService
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Location])
+@router.get("/", response_model=list[Location])
 def get_locations(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

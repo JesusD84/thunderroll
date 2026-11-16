@@ -1,11 +1,10 @@
 """Unit tests for LocationRepository."""
 
-import pytest
 from unittest.mock import MagicMock
-from app.repositories.location_repository import LocationRepository
-from app.models.models import Location, Unit
-from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 
+from app.models.models import Location
+from app.repositories.location_repository import LocationRepository
+from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 
 # ---------------------------------------------------------------------------
 # get_locations

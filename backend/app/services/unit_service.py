@@ -1,14 +1,15 @@
 
 """Unit management service."""
 
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
-from app.models.models import Unit, Transfer, UnitStatus, TransferStatus
-from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.models.models import Transfer, TransferStatus, Unit, UnitStatus
 from app.repositories.location_repository import LocationRepository
 from app.repositories.unit_repository import UnitRepository
+from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 from app.services.transfer_service import TransferService
 
 

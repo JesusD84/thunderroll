@@ -20,13 +20,14 @@ from __future__ import annotations
 import io
 import numbers
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Optional, Union
+from typing import Any
 
 import pandas as pd
 
 # Source can be a filesystem path or the raw bytes of an uploaded file.
-Source = Union[str, bytes]
+Source = str | bytes
 
 # Minimal keyword set used only to tell a header row apart from a data row.
 # The full multilingual synonym -> canonical-field mapping lands in TR-04b;
@@ -89,8 +90,8 @@ class ParseIssue:
 
     level: str  # "info" | "warning" | "error"
     message: str
-    sheet: Optional[str] = None
-    row: Optional[int] = None
+    sheet: str | None = None
+    row: int | None = None
 
 
 @dataclass
@@ -102,9 +103,9 @@ class ParsedTable:
     values are returned as-is; type normalization is TR-04d.
     """
 
-    sheet: Optional[str]
+    sheet: str | None
     has_header: bool
-    header_row: Optional[int]
+    header_row: int | None
     columns: list[str]
     rows: list[dict[str, Any]]
     # canonical field (frame/motor/color/model) -> resolved column name.
@@ -121,7 +122,7 @@ class SheetRow:
     persistence) can use it as the model when the file has no model column.
     """
 
-    sheet: Optional[str]
+    sheet: str | None
     has_header: bool
     field_map: dict[str, str]
     values: dict[str, Any]
@@ -180,7 +181,7 @@ def _ffill_column(rows: list[dict[str, Any]], col: str) -> None:
 
 
 def apply_manual_mapping(
-    result: "WorkbookParseResult", column_to_field: dict[str, str]
+    result: WorkbookParseResult, column_to_field: dict[str, str]
 ) -> list[ParseIssue]:
     """Override the auto-detected mapping with a user-confirmed one (TR-07).
 
@@ -297,7 +298,7 @@ def normalize_id_value(value: Any) -> str:
     return str(value).strip()
 
 
-def resolve_field(label: Any) -> Optional[str]:
+def resolve_field(label: Any) -> str | None:
     """Resolve a single column label to a canonical field, or ``None``.
 
     A label maps to the first canonical field (in ``FIELD_SYNONYMS`` order)
@@ -313,7 +314,7 @@ def resolve_field(label: Any) -> Optional[str]:
 
 
 def resolve_columns(
-    columns: list[str], sheet_name: Optional[str] = None
+    columns: list[str], sheet_name: str | None = None
 ) -> tuple[dict[str, str], list[ParseIssue]]:
     """Map a list of column names to canonical fields.
 
@@ -345,7 +346,7 @@ def resolve_columns(
 
 def detect_header_row(
     raw: pd.DataFrame, max_scan: int = _MAX_HEADER_SCAN
-) -> Optional[int]:
+) -> int | None:
     """Heuristically locate the header row in a header-less DataFrame.
 
     The DataFrame must be read with ``header=None`` so every spreadsheet row is
@@ -363,7 +364,7 @@ def detect_header_row(
     return None
 
 
-def _column_names(header_values: Optional[list[Any]], width: int) -> list[str]:
+def _column_names(header_values: list[Any] | None, width: int) -> list[str]:
     """Build column names from a header row, falling back to positional names.
 
     Blank/duplicate header labels are replaced/disambiguated with positional
@@ -386,7 +387,7 @@ def _column_names(header_values: Optional[list[Any]], width: int) -> list[str]:
     return names
 
 
-def parse_sheet(raw: pd.DataFrame, sheet_name: Optional[str] = None) -> ParsedTable:
+def parse_sheet(raw: pd.DataFrame, sheet_name: str | None = None) -> ParsedTable:
     """Parse a single raw sheet (read with ``header=None``) into a ParsedTable."""
     issues: list[ParseIssue] = []
     width = raw.shape[1]

@@ -1,11 +1,10 @@
 """Unit tests for UserRepository."""
 
-import pytest
 from unittest.mock import MagicMock
-from app.repositories.user_repository import UserRepository
-from app.models.models import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate
 
+from app.models.models import User, UserRole
+from app.repositories.user_repository import UserRepository
+from app.schemas.user import UserCreate, UserUpdate
 
 # ---------------------------------------------------------------------------
 # get_user_by_id

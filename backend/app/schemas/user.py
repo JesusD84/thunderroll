@@ -2,9 +2,11 @@
 """User schemas."""
 
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+
 from app.models.models import UserRole
-from typing import Optional
+
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -12,7 +14,7 @@ class UserBase(BaseModel):
     first_name: str
     last_name: str
     role: UserRole
-    
+
 
 class UserCreate(UserBase):
     email: EmailStr
@@ -31,15 +33,15 @@ class UserUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    email: EmailStr | None = None
+    username: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None
     # Solo un ADMIN puede fijarla (reseteo de contraseña). La contraseña nunca
     # se escribe tal cual: el servicio guarda siempre el hash.
-    password: Optional[str] = Field(None, min_length=8, max_length=100)
+    password: str | None = Field(None, min_length=8, max_length=100)
 
 
 class UserSelfUpdate(BaseModel):
@@ -59,8 +61,8 @@ class UserSelfUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=100)
+    last_name: str | None = Field(None, min_length=1, max_length=100)
 
     @model_validator(mode="after")
     def _reject_null_on_not_nullable_columns(self) -> "UserSelfUpdate":
@@ -86,11 +88,11 @@ class User(UserBase):
     id: int
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 class UserFilters(BaseModel):
-    email: Optional[str] = None
-    username: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    email: str | None = None
+    username: str | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None

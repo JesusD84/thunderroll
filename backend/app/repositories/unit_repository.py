@@ -1,6 +1,7 @@
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_, func
-from app.models.models import Unit, Transfer, UnitStatus, Location
+
+from app.models.models import Location, Transfer, Unit, UnitStatus
 from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 

@@ -1,17 +1,18 @@
 
+
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
-from typing import List
+
 from app.database.database import get_db
 from app.models import models, schemas
-from app.schemas.unit import Unit, UnitCreate, UnitUpdate, UnitFilters, UnitSell
 from app.models.models import UserRole
+from app.schemas.unit import Unit, UnitCreate, UnitFilters, UnitSell, UnitUpdate
 from app.services.auth_service import get_current_active_user, require_role
 from app.services.unit_service import UnitService
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Unit])
+@router.get("/", response_model=list[Unit])
 def get_units(
     response: Response,
     filters: UnitFilters = Depends(),
@@ -63,7 +64,7 @@ def delete_unit(
 ):
     return UnitService.delete_unit(db, unit_id)
 
-@router.get("/{unit_id}/transfers", response_model=List[schemas.Transfer])
+@router.get("/{unit_id}/transfers", response_model=list[schemas.Transfer])
 def get_unit_transfers(
     unit_id: int,
     skip: int = Query(0, ge=0),

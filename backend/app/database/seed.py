@@ -1,9 +1,10 @@
-from app.database.database import SessionLocal
-from app.models.models import User, UserRole
-from app.services.auth_service import get_password_hash
 import asyncio
 import os
 import secrets
+
+from app.database.database import SessionLocal
+from app.models.models import User, UserRole
+from app.services.auth_service import get_password_hash
 
 
 def _bootstrap_admin_password() -> tuple[str, bool]:

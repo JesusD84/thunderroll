@@ -1,11 +1,12 @@
 """Unit tests for UnitRepository."""
 
-import pytest
 from unittest.mock import MagicMock
-from app.repositories.unit_repository import UnitRepository
-from app.models.models import Unit, Location, UnitStatus
-from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
+import pytest
+
+from app.models.models import Unit, UnitStatus
+from app.repositories.unit_repository import UnitRepository
+from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
 # ---------------------------------------------------------------------------
 # get_units

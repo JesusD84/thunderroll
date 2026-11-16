@@ -1,22 +1,21 @@
 
-import os
 import json
-from datetime import datetime, UTC
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+import os
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from app.database.database import get_db
 from app.models import models, schemas
-from app.models.models import UserRole, UnitStatus, TransferStatus
+from app.models.models import TransferStatus, UnitStatus, UserRole
 from app.services.auth_service import require_role
+from app.services.color_mapping import normalize_color
 from app.services.import_parser import (
     CANONICAL_FIELDS,
     apply_manual_mapping,
-    excel_engine_for,
     parse_workbook,
 )
-from app.services.color_mapping import normalize_color
 from app.services.model_equivalence_service import resolve_internal_model
 
 router = APIRouter()
@@ -29,7 +28,7 @@ DEFAULT_COLOR = "Sin especificar"
 DEFAULT_MODEL = "Sin especificar"
 
 
-def _parse_column_mapping(raw: Optional[str]) -> dict:
+def _parse_column_mapping(raw: str | None) -> dict:
     """Parse the optional manual column->field mapping sent on the upload form.
 
     Expects a JSON object like ``{"NO": "model", "Color": "color"}`` mapping a
@@ -40,8 +39,10 @@ def _parse_column_mapping(raw: Optional[str]) -> dict:
         return {}
     try:
         parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="column_mapping must be valid JSON")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=400, detail="column_mapping must be valid JSON"
+        ) from exc
     if not isinstance(parsed, dict):
         raise HTTPException(
             status_code=400,
@@ -71,7 +72,7 @@ def _text_or_default(value, default: str) -> str:
     return text
 
 
-@router.get("/", response_model=List[schemas.Import])
+@router.get("/", response_model=list[schemas.Import])
 def get_imports(
     skip: int = 0,
     limit: int = 100,
@@ -108,9 +109,9 @@ def get_import_errors(
 @router.post("/upload")
 async def upload_inventory_file(
     file: UploadFile = File(...),
-    batch_period: Optional[str] = Form(None),
-    product_type: Optional[str] = Form(None),
-    column_mapping: Optional[str] = Form(None),
+    batch_period: str | None = Form(None),
+    product_type: str | None = Form(None),
+    column_mapping: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
@@ -128,16 +129,16 @@ async def upload_inventory_file(
     # Optional user-confirmed column->field mapping that overrides auto-detection
     # (TR-07). Validated up front so a bad mapping fails before any persistence.
     manual_mapping = _parse_column_mapping(column_mapping)
-    
+
     # Create uploads directory
     os.makedirs("uploads", exist_ok=True)
-    
+
     # Save file
     file_path = f"uploads/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
-    
+
     # Create import record
     import_record = models.Import(
         filename=file_path,
@@ -151,7 +152,7 @@ async def upload_inventory_file(
     db.add(import_record)
     db.commit()
     db.refresh(import_record)
-    
+
     # Process file
     try:
         result = await process_inventory_file(
@@ -163,16 +164,16 @@ async def upload_inventory_file(
             column_mapping=manual_mapping,
             dispatched_by_id=current_user.id,
         )
-        
+
         # Update import record
         import_record.total_records = result["total_records"]
         import_record.successful_imports = result["successful_imports"]
         import_record.failed_imports = result["failed_imports"]
         import_record.status = "completed"
         import_record.completed_at = datetime.now(UTC)
-        
+
         db.commit()
-        
+
         return {
             "import_id": import_record.id,
             "message": f"File processed successfully. {result['successful_imports']} units imported, {result['failed_imports']} failed.",
@@ -180,21 +181,23 @@ async def upload_inventory_file(
             "successful_imports": result["successful_imports"],
             "failed_imports": result["failed_imports"]
         }
-        
+
     except Exception as e:
         import_record.status = "failed"
         import_record.notes = str(e)
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing file: {str(e)}"
+        ) from e
 
 async def process_inventory_file(
     file_path: str,
     import_id: int,
     db: Session,
-    batch_period: Optional[str] = None,
-    product_type: Optional[str] = None,
-    column_mapping: Optional[dict] = None,
-    dispatched_by_id: Optional[int] = None,
+    batch_period: str | None = None,
+    product_type: str | None = None,
+    column_mapping: dict | None = None,
+    dispatched_by_id: int | None = None,
 ):
     """Process an uploaded inventory file and import units.
 
@@ -224,7 +227,7 @@ async def process_inventory_file(
             content = f.read()
         result = parse_workbook(content, filename)
     except Exception as e:
-        raise Exception(f"Error reading file: {str(e)}")
+        raise Exception(f"Error reading file: {str(e)}") from e
 
     # Apply the user-confirmed mapping (if any) over the auto-detected one.
     if column_mapping:
@@ -392,7 +395,7 @@ _MAX_INVALID_PREVIEW_ROWS = 100
 @router.post("/preview")
 async def preview_inventory_file(
     file: UploadFile = File(...),
-    column_mapping: Optional[str] = Form(None),
+    column_mapping: str | None = Form(None),
     current_user: models.User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER]))
 ):
     """Preview an uploaded file for assisted mapping, without persisting anything.
@@ -415,7 +418,9 @@ async def preview_inventory_file(
         content = await file.read()
         result = parse_workbook(content, file.filename)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error reading file: {str(e)}"
+        ) from e
 
     if manual_mapping:
         apply_manual_mapping(result, manual_mapping)
@@ -500,16 +505,16 @@ def delete_import(
     import_record = db.query(models.Import).filter(models.Import.id == import_id).first()
     if not import_record:
         raise HTTPException(status_code=404, detail="Import record not found")
-    
+
     # Delete associated errors
     db.query(models.ImportError).filter(models.ImportError.import_id == import_id).delete()
-    
+
     # Delete file if exists
     if os.path.exists(import_record.filename):
         os.remove(import_record.filename)
-    
+
     # Delete import record
     db.delete(import_record)
     db.commit()
-    
+
     return {"message": "Import record deleted successfully"}

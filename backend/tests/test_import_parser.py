@@ -512,7 +512,7 @@ def test_apply_manual_mapping_maps_unrecognized_column_to_model():
     apply_manual_mapping(result, {"NO": "model"})
 
     assert table.field_map["model"] == "NO"
-    rows = [r for r in result.iter_rows()]
+    rows = list(result.iter_rows())
     assert rows[0].canonical()["model"] == "X3"
     assert rows[1].canonical()["model"] == "xiaodou"
 

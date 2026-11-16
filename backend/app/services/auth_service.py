@@ -1,17 +1,18 @@
 
-from datetime import datetime, timedelta, UTC
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import os
+import secrets
+from datetime import UTC, datetime, timedelta
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+
+from app.core.security import Security
 from app.database.database import get_db
 from app.models.models import User
 from app.models.schemas import TokenData
-from app.core.security import Security
-import os
-import secrets
 
 
 def _resolve_secret_key() -> str:
@@ -50,7 +51,7 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return Security.get_password_hash(password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
@@ -94,9 +95,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    
+    except JWTError as exc:
+        raise credentials_exception from exc
+
     user = get_user_by_username(db, username=token_data.username)
     if user is None:
         raise credentials_exception
@@ -148,8 +149,8 @@ def verify_password_reset_token(token: str) -> str:
                 detail="Invalid reset token",
             )
         return email
-    except JWTError:
+    except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token",
-        )
+        ) from exc

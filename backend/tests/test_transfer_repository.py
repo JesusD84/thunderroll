@@ -1,11 +1,10 @@
 """Unit tests for TransferRepository."""
 
-import pytest
 from unittest.mock import MagicMock
-from app.repositories.transfer_repository import TransferRepository
-from app.models.models import Transfer, TransferStatus
-from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
 
+from app.models.models import Transfer, TransferStatus
+from app.repositories.transfer_repository import TransferRepository
+from app.schemas.transfer import TransferCreate, TransferFilters, TransferUpdate
 
 # ---------------------------------------------------------------------------
 # get_transfers
@@ -86,7 +85,7 @@ def test_create_transfer_does_not_null_dispatched_at():
 
 def test_create_transfer_keeps_provided_dispatched_at():
     """When dispatched_at is provided explicitly, it must be kept."""
-    from datetime import datetime, UTC
+    from datetime import UTC, datetime
     mock_db = MagicMock()
     provided_at = datetime.now(UTC)
     transfer_data = TransferCreate(unit_id=1, dispatched_at=provided_at)

@@ -95,7 +95,9 @@ def test_xlrd_available_for_legacy_xls():
 )
 def test_excel_engine_selection(filename, expected_engine):
     """TR-03: engine is selected explicitly by extension (case-insensitive)."""
-    from app.api.v1.endpoints.imports import excel_engine_for
+    # Imported from the parser, where it lives: the endpoint module does not
+    # re-export it.
+    from app.services.import_parser import excel_engine_for
 
     assert excel_engine_for(filename) == expected_engine
 
@@ -349,7 +351,7 @@ async def test_upload_transfer_uses_authenticated_user(
     client, auth_headers, test_users, test_locations, db_session
 ):
     """The inbound transfer is owned by the authenticated user, not a hardcoded id."""
-    from app.models.models import User, Transfer
+    from app.models.models import Transfer, User
 
     admin = db_session.query(User).filter(User.username == "admin").first()
     content = _make_xlsx([
