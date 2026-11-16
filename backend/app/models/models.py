@@ -1,22 +1,34 @@
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Enum, Float
+from enum import StrEnum
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.database import Base
-import enum
 
-class UserRole(str, enum.Enum):
+from app.database.database import Base
+
+
+class UserRole(StrEnum):
     ADMIN = "admin"
     MANAGER = "manager"
     OPERATOR = "operator"
 
-class UnitStatus(str, enum.Enum):
+class UnitStatus(StrEnum):
     WAREHOUSE_UNIDENTIFIED = "WAREHOUSE_UNIDENTIFIED"
     AVAILABLE = "AVAILABLE"
     SOLD = "SOLD"
     IN_TRANSIT = "IN_TRANSIT"
 
-class TransferStatus(str, enum.Enum):
+class TransferStatus(StrEnum):
     PENDING = "PENDING"
     IN_TRANSIT = "IN_TRANSIT"
     RECEIVED = "RECEIVED"

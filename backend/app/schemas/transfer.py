@@ -1,18 +1,20 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.models.models import TransferStatus
 
 
 class TransferBase(BaseModel):
     unit_id: int = Field(..., gt=0)
-    dispatched_by_id: Optional[int] = Field(None, gt=0)
-    received_by_id: Optional[int] = Field(None, gt=0)
-    origin_location_id: Optional[int] = Field(None, gt=0)
-    destination_location_id: Optional[int] = Field(None, gt=0)
+    dispatched_by_id: int | None = Field(None, gt=0)
+    received_by_id: int | None = Field(None, gt=0)
+    origin_location_id: int | None = Field(None, gt=0)
+    destination_location_id: int | None = Field(None, gt=0)
     status: TransferStatus = TransferStatus.PENDING
-    dispatched_at: Optional[datetime] = None
-    received_at: Optional[datetime] = None
+    dispatched_at: datetime | None = None
+    received_at: datetime | None = None
 
 
 class TransferCreate(TransferBase):
@@ -36,8 +38,8 @@ class TransferDispatchCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unit_id: int = Field(..., gt=0)
-    origin_location_id: Optional[int] = Field(None, gt=0)
-    destination_location_id: Optional[int] = Field(None, gt=0)
+    origin_location_id: int | None = Field(None, gt=0)
+    destination_location_id: int | None = Field(None, gt=0)
 
 
 class TransferReceiveUpdate(BaseModel):
@@ -61,9 +63,9 @@ class UnitTransferRequest(BaseModel):
     `to_location_id` absent -> sell the unit (SOLD), per
     TransferService.transfer_unit_with_status_update.
     """
-    from_location_id: Optional[int] = Field(None, gt=0)
-    to_location_id: Optional[int] = Field(None, gt=0)
-    notes: Optional[str] = None
+    from_location_id: int | None = Field(None, gt=0)
+    to_location_id: int | None = Field(None, gt=0)
+    notes: str | None = None
 
 
 class TransferUpdate(BaseModel):
@@ -74,28 +76,28 @@ class TransferUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    unit_id: Optional[int] = Field(None, gt=0)
-    dispatched_by_id: Optional[int] = Field(None, gt=0)
-    received_by_id: Optional[int] = Field(None, gt=0)
-    origin_location_id: Optional[int] = Field(None, gt=0)
-    destination_location_id: Optional[int] = Field(None, gt=0)
-    status: Optional[TransferStatus] = None
-    dispatched_at: Optional[datetime] = None
-    received_at: Optional[datetime] = None
+    unit_id: int | None = Field(None, gt=0)
+    dispatched_by_id: int | None = Field(None, gt=0)
+    received_by_id: int | None = Field(None, gt=0)
+    origin_location_id: int | None = Field(None, gt=0)
+    destination_location_id: int | None = Field(None, gt=0)
+    status: TransferStatus | None = None
+    dispatched_at: datetime | None = None
+    received_at: datetime | None = None
 
 
 class TransferFilters(BaseModel):
-    unit_id: Optional[int] = None
-    status: Optional[TransferStatus] = None
-    origin_location_id: Optional[int] = None
-    destination_location_id: Optional[int] = None
-    dispatched_by_id: Optional[int] = None
-    received_by_id: Optional[int] = None
+    unit_id: int | None = None
+    status: TransferStatus | None = None
+    origin_location_id: int | None = None
+    destination_location_id: int | None = None
+    dispatched_by_id: int | None = None
+    received_by_id: int | None = None
 
 
 class Transfer(TransferBase):
     id: int
-    dispatched_by_name: Optional[str] = None
+    dispatched_by_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

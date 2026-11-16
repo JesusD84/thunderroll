@@ -2,8 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.models.models import User
-from app.schemas.user import UserCreate, UserUpdate
-
+from app.schemas.user import UserCreate
 
 # Attributes that must never be written through the generic setattr loop:
 # the primary key and the password hash. Passwords are hashed and assigned

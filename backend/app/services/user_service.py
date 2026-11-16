@@ -3,10 +3,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.models import User, UserRole
-from app.schemas.user import PasswordChange, UserCreate, UserSelfUpdate, UserUpdate
 from app.repositories.user_repository import UserRepository
+from app.schemas.user import PasswordChange, UserCreate, UserSelfUpdate, UserUpdate
 from app.services.auth_service import get_password_hash, verify_password
-
 
 # The only attributes a user may change on their own account. The account
 # identifiers (email/username) and the role flags (role/is_active) are

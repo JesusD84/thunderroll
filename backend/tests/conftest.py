@@ -4,20 +4,28 @@ Uses the real app models (app.models.models) with an in-memory SQLite database.
 Sync engine matches production (app uses sync SQLAlchemy).
 """
 
-import pytest
 import asyncio
+from collections.abc import Generator
 from datetime import datetime
-from typing import Generator
-from httpx import AsyncClient, ASGITransport
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.main import app
-from app.database.database import Base, get_db
-from app.models.models import User, UserRole, Location, Unit, Transfer, Import, ImportError
-from app.models.models import UnitStatus, TransferStatus
 from app.core.security import Security
+from app.database.database import Base, get_db
+from app.main import app
+from app.models.models import (
+    Location,
+    Transfer,
+    TransferStatus,
+    Unit,
+    UnitStatus,
+    User,
+    UserRole,
+)
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 

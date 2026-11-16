@@ -2,14 +2,14 @@
 """Location schemas."""
 
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LocationBase(BaseModel):
     """Base location schema."""
     name: str = Field(..., min_length=1, max_length=100)
-    address: Optional[str] = None
+    address: str | None = None
 
 
 class LocationCreate(LocationBase):
@@ -24,8 +24,8 @@ class LocationUpdate(BaseModel):
     """
     model_config = ConfigDict(extra="forbid")
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    address: Optional[str] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    address: str | None = None
 
 
 class Location(LocationBase):
@@ -37,4 +37,4 @@ class Location(LocationBase):
 
 class LocationFilters(BaseModel):
     """Location filter parameters."""
-    name: Optional[str] = None
+    name: str | None = None

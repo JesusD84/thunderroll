@@ -6,7 +6,6 @@ Known foreign-language names are translated to the Spanish name the app uses
 else, including Spanish names, is kept exactly as the supplier wrote it.
 """
 
-from typing import Optional
 
 # Canonical Spanish name (uppercase, as the app stores colors) -> lowercase
 # aliases in other languages.
@@ -29,7 +28,7 @@ _ALIAS_TO_CANONICAL: dict[str, str] = {
 }
 
 
-def normalize_color(value: Optional[str]) -> Optional[str]:
+def normalize_color(value: str | None) -> str | None:
     """Translate a foreign-language color name to its Spanish equivalent.
 
     Matching ignores case and surrounding whitespace, so ``"Black"``, ``"BLACK"``

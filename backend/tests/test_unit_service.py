@@ -1,12 +1,13 @@
 """Unit tests for UnitService."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException
-from app.services.unit_service import UnitService
-from app.models.models import Unit, Location, UnitStatus, TransferStatus
-from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
 
+import pytest
+from fastapi import HTTPException
+
+from app.models.models import Location, Unit, UnitStatus
+from app.schemas.unit import UnitCreate, UnitFilters, UnitUpdate
+from app.services.unit_service import UnitService
 
 # ---------------------------------------------------------------------------
 # get_units

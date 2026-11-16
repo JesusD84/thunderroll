@@ -1,9 +1,9 @@
-from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.models.models import Location
-from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 from app.repositories.location_repository import LocationRepository
+from app.schemas.location import LocationCreate, LocationFilters, LocationUpdate
 
 
 class LocationService:

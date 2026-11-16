@@ -1,6 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, units, locations, imports, reports, user, transfers, model_equivalences
+from app.api.v1.endpoints import (
+    auth,
+    imports,
+    locations,
+    model_equivalences,
+    reports,
+    transfers,
+    units,
+    user,
+)
 
 router = APIRouter()
 

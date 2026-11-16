@@ -1,14 +1,16 @@
 
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-import os
 
-from app.database.database import engine
-from app.models import models
 from app.api.router import router as api_router
+from app.database.database import engine
 from app.database.seed import create_demo_data
+from app.models import models
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

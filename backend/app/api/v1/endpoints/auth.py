@@ -1,22 +1,24 @@
 
+import logging
 from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+
 from app.database.database import get_db
 from app.models import schemas
 from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.auth_service import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,
     create_access_token,
+    create_password_reset_token,
     get_password_hash,
     get_user_by_email,
-    create_password_reset_token,
     verify_password_reset_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from app.services.email import send_password_reset_email
-import logging
 
 logger = logging.getLogger(__name__)
 

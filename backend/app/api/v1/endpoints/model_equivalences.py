@@ -1,20 +1,19 @@
 """Admin CRUD for manufacturer->internal model equivalences (TR-05)."""
 
-from typing import List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models import schemas
-from app.models.models import UserRole, User
-from app.services.auth_service import require_role
+from app.models.models import User, UserRole
 from app.services import model_equivalence_service as service
+from app.services.auth_service import require_role
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[schemas.ModelEquivalence])
+@router.get("/", response_model=list[schemas.ModelEquivalence])
 def list_equivalences(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -24,7 +23,7 @@ def list_equivalences(
     return service.get_equivalences(db, skip=skip, limit=limit)
 
 
-@router.get("/unmapped", response_model=List[str])
+@router.get("/unmapped", response_model=list[str])
 def list_unmapped_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),

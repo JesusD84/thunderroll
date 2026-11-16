@@ -4,8 +4,6 @@ import pytest
 
 from app.models.models import ModelEquivalence, Unit, UnitStatus
 from app.services import model_equivalence_service as service
-from app.models import schemas
-
 
 # --- Service: resolution -----------------------------------------------------
 
