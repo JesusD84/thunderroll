@@ -6,9 +6,11 @@ services:
     image: postgres:15
     container_name: thunderoll_postgres
     environment:
-      POSTGRES_DB: thunderoll
-      POSTGRES_USER: thunderoll
-      POSTGRES_PASSWORD: thunderoll123
+      POSTGRES_DB: ${POSTGRES_DB:-thunderoll}
+      POSTGRES_USER: ${POSTGRES_USER:-thunderoll}
+      # La contraseña vive en el .env local (nunca en git). El default es un
+      # placeholder: cámbiala por una tuya.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
       - "5432:5432"
     volumes:
@@ -23,7 +25,10 @@ services:
     build: ./backend
     container_name: thunderoll_backend
     environment:
-      DATABASE_URL: postgresql://thunderoll:thunderoll123@postgres:5432/thunderoll
+      # Se arma con las mismas variables que usa el servicio postgres de más
+      # arriba, así que cambiar la contraseña en el .env basta: no puede
+      # quedar desincronizada con la que se inicializó el volumen.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-thunderoll}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-thunderoll}
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
