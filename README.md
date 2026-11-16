@@ -87,7 +87,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Variables de entorno del backend (en `backend/.env` o exportadas):
 
 ```bash
-DATABASE_URL=postgresql://thunderoll:thunderoll123@localhost:5432/thunderoll
+DATABASE_URL=postgresql://thunderoll:change-me@localhost:5432/thunderoll
 SECRET_KEY=tu-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
