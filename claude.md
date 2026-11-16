@@ -339,6 +339,7 @@ El módulo está **completo** (FR-00…FR-10). Seguimiento local: `frontend/IMPO
 - `main` está protegida: requiere PR, que pasen **Backend Tests** (pytest) y **Frontend Tests** (vitest), rama actualizada y conversaciones resueltas. **No push directo ni force-push a `main`.**
 - Frontend → Vercel (preview por PR, producción al mergear). Backend + DB → Render (push a `main`).
 - Alembic está configurado pero **el deploy no lo ejecuta**: las tablas se crean con `create_all` en el lifespan (se revirtió `alembic upgrade head` del startCommand por una migración rota).
+- **`create_all` no altera las tablas que ya existen**: solo crea las que faltan. Una columna nueva no llega a la base real (Neon) con el deploy, y la app no arranca contra ella (`column users.token_version does not exist`). **Toda columna nueva hay que aplicarla a la base antes de mergear**, con su migración real: `alembic upgrade head` apuntando a la base (la cadena de migraciones está rota antes de la 005, así que primero `alembic stamp` del revision anterior). Hay un script de ejemplo en `backend/tmp_apply_005_neon.py`.
 
 ---
 
