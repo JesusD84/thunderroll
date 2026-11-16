@@ -56,9 +56,7 @@ def scenario():
     finally:
         db.query(Transfer).filter(Transfer.unit_id == unit.id).delete()
         db.query(Unit).filter(Unit.id == unit.id).delete()
-        db.query(Location).filter(
-            Location.id.in_([origin.id, destination.id])
-        ).delete()
+        db.query(Location).filter(Location.id.in_([origin.id, destination.id])).delete()
         db.commit()
         db.close()
 
@@ -190,9 +188,7 @@ def test_create_transfer_rejects_an_unknown_destination(scenario):
     with pytest.raises(HTTPException) as exc:
         TransferService.create_transfer(
             db,
-            TransferCreate(
-                unit_id=scenario["unit_id"], destination_location_id=999999
-            ),
+            TransferCreate(unit_id=scenario["unit_id"], destination_location_id=999999),
             actor_id=1,
         )
     assert exc.value.status_code == 404
@@ -422,9 +418,7 @@ def test_transfer_unit_with_destination_sets_in_transit(scenario):
     unit = db.query(Unit).filter(Unit.id == scenario["unit_id"]).one()
     assert unit.status == UnitStatus.IN_TRANSIT
 
-    transfer = (
-        db.query(Transfer).filter(Transfer.unit_id == scenario["unit_id"]).one()
-    )
+    transfer = db.query(Transfer).filter(Transfer.unit_id == scenario["unit_id"]).one()
     assert transfer.status == TransferStatus.PENDING
     assert transfer.origin_location_id == scenario["origin_id"]
     assert transfer.destination_location_id == scenario["destination_id"]
@@ -448,9 +442,7 @@ def test_transfer_unit_without_destination_sells_it(scenario):
     assert unit.sold_date is not None
 
     # The sale is part of the history.
-    transfer = (
-        db.query(Transfer).filter(Transfer.unit_id == scenario["unit_id"]).one()
-    )
+    transfer = db.query(Transfer).filter(Transfer.unit_id == scenario["unit_id"]).one()
     assert transfer.status == TransferStatus.RECEIVED
     assert transfer.destination_location_id is None
     assert transfer.origin_location_id == scenario["origin_id"]

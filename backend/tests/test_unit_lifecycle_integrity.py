@@ -115,7 +115,10 @@ def _transfer_rows(unit_id: int) -> list[Transfer]:
     db = TestingSessionLocal()
     try:
         return (
-            db.query(Transfer).filter(Transfer.unit_id == unit_id).order_by(Transfer.id).all()
+            db.query(Transfer)
+            .filter(Transfer.unit_id == unit_id)
+            .order_by(Transfer.id)
+            .all()
         )
     finally:
         db.close()
@@ -399,21 +402,16 @@ async def test_a_second_active_transfer_is_rejected(
     """A unit holds at most one active transfer."""
     unit_id = await _create_unit(client, auth_headers, places[0].id, "TWO")
 
-    first = await _dispatch(
-        client, auth_headers, unit_id, places[0].id, places[1].id
-    )
+    first = await _dispatch(client, auth_headers, unit_id, places[0].id, places[1].id)
     assert first.status_code == 200, first.text
 
-    second = await _dispatch(
-        client, auth_headers, unit_id, places[0].id, places[2].id
-    )
+    second = await _dispatch(client, auth_headers, unit_id, places[0].id, places[2].id)
     assert second.status_code == 409, second.text
 
     active = [
         transfer
         for transfer in _transfer_rows(unit_id)
-        if transfer.status
-        in (TransferStatus.PENDING, TransferStatus.IN_TRANSIT)
+        if transfer.status in (TransferStatus.PENDING, TransferStatus.IN_TRANSIT)
     ]
     assert len(active) == 1
 
@@ -424,9 +422,7 @@ async def test_a_unit_can_be_dispatched_again_once_the_transfer_is_closed(
 ):
     """The rule is about *active* transfers, not about the whole history."""
     unit_id = await _create_unit(client, auth_headers, places[0].id, "AGAIN")
-    first = await _dispatch(
-        client, auth_headers, unit_id, places[0].id, places[1].id
-    )
+    first = await _dispatch(client, auth_headers, unit_id, places[0].id, places[1].id)
     assert first.status_code == 200, first.text
 
     received = await client.put(
@@ -436,9 +432,7 @@ async def test_a_unit_can_be_dispatched_again_once_the_transfer_is_closed(
     )
     assert received.status_code == 200, received.text
 
-    second = await _dispatch(
-        client, auth_headers, unit_id, places[1].id, places[2].id
-    )
+    second = await _dispatch(client, auth_headers, unit_id, places[1].id, places[2].id)
     assert second.status_code == 200, second.text
 
 
@@ -448,9 +442,7 @@ async def test_a_unit_in_transit_cannot_be_dispatched_again(
 ):
     """The unit-detail dispatch refuses a unit that is already travelling."""
     unit_id = await _create_unit(client, auth_headers, places[0].id, "INTR")
-    first = await _dispatch(
-        client, auth_headers, unit_id, places[0].id, places[1].id
-    )
+    first = await _dispatch(client, auth_headers, unit_id, places[0].id, places[1].id)
     assert first.status_code == 200, first.text
 
     again = await client.post(

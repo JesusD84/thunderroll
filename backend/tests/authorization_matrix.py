@@ -264,7 +264,9 @@ CASES: tuple[EndpointCase, ...] = (
     EndpointCase("GET", "/api/v1/transfers/stats"),
     EndpointCase("GET", "/api/v1/transfers/"),
     EndpointCase("POST", "/api/v1/transfers/", body=_new_transfer_body),
-    EndpointCase("POST", "/api/v1/transfers/unit/{plain_unit_id}", body=_transfer_unit_body),
+    EndpointCase(
+        "POST", "/api/v1/transfers/unit/{plain_unit_id}", body=_transfer_unit_body
+    ),
     EndpointCase("GET", "/api/v1/transfers/unit/{unit_id}/active"),
     EndpointCase("GET", "/api/v1/transfers/{transfer_id}"),
     EndpointCase("PUT", "/api/v1/transfers/{transfer_id}", body={"status": "RECEIVED"}),

@@ -65,7 +65,9 @@ class TransferService:
                 status_code=409, detail="A sold unit cannot be dispatched"
             )
 
-        origin_location_id = transfer_data.origin_location_id or unit.current_location_id
+        origin_location_id = (
+            transfer_data.origin_location_id or unit.current_location_id
+        )
         if origin_location_id != unit.current_location_id:
             raise HTTPException(
                 status_code=409,
@@ -86,7 +88,9 @@ class TransferService:
                 detail="Origin and destination locations must be different",
             )
         if not LocationRepository.get_location(db, destination_location_id):
-            raise HTTPException(status_code=404, detail="Destination location not found")
+            raise HTTPException(
+                status_code=404, detail="Destination location not found"
+            )
 
         TransferService._ensure_no_active_transfer(db, unit.id)
 
@@ -185,7 +189,9 @@ class TransferService:
                 detail="Origin and destination locations must be different",
             )
         if not LocationRepository.get_location(db, destination_location_id):
-            raise HTTPException(status_code=404, detail="Destination location not found")
+            raise HTTPException(
+                status_code=404, detail="Destination location not found"
+            )
 
         TransferService._ensure_no_active_transfer(db, unit.id)
 
@@ -255,10 +261,7 @@ class TransferService:
             if unit.status == UnitStatus.SOLD:
                 raise HTTPException(
                     status_code=409,
-                    detail=(
-                        "The unit was sold: a sold unit cannot be received "
-                        "again"
-                    ),
+                    detail=("The unit was sold: a sold unit cannot be received again"),
                 )
             destination_location_id = db_transfer.destination_location_id
             if destination_location_id is None:
