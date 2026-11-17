@@ -621,14 +621,14 @@ La clave de IP **no** puede ser `request.client.host`: en producción la petici�
 
 `app/core/client_ip.py` resuelve la IP real:
 
-1. La conexión es de un proxy de confianza (`TRUSTED_PROXY_CIDRS`; por defecto las redes privadas y el loopback, que es de donde se conecta el balanceador de Render) → se lee el `X-Forwarded-For`.
-2. Se usa la entrada de la **derecha**, que es la que agregó el proxy. El cliente solo puede *anteponer* valores (`X-Forwarded-For: mía, <la del proxy>`), así que no puede elegir su cubeta.
-3. Si la conexión no viene de un proxy de confianza, el header **se ignora**: quien alcance la API directamente puede escribir lo que quiera en él.
-4. Sin header (o con un valor que no es una IP), se usa `request.client.host`.
+1. **`CF-Connecting-IP`** si viene: la pone el edge de **Cloudflare** (el de Render) con la IP de quien conectó, y Cloudflare **rechaza** (403, *error code 1000*) las peticiones que traen su propia copia → no se puede falsificar.
+2. Si no viene, `request.client.host`.
 
-> **Por qué no los flags de uvicorn** (`--proxy-headers --forwarded-allow-ips`): reescriben `scope["client"]`, así que la app deja de saber quién fue el peer y no puede comprobar si el header viene de un proxy. Y con `--forwarded-allow-ips=*`, uvicorn toma la entrada **más a la izquierda**, que es justo la que escribe el cliente: sería un agujero de spoofing (la propia guía de Render lo advierte).
+> **`X-Forwarded-For` no se usa, y es a propósito.** En principio el cliente escribe el header primero y cada proxy **añade** la suya al final, así que la entrada de la derecha sería la del proxy. Pero Render **no lo hace**: pasa el header del cliente **tal cual**. Comprobado en producción: con el `X-Forwarded-For` falsificado, la clave del límite cambiaba con el valor falsificado y el límite se podía saltar (6 intentos con 6 IP distintas → 6 cubetas nuevas). Con `CF-Connecting-IP` no pasa: Cloudflare sustituye el valor y rechaza las copias.
 
-> Ojo con la topología: hoy el login lo hace NextAuth **desde el servidor** (`authorize` llama al backend), así que la IP que llega al backend es la del nodo de salida de Vercel, no la del usuario final. Para buckets por usuario final, el proxy del frontend (`app/api/proxy/[...path]/route.ts`) tendría que reenviar el `X-Forwarded-For` del browser y el backend tendría que descartar un salto más (`TRUSTED_PROXY_HOPS`).
+> Tampoco los flags de uvicorn (`--proxy-headers --forwarded-allow-ips`): reescriben `scope["client"]` y con `*` toman justo el valor que escribe el cliente.
+
+> Ojo con la topología: hoy el login lo hace NextAuth **desde el servidor** (`authorize` llama al backend), así que la IP que llega al backend es la del nodo de salida de Vercel, no la del usuario final. Para buckets por usuario final, el proxy del frontend (`app/api/proxy/[...path]/route.ts`) tendría que reenviar la IP del browser y el backend tendría que confiar en esa cabecera (hoy no puede: solo Cloudflare garantiza que su cabecera no se falsifica).
 
 ### 3.6 Estados de UI consistentes
 

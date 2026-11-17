@@ -192,11 +192,10 @@ Devuelve un `access_token` nuevo; el `refresh_token` **no rota** (7 días fijos 
 
 La clave de IP **no** es `request.client.host`: detrás de un proxy (Render en producción, el contenedor del frontend en local) esa es la dirección del proxy y todos los usuarios acabarían en la misma cubeta. `app/core/client_ip.py` resuelve la IP real:
 
-- el `X-Forwarded-For` **solo se lee si la conexión viene de un proxy de confianza** (`TRUSTED_PROXY_CIDRS`, por defecto las redes privadas y el loopback);
-- de ese header se usa la entrada de la **derecha**, que es la que agregó el proxy: el cliente solo puede *anteponer* valores, así que no puede elegir su cubeta;
-- sin header, o con un peer que no sea de confianza, se usa `request.client.host`.
+- **`CF-Connecting-IP`** si viene: la pone el edge de Cloudflare (el de Render) con la IP de quien conectó, y **rechaza** (403, *error 1000*) las peticiones que traen su propia copia → no se puede falsificar;
+- si no, `request.client.host`.
 
-> No se usan los flags `--proxy-headers --forwarded-allow-ips` de uvicorn: reescriben `scope["client"]` (y con `--forwarded-allow-ips=*` toman justo el valor que escribe el cliente). La resolución va en la app, que así puede comprobar quién mandó el header.
+> **`X-Forwarded-For` no se usa, a propósito.** En principio cada proxy añade su entrada al final del header, así que la de la derecha sería la del proxy; pero Render **pasa el header del cliente tal cual** (comprobado en producción: con el header falsificado, la clave del límite cambiaba y el límite se podía saltar). La cabecera fiable aquí es la de Cloudflare.
 
 ---
 
