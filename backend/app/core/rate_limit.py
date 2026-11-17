@@ -21,9 +21,10 @@ from urllib.parse import parse_qs
 
 from jose import jwt
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.core.client_ip import get_client_ip
 
 # Rutas cuyo cuerpo identifica la cuenta atacada.
 ACCOUNT_PATHS = frozenset(
@@ -76,12 +77,18 @@ def _limit_provider(per_minute: int):
     return provider
 
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[], headers_enabled=True)
+limiter = Limiter(key_func=get_client_ip, default_limits=[], headers_enabled=True)
 
 
 def ip_key(request: Request) -> str:
-    """Clave del límite por IP."""
-    return get_remote_address(request)
+    """Clave del límite por IP.
+
+    No es la dirección de la conexión: detrás de un proxy (Render en
+    producción, el contenedor del frontend en local) esa es siempre la del
+    proxy, y todos los usuarios acabarían en la misma cubeta. Se resuelve la
+    IP real del cliente en `app/core/client_ip.py`.
+    """
+    return get_client_ip(request)
 
 
 def account_key(request: Request) -> str:

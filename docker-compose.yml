@@ -33,6 +33,12 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       # "development" es lo que habilita los orígenes de localhost en CORS.
       ENV: ${ENV:-development}
+      # La IP que se usa para el rate limit detrás de un proxy. En local el
+      # peer es el contenedor del frontend (red privada de Docker), así que el
+      # X-Forwarded-For se acepta; si no viene, se usa la dirección de la
+      # conexión.
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
       FRONTEND_URL: ${FRONTEND_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       SMTP_HOST: ${SMTP_HOST}

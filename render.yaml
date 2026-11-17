@@ -32,6 +32,13 @@ services:
       # lista de CORS. En producción valen FRONTEND_URL y ALLOWED_ORIGINS.
       - key: ENV
         value: production
+      # El rate limit keya por IP (ver app/core/client_ip.py). Detrás del
+      # balanceador de Render, la dirección de la conexión es la del proxy:
+      # sin resolver el X-Forwarded-For, todos los usuarios compartirían la
+      # misma cubeta. El default del código ya acepta el header desde las
+      # redes privadas (de donde se conecta el balanceador de Render); si
+      # hubiera que ajustarlo, se hace en el dashboard (Environment), no
+      # aquí: el blueprint pisa lo que esté en el dashboard.
       - key: FRONTEND_URL
         value: https://thunderroll.vercel.app
       - key: SMTP_HOST
