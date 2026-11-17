@@ -51,12 +51,11 @@ class UserSelfUpdate(BaseModel):
     ``first_name`` and ``last_name``.
 
     The account identifiers (``email``, ``username``) are administrator-only
-    too: they are what the account signs in with, and correcting them
-    invalidates the session (the JWT carries the username). ``role`` and
-    ``is_active`` are administrator-only as well. ``extra="forbid"`` turns
-    any attempt to set them - or to send a field that does not exist at all
-    - into a 422, instead of letting it reach the setattr-based persistence
-    layer.
+    too: they are what the account signs in with, so correcting them is an
+    admin task. ``role`` and ``is_active`` are administrator-only as well.
+    ``extra="forbid"`` turns any attempt to set them - or to send a field
+    that does not exist at all - into a 422, instead of letting it reach the
+    setattr-based persistence layer.
     """
 
     model_config = ConfigDict(extra="forbid")
