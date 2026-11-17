@@ -846,7 +846,7 @@ personalizado, no se puede mandar en un form simple).
 5. **Arreglalo** y explica por qué `safeCallbackUrl` existe.
 
 ## E3 · El bug del rol (30 min)
-1. En `frontend/lib/auth.ts`, cambia `manageUnits: isAdmin || isManager` por `manageUnits: true`.
+1. En `frontend/lib/permissions.ts`, cambia `manageUnits: isAdmin || isManager` por `manageUnits: true`.
 2. Haz login como `operator` y mira el botón "Nueva unidad" en `/units`.
 3. ¿Qué **pasa** en la UI? ¿Y qué pasa si haces click? (mira el 403 del backend)
 4. Explica por qué el espejo entre `getPermissions` y `require_role` importa.

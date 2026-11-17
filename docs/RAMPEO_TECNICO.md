@@ -495,33 +495,49 @@ El service es donde vive la lógica; el repository solo habla SQL; el endpoint s
 |---|---|
 | `require_role([UserRole.ADMIN, UserRole.MANAGER])` | `getPermissions(role).manageEquivalences` |
 
-`frontend/lib/auth.ts` es el **espejo** del backend. Si agregas un permiso, lo agregas en los dos lados.
+`frontend/lib/permissions.ts` es el **espejo** del backend. Si agregas un permiso, lo agregas en los dos lados.
 El backend manda (es la autoridad), la UI solo esconde botones.
 
-### 3.3 El cliente HTTP: `lib/api.ts`
+Las reglas viven en `permissions.ts` (y no en `auth.ts`) porque el **middleware** corre en el edge runtime y
+no puede importar un módulo `'use client'`. `lib/auth.ts` las reexporta, así que la UI sigue importando desde
+ahí. El mismo archivo define `ROLE_GATED_ROUTES`: las secciones que no son para todos los roles
+(`/imports`, `/model-equivalences`, `/reports`, `/units/new`). El middleware usa esas reglas para no dejar
+entrar a un rol a una página que no puede usar, y cada página conserva sus propios checks como UX.
 
-Hay **dos estilos** en el repo y ambos son válidos:
+### 3.3 El cliente HTTP: `lib/api.ts` — todo pasa por el proxy
 
-**Estilo A — `apiFetch`** (el que usa `lib/imports.ts`): el **path es relativo** (`/api/v1/imports`) y es
-`apiFetch` quien le antepone `API_URL`; el token se inyecta solo y los errores se normalizan en `ApiError`.
+**El navegador nunca habla con el backend.** Cada llamada sale por el proxy del servidor
+(`frontend/app/api/proxy/[...path]/route.ts`):
 
-```typescript
-const res = await apiFetch<ImportPreviewResponse>(`${IMPORTS_BASE}/preview`, {
-  token,
-  body: formData,          // multipart: el body va crudo, sin Content-Type manual
-});
+```
+navegador  ->  /api/proxy/api/v1/units/  ->  proxy (route handler)  ->  BACKEND_URL/api/v1/units/
+                     (sin token)              (lee la cookie cifrada,
+                                              pone el Authorization: Bearer)
 ```
 
-**Estilo B — `sessionAwareFetch` directo** (el que usan páginas como `app/units/page.tsx`): tú armas la
-URL con `URLSearchParams` y el header Bearer.
+El token de acceso del backend vive **solo** dentro de la cookie de sesión de NextAuth (cifrada,
+`httpOnly`). El proxy lo lee con `getToken()` (`frontend/lib/server/session.ts`) y lo pone en el header
+`Authorization`. El navegador nunca lo ve: un XSS no tiene nada que robar.
+
+Por eso el frontend ya **no** necesita `NEXT_PUBLIC_API_URL` ni CORS: `BACKEND_URL` (server-side) es lo
+único que hace falta.
+
+Dos estilos en `lib/api.ts`, ambos válidos:
+
+**Estilo A — `apiFetch`** (el que usa `lib/imports.ts` y casi todas las páginas): el path es el del backend
+(`/api/v1/imports`) y es `apiFetch` quien le antepone `API_BASE` (`/api/proxy`); los errores se normalizan
+en `ApiError`.
 
 ```typescript
-const params = new URLSearchParams({ skip: String((page - 1) * PAGE_SIZE), limit: String(PAGE_SIZE) });
-if (searchTerm) params.set('search', searchTerm);
+const preview = await previewImport(file, mapping);   // sin token: el proxy lo pone
 
-const res = await sessionAwareFetch(`${API_URL}/api/v1/units/?${params.toString()}`, {
-  headers: { 'Authorization': `Bearer ${token}` },
-});
+const units = await apiFetch<Unit[]>('/api/v1/units/');
+```
+
+**Estilo B — `sessionAwareFetch` directo** (cuando hace falta la `Response` cruda: un header o un blob):
+
+```typescript
+const res = await sessionAwareFetch(`${API_BASE}/api/v1/units/?${params.toString()}`);
 if (!res.ok) throw new Error('No se pudieron cargar las unidades');
 
 const data = await res.json();
@@ -530,8 +546,7 @@ setTotalCount(Number(res.headers.get('X-Total-Count') ?? data.length));  // ← 
 ```
 
 Detalle del segundo estilo: el **total de unidades no viene en el body**, viene en el header
-`X-Total-Count` (el backend lo pone con `response.headers[...]`, y CORS lo expone con
-`expose_headers=["X-Total-Count"]`).
+`X-Total-Count` (el backend lo pone con `response.headers[...]`). El proxy lo reenvía.
 
 `apiFetch` normaliza los errores: si la respuesta no es `ok`, lanza `ApiError` con el `detail` que mandó
 FastAPI. Los catch de las páginas hacen:
@@ -544,21 +559,18 @@ catch (err) {
 
 ### 3.4 El manejo del 401 — el patrón más particular del repo
 
-Cuando el JWT expira, el backend responde 401. Antes del PR #73 el frontend se quedaba en un bucle de
-errores (la sesión de NextAuth seguía marcada como activa). La solución (`lib/session-expiry.ts` +
-`lib/api.ts`):
+Cuando el token expira (o la sesión ya no vale), el backend responde 401. El flujo (`lib/api.ts` +
+`lib/session-refresh.ts` + `lib/session-expiry.ts`):
 
 ```typescript
 export async function sessionAwareFetch(input, init, { skipSessionExpiry = false } = {}) {
   const response = await fetch(input, init);
   if (response.status === 401 && !skipSessionExpiry) {
-    const freshToken = await refreshAccessToken();   // renueva el token de acceso
-    if (freshToken && freshToken !== usedToken) {
-      const retried = await fetch(input, withBearerToken(init, freshToken));
-      if (retried.status !== 401) return retried;     // ← un reintento, y sale
-    }
-    void handleSessionExpired();          // cierra sesión + redirige a /login
-    return new Promise<Response>(() => {}); // ← promesa que NUNCA resuelve
+    await renewSession();                    // renueva la sesión en el servidor
+    const retried = await fetch(input, init);  // ← un reintento, y sale
+    if (retried.status !== 401) return retried;
+    void handleSessionExpired();              // cierra sesión + redirige a /login
+    return new Promise<Response>(() => {});   // ← promesa que NUNCA resuelve
   }
   return response;
 }
@@ -575,18 +587,31 @@ Tres detalles que parecen rarezas pero son intencionales:
    - **Proactiva (server-side)**: el callback `jwt` de NextAuth corre en cada lectura de
      `/api/auth/session`; si el token expira en menos de 60 s, pide uno nuevo a `POST /api/v1/auth/refresh`
      (`lib/backend-auth.ts`) y actualiza la cookie de sesión (que va cifrada).
-   - **Reactiva (client-side)**: ante un 401, `lib/api.ts` llama a `refreshAccessToken()`
-     (`lib/session-refresh.ts`, single-flight) → `getSession()` → reintenta **una vez** con el token nuevo.
+   - **Reactiva (client-side)**: ante un 401, `lib/api.ts` llama a `renewSession()`
+     (`lib/session-refresh.ts`, single-flight) → `getSession()` → el servidor renueva la cookie →
+     la petición se reintenta **una vez**.
 
-   Si el `refresh_token` ya no vale (cambió la contraseña, el rol o se dio de baja la cuenta), el backend
+   El reintento no cambia ningún header: la credencial viaja en la cookie, y para entonces la cookie ya
+   trae el token nuevo.
+
+   Si el `refresh_token` ya no vale (cambió la contraseña o se dio de baja la cuenta), el backend
    responde 401 y cae al flujo de sesión expirada de siempre.
 
 `safeCallbackUrl()` bloquea redirects externos (`//evil.com`, `/login`) → solo acepta rutas relativas
 internas.
 
+### 3.4.1 El rol se refresca sin cerrar la sesión
+
+El callback `jwt` relee el rol del backend (`GET /api/v1/user/me`, `lib/backend-auth.ts`) cada vez que la
+sesión se renueva (y como máximo una vez por minuto). Así un cambio de rol aplica sin cerrar la sesión: el
+backend evalúa el rol **desde la base** en cada petición (`require_role` mira `current_user.role`), así que
+el cambio aplica de inmediato y la copia que guarda la cookie solo tiene que estar al día.
+
+Por eso un cambio de rol **no** revoca las sesiones (un cambio de contraseña o una baja, sí).
+
 > **Regla**: toda request autenticada va por `apiFetch` / `sessionAwareFetch`. No llames `fetch()` pelado en
-> una página. Hoy **ninguna** lo hace: los únicos dos `fetch()` del frontend son el wrapper de `lib/api.ts`
-> y el route handler de NextAuth (que es server-side y por diseño no lleva el token del usuario).
+> una página. Hoy **ninguna** lo hace: los únicos `fetch()` del frontend son el wrapper de `lib/api.ts`,
+> el proxy (server-side) y el route handler de NextAuth (también server-side).
 
 ### 3.5 Estados de UI consistentes
 
