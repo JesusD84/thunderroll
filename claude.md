@@ -190,6 +190,14 @@ Devuelve un `access_token` nuevo; el `refresh_token` **no rota** (7 días fijos 
 
 `login` y `forgot-password`: 5/min por IP **y** por cuenta. `refresh`: 30/min por IP y por cuenta. Al pasarse: **429**.
 
+La clave de IP **no** es `request.client.host`: detrás de un proxy (Render en producción, el contenedor del frontend en local) esa es la dirección del proxy y todos los usuarios acabarían en la misma cubeta. `app/core/client_ip.py` resuelve la IP real:
+
+- el `X-Forwarded-For` **solo se lee si la conexión viene de un proxy de confianza** (`TRUSTED_PROXY_CIDRS`, por defecto las redes privadas y el loopback);
+- de ese header se usa la entrada de la **derecha**, que es la que agregó el proxy: el cliente solo puede *anteponer* valores, así que no puede elegir su cubeta;
+- sin header, o con un peer que no sea de confianza, se usa `request.client.host`.
+
+> No se usan los flags `--proxy-headers --forwarded-allow-ips` de uvicorn: reescriben `scope["client"]` (y con `--forwarded-allow-ips=*` toman justo el valor que escribe el cliente). La resolución va en la app, que así puede comprobar quién mandó el header.
+
 ---
 
 ## Patrones de arquitectura

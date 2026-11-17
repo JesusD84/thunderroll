@@ -613,7 +613,24 @@ Por eso un cambio de rol **no** revoca las sesiones (un cambio de contraseña o 
 > una página. Hoy **ninguna** lo hace: los únicos `fetch()` del frontend son el wrapper de `lib/api.ts`,
 > el proxy (server-side) y el route handler de NextAuth (también server-side).
 
-### 3.5 Estados de UI consistentes
+### 3.5 El rate limit y la IP real del cliente
+
+`app/core/rate_limit.py` limita los endpoints de autenticación: 5/min por IP **y** por cuenta (30/min el refresco). Al pasarse, **429**.
+
+La clave de IP **no** puede ser `request.client.host`: en producción la petición llega al contenedor a través del balanceador de Render, así que esa dirección es la del proxy y **todos los usuarios compartirían la misma cubeta** (5 logins por minuto entre todos).
+
+`app/core/client_ip.py` resuelve la IP real:
+
+1. La conexión es de un proxy de confianza (`TRUSTED_PROXY_CIDRS`; por defecto las redes privadas y el loopback, que es de donde se conecta el balanceador de Render) → se lee el `X-Forwarded-For`.
+2. Se usa la entrada de la **derecha**, que es la que agregó el proxy. El cliente solo puede *anteponer* valores (`X-Forwarded-For: mía, <la del proxy>`), así que no puede elegir su cubeta.
+3. Si la conexión no viene de un proxy de confianza, el header **se ignora**: quien alcance la API directamente puede escribir lo que quiera en él.
+4. Sin header (o con un valor que no es una IP), se usa `request.client.host`.
+
+> **Por qué no los flags de uvicorn** (`--proxy-headers --forwarded-allow-ips`): reescriben `scope["client"]`, así que la app deja de saber quién fue el peer y no puede comprobar si el header viene de un proxy. Y con `--forwarded-allow-ips=*`, uvicorn toma la entrada **más a la izquierda**, que es justo la que escribe el cliente: sería un agujero de spoofing (la propia guía de Render lo advierte).
+
+> Ojo con la topología: hoy el login lo hace NextAuth **desde el servidor** (`authorize` llama al backend), así que la IP que llega al backend es la del nodo de salida de Vercel, no la del usuario final. Para buckets por usuario final, el proxy del frontend (`app/api/proxy/[...path]/route.ts`) tendría que reenviar el `X-Forwarded-For` del browser y el backend tendría que descartar un salto más (`TRUSTED_PROXY_HOPS`).
+
+### 3.6 Estados de UI consistentes
 
 `components/ui/states.tsx` define `LoadingState` (con `role="status"`), `EmptyState` y `ErrorState`
 (con `role="alert"`). Úsalos en lugar de inventar spinners nuevos. Y `sonner` para los toasts.
