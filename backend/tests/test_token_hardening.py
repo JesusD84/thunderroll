@@ -171,19 +171,24 @@ async def test_old_token_is_rejected_after_a_password_change(
 
 
 @pytest.mark.asyncio
-async def test_old_token_is_rejected_after_a_role_change(
+async def test_role_change_keeps_the_session_and_applies_the_new_role(
     client: AsyncClient, auth_headers, test_users, test_locations
 ):
-    """Cambiar el rol cierra las sesiones abiertas con el rol anterior.
+    """Cambiar el rol no cierra las sesiones abiertas: el rol nuevo aplica ya.
 
-    Si no, un token de operador seguiría valiendo como token de manager
-    hasta que se venciera.
+    El rol se evalúa desde la base en cada petición (``require_role`` mira
+    ``current_user.role``), así que un token de operador no puede seguir
+    valiendo como token de manager aunque la sesión siga viva: lo que cambia
+    son los permisos, no la credencial. Cerrar la sesión no añadiría nada y
+    obligaría a volver a iniciar sesión.
     """
     user_id = _create_user("hp-role")
     token = await _login(client, "hp-role")
     headers = _bearer(token)
 
-    assert (await client.get("/api/v1/user/me", headers=headers)).status_code == 200
+    # Con el rol de operador todavía no puede listar los usuarios.
+    forbidden = await client.get("/api/v1/user/", headers=headers)
+    assert forbidden.status_code == 403
 
     change = await client.put(
         f"/api/v1/user/{user_id}",
@@ -192,8 +197,13 @@ async def test_old_token_is_rejected_after_a_role_change(
     )
     assert change.status_code == 200, change.text
 
+    # La sesión sigue viva y ya trae el rol nuevo.
     after = await client.get("/api/v1/user/me", headers=headers)
-    assert after.status_code == 401
+    assert after.status_code == 200
+    assert after.json()["role"] == "manager"
+
+    allowed = await client.get("/api/v1/user/", headers=headers)
+    assert allowed.status_code == 200
 
 
 @pytest.mark.asyncio

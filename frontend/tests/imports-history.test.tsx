@@ -3,9 +3,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ImportsHistoryPage from '@/app/imports/history/page';
 import ImportDetailPage from '@/app/imports/[id]/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin', role: 'admin' } };
 let mockStatus = 'authenticated';
 let mockParams: Record<string, string> = {};
 
@@ -17,19 +21,16 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: mockSession, status: mockStatus }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 function mockJson(body: unknown, init: { ok?: boolean; status?: number } = {}) {
-  const { ok = true, status = 200 } = init;
-  return Promise.resolve({
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    text: () => Promise.resolve(JSON.stringify(body)),
-  });
+  const { status = init.ok === false ? 500 : 200 } = init;
+  return Promise.resolve(mockResponse(body, { status }));
 }
 
 const importsList = [
@@ -67,7 +68,7 @@ const importsList = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin', role: 'admin' } };
   mockStatus = 'authenticated';
   mockParams = {};
 });
@@ -90,7 +91,7 @@ describe('ImportsHistoryPage', () => {
     expect(screen.getByText('Fallido')).toBeInTheDocument();
 
     const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('/api/v1/imports/');
+    expect(url).toBe(`${API_BASE}/api/v1/imports/`);
   });
 
   it('shows an empty state when there are no imports', async () => {
@@ -121,7 +122,7 @@ describe('ImportsHistoryPage', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
     const deleteCall = mockFetch.mock.calls[1];
-    expect(deleteCall[0]).toContain('/api/v1/imports/1');
+    expect(deleteCall[0]).toBe(`${API_BASE}/api/v1/imports/1`);
     expect(deleteCall[1].method).toBe('DELETE');
 
     await waitFor(() => {
@@ -131,7 +132,7 @@ describe('ImportsHistoryPage', () => {
   });
 
   it('hides the delete action for non-admin roles', async () => {
-    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockSession = { user: { name: 'Op', role: 'operator' } };
     mockFetch.mockReturnValueOnce(mockJson(importsList));
     render(<ImportsHistoryPage />);
 
@@ -172,8 +173,8 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Errores (1)')).toBeInTheDocument();
     expect(screen.getByText('Identificador duplicado')).toBeInTheDocument();
 
-    expect(mockFetch.mock.calls[0][0]).toContain('/api/v1/imports/1');
-    expect(mockFetch.mock.calls[1][0]).toContain('/api/v1/imports/1/errors');
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API_BASE}/api/v1/imports/1`);
+    expect(mockFetch.mock.calls[1][0]).toBe(`${API_BASE}/api/v1/imports/1/errors`);
   });
 
   it('shows an error when the import cannot be loaded', async () => {

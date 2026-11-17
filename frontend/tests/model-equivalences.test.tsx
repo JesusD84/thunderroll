@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ModelEquivalencesPage from '@/app/model-equivalences/page';
+import { API_BASE } from '@/lib/api';
 import type { ModelEquivalence } from '@/lib/imports';
+import { mockResponse } from './mocks/response';
 
 // --- Mocks ---
-let mockSession: any = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin', role: 'admin' } };
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -15,19 +19,16 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: mockSession, status: 'authenticated' }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 function mockJson(body: unknown, init: { ok?: boolean; status?: number } = {}) {
-  const { ok = true, status = 200 } = init;
-  return Promise.resolve({
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    text: () => Promise.resolve(JSON.stringify(body)),
-  });
+  const { status = init.ok === false ? 500 : 200 } = init;
+  return Promise.resolve(mockResponse(body, { status }));
 }
 
 let eqs: ModelEquivalence[];
@@ -89,7 +90,7 @@ function installFetch() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin', role: 'admin' }, accessToken: 'fake-token' };
+  mockSession = { user: { name: 'Admin', role: 'admin' } };
   seed();
   installFetch();
 });
@@ -164,7 +165,7 @@ describe('ModelEquivalencesPage', () => {
     await waitFor(() => {
       const put = mockFetch.mock.calls.find((c) => c[1]?.method === 'PUT');
       expect(put).toBeTruthy();
-      expect(put![0]).toContain('/model-equivalences/1');
+      expect(put![0]).toBe(`${API_BASE}/api/v1/model-equivalences/1`);
       expect(JSON.parse(put![1].body)).toMatchObject({ internal_model: 'Thunder X3 Pro' });
     });
   });
@@ -179,12 +180,12 @@ describe('ModelEquivalencesPage', () => {
     await waitFor(() => {
       const del = mockFetch.mock.calls.find((c) => c[1]?.method === 'DELETE');
       expect(del).toBeTruthy();
-      expect(del![0]).toContain('/model-equivalences/1');
+      expect(del![0]).toBe(`${API_BASE}/api/v1/model-equivalences/1`);
     });
   });
 
   it('hides delete for MANAGER but allows editing', async () => {
-    mockSession = { user: { name: 'Mgr', role: 'manager' }, accessToken: 'fake-token' };
+    mockSession = { user: { name: 'Mgr', role: 'manager' } };
     render(<ModelEquivalencesPage />);
     await waitFor(() => expect(screen.getByText('X3')).toBeInTheDocument());
 
@@ -194,7 +195,7 @@ describe('ModelEquivalencesPage', () => {
   });
 
   it('is read-only for OPERATOR', async () => {
-    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'fake-token' };
+    mockSession = { user: { name: 'Op', role: 'operator' } };
     render(<ModelEquivalencesPage />);
     await waitFor(() => expect(screen.getByText('X3')).toBeInTheDocument());
 

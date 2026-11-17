@@ -49,7 +49,6 @@ export default function ImportsPage() {
   const { data: session } = useSession();
   const { viewImports } = useAuth();
   const router = useRouter();
-  const token = (session as { accessToken?: string } | null)?.accessToken;
 
   useEffect(() => {
     if (session && !viewImports) {
@@ -90,7 +89,7 @@ export default function ImportsPage() {
     setError(null);
 
     try {
-      const result = await previewImport(file, mapping, token);
+      const result = await previewImport(file, mapping);
       setPreview(result);
     } catch (err) {
       const message =
@@ -135,7 +134,6 @@ export default function ImportsPage() {
           product_type: null,
           columnMapping: buildColumnMapping(preview, overrides),
         },
-        token,
       );
       setResult(res);
       setImportErrors(null);
@@ -159,7 +157,7 @@ export default function ImportsPage() {
 
     setLoadingErrors(true);
     try {
-      const errors = await getImportErrors(result.import_id, token);
+      const errors = await getImportErrors(result.import_id);
       setImportErrors(errors);
     } catch (err) {
       const message =

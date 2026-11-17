@@ -20,6 +20,40 @@ export interface BackendTokenResponse {
   expires_in: number;
 }
 
+/** The user as the backend describes it (`GET /api/v1/user/me`). */
+export interface BackendUser {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+}
+
+/**
+ * Lee el usuario actual del backend.
+ *
+ * Se usa para refrescar el rol cuando se renueva la sesión: un cambio de
+ * rol tiene que aplicar sin cerrar la sesión, y el backend evalúa el rol en
+ * cada petición, así que la copia que guarda la cookie solo tiene que estar
+ * al día.
+ */
+export async function fetchBackendUser(
+  accessToken: string,
+): Promise<BackendUser | null> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/user/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as BackendUser;
+  } catch (error) {
+    console.error('Error al leer el usuario del backend:', error);
+    return null;
+  }
+}
+
 /**
  * Pide al backend un token de acceso nuevo a partir del token de refresco.
  *

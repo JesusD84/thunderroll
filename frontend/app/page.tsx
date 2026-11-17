@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,8 +22,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface DashboardData {
   units: {
@@ -75,21 +73,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchDashboard = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token || isOperator) return;
+      if (!session || isOperator) return;
 
       try {
-        const res = await sessionAwareFetch(`${API_URL}/api/v1/reports/dashboard`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-
-        const data: DashboardData = await res.json();
+        const data = await apiFetch<DashboardData>('/api/v1/reports/dashboard');
         setDashboardData(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching dashboard:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'Error cargando dashboard');
       } finally {
         setLoading(false);
       }

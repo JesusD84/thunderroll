@@ -20,9 +20,10 @@ Convención: **una rama y un PR por tarea**, mensajes de commit descriptivos, te
 - Metadata upload: `batch_period` (ej. "2026-ABRIL") y `product_type` (triciclo/bici eléctrica/scooter), ambos opcionales.
 - Archivos soportados: `.xlsx`, `.xls`, `.csv`.
 - Preview **no bloquea** import; `invalid_rows` es esperado; import atómico con éxito parcial.
-- Base imports: `${API_URL}/api/v1/imports` — `POST /preview`, `POST /upload`, `GET /`, `GET /{id}`, `GET /{id}/errors`, `DELETE /{id}` (solo ADMIN).
-- Base equivalencias: `${API_URL}/api/v1/model-equivalences` — CRUD + `GET /unmapped`.
-- Auth: `(session as any).accessToken` → header `Authorization: Bearer <token>`.
+- Base imports: `/api/v1/imports` — `POST /preview`, `POST /upload`, `GET /`, `GET /{id}`, `GET /{id}/errors`, `DELETE /{id}` (solo ADMIN).
+- Base equivalencias: `/api/v1/model-equivalences` — CRUD + `GET /unmapped`.
+- Auth: ninguna. Las llamadas van por el proxy del servidor (`lib/api.ts`), que pone el
+  `Authorization: Bearer` con el token que vive en la cookie cifrada. El navegador nunca lo ve.
 
 ---
 
@@ -36,7 +37,7 @@ Auditoría de `app/imports/page.tsx` (mock completo), propuesta de arquitectura 
 ## FR-01 · Cliente API + tipos TS + wrappers UI
 **Estado:** ✅ DONE (PR #53) · **Depende de:** FR-00
 
-- `lib/api.ts`: wrapper `fetch` autenticado (inyecta `Bearer`, base `NEXT_PUBLIC_API_URL`, parseo de errores 400/500).
+- `lib/api.ts`: wrapper `fetch` que manda todo por el proxy del servidor (`/api/proxy`) y parsea los errores 400/500 en `ApiError`. No lleva token: el proxy lo agrega en el servidor.
 - `lib/imports.ts`: funciones tipadas por endpoint (preview, upload, list, get, errors, delete).
 - `lib/types.ts`: `ImportPreviewResponse`, `SheetPreview`, `InvalidRow`, `Issue`, `Validation`, `UploadResult`, `ImportRecord`, `ImportError`, `ModelEquivalence`, `CanonicalField`.
 - Wrappers shadcn faltantes: `tabs`, `dialog`, `alert-dialog`, `progress`, `checkbox`, `tooltip`, `skeleton` + toaster `sonner`.

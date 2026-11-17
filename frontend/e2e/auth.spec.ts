@@ -1,45 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-const mockSession = {
-  user: { id: '1', email: 'admin@thunderoll.com', name: 'Admin User', role: 'admin' },
-  accessToken: 'mock-jwt-token',
-  expires: new Date(Date.now() + 86400000).toISOString(),
-};
+import { E2E_BACKEND_URL, createSessionCookie, sessionCookieName } from './session';
 
-// The shape the API really returns (app/services/report.py): the counts are
-// nested under "units"/"locations"/"transfers". An older flat shape
-// (total_units, available_units, ...) used to be mocked here, and since the
-// dashboard reads dashboardData.units.total, the page rendered zeros while
-// the test still passed. Keep this in sync with the backend.
-const mockDashboard = {
-  units: { total: 42, available: 30, sold: 8, in_transit: 4 },
-  locations: { total: 3 },
-  transfers: { active: 2 },
-  inventory_by_location: [{ location: 'Bodega Central', count: 25 }],
-  inventory_by_brand: [{ brand: 'Honda', count: 25 }],
-  sales_by_month: [{ month: '2025-05', count: 3 }],
-  recent_transfers: [],
-  recent_imports: [],
-};
-
-// The API always returns ``color`` (NOT NULL in the model, required in the
-// response schema), and the units page reads it without a guard:
-// ``unit.color.toLowerCase()``. A mock without that field crashes the page
-// with "Application error" and makes this spec flaky, because the crash can
-// land before or after the assertion runs.
-const mockUnits = [
-  { id: 1, brand: 'Honda', model: 'PCX', engine_number: 'ENG001', chassis_number: 'CHS001', color: 'Rojo', status: 'AVAILABLE', location_name: 'Bodega Central' },
-  { id: 2, brand: 'Yamaha', model: 'NMAX', engine_number: 'ENG002', chassis_number: 'CHS002', color: 'Azul', status: 'SOLD', location_name: 'Sucursal Norte' },
-];
-
-async function setupMocks(page: any) {
-  await page.route('**/api/auth/session', r => r.fulfill({ json: mockSession }));
-  await page.route('**/api/auth/csrf', r => r.fulfill({ json: { csrfToken: 'x' } }));
-  await page.route('**/api/auth/signout', r => r.fulfill({ json: { url: '/login' } }));
-  await page.route('**/api/v1/reports/dashboard', r => r.fulfill({ json: mockDashboard }));
-  await page.route('**/api/v1/units/**', r => r.fulfill({ json: mockUnits }));
-  await page.route('**/api/v1/locations/', r => r.fulfill({ json: [{ id: 1, name: 'Bodega Central' }] }));
-  await page.route('**/api/v1/user/', r => r.fulfill({ json: [{ id: 1, email: 'a@t.com', first_name: 'A', last_name: 'U', role: 'admin', is_active: true }] }));
+/**
+ * The session is a REAL NextAuth session cookie: the middleware (server
+ * side) and the API proxy read it, so mocking `/api/auth/session` in the
+ * browser is not enough any more.
+ */
+async function signIn(page: Page, role: 'admin' | 'manager' | 'operator' = 'admin') {
+  const value = await createSessionCookie({ role });
+  await page.context().addCookies([
+    { name: sessionCookieName(), value, domain: 'localhost', path: '/' },
+  ]);
 }
 
 test.describe('Auth', () => {
@@ -57,13 +29,16 @@ test.describe('Auth', () => {
 
   test('protected route redirects to login', async ({ page }) => {
     await page.goto('/units');
-    await page.waitForURL('/login');
+    // The middleware answers 307 with the callbackUrl, so the user lands
+    // back where they were after signing in.
+    await page.waitForURL(/\/login\?callbackUrl=/);
+    await expect(page.locator('h2')).toContainText('Iniciar Sesión');
   });
 });
 
 test.describe('Authenticated', () => {
   test.beforeEach(async ({ page }) => {
-    await setupMocks(page);
+    await signIn(page, 'admin');
     await page.goto('/');
   });
 
@@ -94,6 +69,11 @@ test.describe('Authenticated', () => {
     await page.getByText('Unidades').first().click();
     await page.waitForURL('/units');
     await expect(page.locator('h1')).toContainText('Unidades');
+    // The data has to arrive too: a proxy that loses the trailing slash
+    // would answer 404 and the table would stay empty.
+    await expect(page.getByText('Honda')).toBeVisible();
+    await expect(page.getByText('PCX')).toBeVisible();
+    await expect(page.getByText('Unidades (2)')).toBeVisible();
   });
 
   test('navigates to Imports', async ({ page }) => {
@@ -114,5 +94,64 @@ test.describe('Authenticated', () => {
   test('navigates to Settings', async ({ page }) => {
     await page.getByText('Configuración').first().click();
     await page.waitForURL('/settings');
+  });
+});
+
+test.describe('The token never reaches the browser', () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, 'admin');
+  });
+
+  test('the session does not carry the access token', async ({ page }) => {
+    const response = await page.request.get('/api/auth/session');
+    const session = await response.json();
+
+    expect(session.user.role).toBe('admin');
+    expect(session.accessToken).toBeUndefined();
+    expect(session.accessTokenExpiresAt).toBeUndefined();
+  });
+
+  test('the proxy forwards the credential to the backend', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByText('Total de Unidades').first().locator('..')).toContainText('42');
+
+    // The backend records what it received: the credential arrives there,
+    // even though the browser never saw it.
+    const received = await (await page.request.get(`${E2E_BACKEND_URL}/__mock/requests`)).json();
+    const apiCalls = received.filter((entry: { path: string }) =>
+      entry.path.startsWith('/api/v1/'),
+    );
+
+    expect(apiCalls.length).toBeGreaterThan(0);
+    expect(apiCalls.every((entry: { hasAuthorization: boolean }) => entry.hasAuthorization)).toBe(
+      true,
+    );
+    expect(apiCalls[0].authorizationScheme).toBe('Bearer');
+  });
+});
+
+test.describe('Role gates in the middleware', () => {
+  test('an admin can open the reports section', async ({ page }) => {
+    await signIn(page, 'admin');
+    await page.goto('/reports');
+    await expect(page.locator('h1')).toContainText('Reportes');
+  });
+
+  test('an operator is sent away from the reports section', async ({ page }) => {
+    await signIn(page, 'operator');
+    await page.goto('/reports');
+    await page.waitForURL(/\/units/);
+  });
+
+  test('an operator is sent away from the imports section', async ({ page }) => {
+    await signIn(page, 'operator');
+    await page.goto('/imports');
+    await page.waitForURL(/\/units/);
+  });
+
+  test('an operator can open the units section', async ({ page }) => {
+    await signIn(page, 'operator');
+    await page.goto('/units');
+    await expect(page.locator('h1')).toContainText('Gestión de Unidades');
   });
 });

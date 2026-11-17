@@ -15,7 +15,7 @@ Sistema de trazabilidad de inventario para **Thunderoll**, empresa de scooters/m
 | **Backend** | FastAPI + SQLAlchemy (sync) + Alembic | Python 3.11+, FastAPI 0.135 |
 | **Frontend** | Next.js (App Router) + TypeScript + TailwindCSS | Next 14.2, React 18.2 |
 | **DB** | PostgreSQL 15 | psycopg2-binary (sync) |
-| **Auth frontend** | NextAuth 4.x con JWT del backend | |
+| **Auth frontend** | NextAuth 4.x con JWT del backend (el token vive solo en la cookie cifrada) | |
 | **Auth backend** | python-jose + passlib/bcrypt + OAuth2PasswordBearer | |
 | **UI Components** | shadcn/ui (Radix primitives) + Lucide icons | |
 | **State** | Zustand, Jotai, SWR, TanStack Query (todos instalados) | |
@@ -162,7 +162,9 @@ Cada tipo se rechaza donde se espera el otro: un token de reset no abre sesión 
 
 No hay session store: la revocación se hace con un contador entero en `users.token_version` que viaja dentro del token.
 
-- Se **incrementa** al cambiar la contraseña, al resetearla, al cambiar el rol y al desactivar la cuenta.
+- Se **incrementa** al cambiar la contraseña, al resetearla y al desactivar la cuenta. Un cambio de **rol no**
+  la incrementa: el rol se evalúa desde la base en cada petición, así que el cambio aplica de inmediato y la
+  sesión sigue viva (el frontend relee el rol al renovar la sesión).
 - Un token cuyo `ver` no coincide con el valor guardado → **401**.
 - El token de reset también queda invalidado por lo mismo: al canjearlo, la contraseña cambia, el contador sube y ese token no se puede usar dos veces.
 
@@ -204,11 +206,16 @@ Devuelve un `access_token` nuevo; el `refresh_token` **no rota** (7 días fijos 
 - **Next.js App Router** (no Pages Router)
 - **Path alias**: `@/*` apunta a la raíz del frontend
 - **Auth**: NextAuth con custom credentials provider que llama al backend JWT
-- **Session type** extendida en `types/next-auth.d.ts` con `role`, `accessToken` y `accessTokenExpiresAt`
+- **Session type** extendida en `types/next-auth.d.ts` con `role` y `id` (el `accessToken` **no** se expone al
+  navegador: vive en la cookie cifrada y lo lee el servidor)
 - **UI**: shadcn/ui components en `components/ui/`
 - **Fetching**: el patrón consolidado es `fetch` + `useState` vía `lib/api.ts` (`apiFetch` inyecta el `Bearer`); SWR, TanStack Query, Zustand y Jotai están instalados pero **no** son el estándar usado
-- **Permisos en UI**: `lib/auth.ts` (`useAuth` + `getPermissions`) es la única fuente de gating del frontend; refleja las reglas de `require_role` del backend
-- **401 / sesión expirada**: `lib/session-expiry.ts` (`handleSessionExpired`, single-flight) cierra sesión y redirige a `/login?reason=expired&callbackUrl=…`; `safeCallbackUrl()` bloquea redirects externos. Las peticiones autenticadas deben ir por `sessionAwareFetch()`
+- **Permisos en UI**: `lib/permissions.ts` (`getPermissions` + las reglas de ruta) es la única fuente de gating
+  del frontend; refleja las reglas de `require_role` del backend. `lib/auth.ts` lo reexporta y agrega `useAuth`.
+  El **middleware** (`frontend/middleware.ts`) usa las mismas reglas para proteger las rutas
+- **Proxy de API**: el navegador **nunca** habla con el backend. Todo pasa por `frontend/app/api/proxy/[...path]/route.ts`, que lee el token de la cookie cifrada con `getToken()` (`lib/server/session.ts`) y pone el `Authorization: Bearer` en el servidor. Por eso el frontend no necesita `NEXT_PUBLIC_API_URL` ni CORS: solo `BACKEND_URL`.
+- **Middleware**: `frontend/middleware.ts` usa `withAuth` de next-auth: sin sesión, ninguna ruta (excepto `/login` y la API de auth) responde — se redirige a `/login?callbackUrl=…`. Además cierra por rol las secciones de `ROLE_GATED_ROUTES` (`/imports`, `/model-equivalences`, `/reports`, `/units/new`).
+- **401 / sesión expirada**: `lib/session-expiry.ts` (`handleSessionExpired`, single-flight) cierra sesión y redirige a `/login?reason=expired&callbackUrl=…`; `safeCallbackUrl()` bloquea redirects externos. Las peticiones autenticadas deben ir por `apiFetch` / `sessionAwareFetch()`
 - **Refresco de sesión**: el access token dura 60 min; el `refresh_token` (7 días) permite renovarlo sin volver a autenticarse. El backend renueva de forma proactiva en el callback `jwt` de NextAuth (`lib/backend-auth.ts`), y `lib/api.ts` reintenta la petición una vez si el backend responde 401. Si el refresh tampoco vale, cae al flujo de sesión expirada
 
 ---
@@ -258,7 +265,9 @@ cd backend && black app/           # formateo
 - **Branch protection en `main`**: requiere PR, que ambos checks pasen, rama actualizada (strict) y conversaciones resueltas. No se permite push directo ni force-push.
 - **CD Frontend (Vercel)**: preview por PR, producción al mergear a `main` (`thunderroll.vercel.app`).
 - **CD Backend + DB (Render)**: deploy al push a `main` vía `render.yaml` (runtime python; FastAPI + PostgreSQL).
-- **Variables clave en Vercel**: `BACKEND_URL` (login server-side de NextAuth) **y** `NEXT_PUBLIC_API_URL` (llamadas del navegador) — ambas necesarias y distintas. Detalle completo en `CI_CD_PLAN.md`.
+- **Variables clave en Vercel**: `BACKEND_URL` (login server-side de NextAuth **y** proxy de la API) y
+  `NEXTAUTH_SECRET` + `NEXTAUTH_URL` (obligatorias: sin secret el middleware y el proxy no pueden abrir la
+  sesión). `NEXT_PUBLIC_API_URL` ya no se usa. Detalle completo en `CI_CD_PLAN.md`.
 
 ---
 
@@ -373,8 +382,8 @@ RATE_LIMIT_LOGIN_PER_MINUTE, RATE_LIMIT_FORGOT_PASSWORD_PER_MINUTE, RATE_LIMIT_R
 BOOTSTRAP_ADMIN_PASSWORD      # Password inicial del admin bootstrap (opcional)
 
 # Frontend
-NEXT_PUBLIC_API_URL   # URL del backend (http://localhost:8000) — llamadas del navegador
-BACKEND_URL           # URL del backend para el login server-side de NextAuth (distinta de la anterior)
+BACKEND_URL           # URL del backend para el login server-side de NextAuth y el proxy de la API
+NEXT_PUBLIC_API_URL   # (deprecado) ya no lo usa el frontend: las llamadas pasan por el proxy
 NEXTAUTH_URL          # URL del frontend (http://localhost:3000)
 NEXTAUTH_SECRET       # Secret para NextAuth
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { API_BASE, apiFetch, sessionAwareFetch } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Download, FileText, Package, Truck, DollarSign, Loader2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 type ReportTab = 'inventory' | 'transfers' | 'sales';
 
@@ -34,10 +32,9 @@ export default function ReportsPage() {
   const [previewData, setPreviewData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const token = (session as any)?.accessToken;
-
-  const downloadFile = async (url: string, filename: string) => {
-    const res = await sessionAwareFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  const downloadFile = async (path: string, filename: string) => {
+    // The file comes as a blob, so this call needs the raw Response.
+    const res = await sessionAwareFetch(`${API_BASE}${path}`);
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -47,40 +44,34 @@ export default function ReportsPage() {
     URL.revokeObjectURL(a.href);
   };
 
-  const fetchPreview = async (endpoint: string) => {
-    const res = await sessionAwareFetch(`${API_URL}${endpoint}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-    return res.json();
-  };
+  const fetchPreview = (endpoint: string) => apiFetch<unknown>(endpoint);
 
   const handleGenerateReport = async () => {
-    if (!token) return;
+    if (!session) return;
     setLoading(true);
     setError(null);
     try {
       const from = dateFrom?.toISOString().split('T')[0];
       const to = dateTo?.toISOString().split('T')[0];
-      let url = '', filename = '';
+      let path = '', filename = '';
       switch (activeTab) {
         case 'inventory':
-          url = `${API_URL}/api/v1/reports/export/inventory`;
+          path = '/api/v1/reports/export/inventory';
           filename = 'inventario.xlsx'; break;
         case 'transfers':
-          url = `${API_URL}/api/v1/reports/export/transfers?date_from=${from}&date_to=${to}`;
+          path = `/api/v1/reports/export/transfers?date_from=${from}&date_to=${to}`;
           filename = `transferencias_${from}_${to}.xlsx`; break;
         case 'sales':
-          url = `${API_URL}/api/v1/reports/export/sales?date_from=${from}&date_to=${to}`;
+          path = `/api/v1/reports/export/sales?date_from=${from}&date_to=${to}`;
           filename = `ventas_${from}_${to}.xlsx`; break;
       }
-      await downloadFile(url, filename);
-    } catch (err: any) { setError(err.message); }
+      await downloadFile(path, filename);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Error generando reporte'); }
     finally { setLoading(false); }
   };
 
   const handlePreview = async () => {
-    if (!token) return;
+    if (!session) return;
     setLoading(true); setError(null);
     try {
       const from = dateFrom?.toISOString().split('T')[0];
@@ -92,25 +83,25 @@ export default function ReportsPage() {
         case 'sales': endpoint = `/api/v1/reports/sales?date_from=${from}&date_to=${to}`; break;
       }
       setPreviewData(await fetchPreview(endpoint));
-    } catch (err: any) { setError(err.message); }
+    } catch (err) { setError(err instanceof Error ? err.message : 'Error generando reporte'); }
     finally { setLoading(false); }
   };
 
   const handleQuickReport = async (type: string) => {
-    if (!token) return;
+    if (!session) return;
     setLoading(true); setError(null);
     try {
       const today = new Date().toISOString().split('T')[0];
       const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
       switch (type) {
         case 'transfers':
-          await downloadFile(`${API_URL}/api/v1/reports/export/transfers?date_from=${today}&date_to=${today}`, `transferencias_hoy_${today}.xlsx`); break;
+          await downloadFile(`/api/v1/reports/export/transfers?date_from=${today}&date_to=${today}`, `transferencias_hoy_${today}.xlsx`); break;
         case 'inventory':
-          await downloadFile(`${API_URL}/api/v1/reports/export/inventory`, `inventario_actual_${today}.xlsx`); break;
+          await downloadFile('/api/v1/reports/export/inventory', `inventario_actual_${today}.xlsx`); break;
         case 'sales':
-          await downloadFile(`${API_URL}/api/v1/reports/export/sales?date_from=${firstOfMonth}&date_to=${today}`, `ventas_mes_${today}.xlsx`); break;
+          await downloadFile(`/api/v1/reports/export/sales?date_from=${firstOfMonth}&date_to=${today}`, `ventas_mes_${today}.xlsx`); break;
       }
-    } catch (err: any) { setError(err.message); }
+    } catch (err) { setError(err instanceof Error ? err.message : 'Error generando reporte'); }
     finally { setLoading(false); }
   };
   return (

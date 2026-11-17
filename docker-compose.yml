@@ -62,7 +62,6 @@ services:
       dockerfile: Dockerfile
     container_name: thunderoll_frontend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       BACKEND_URL: ${BACKEND_URL}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}

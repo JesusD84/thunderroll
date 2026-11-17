@@ -1,4 +1,3 @@
-
 import NextAuth from "next-auth"
 
 declare module "next-auth" {
@@ -10,12 +9,11 @@ declare module "next-auth" {
       role: string
     }
     /**
-     * Token de acceso del backend. Vive dentro de la cookie de sesión
-     * (cifrada), no en el localStorage.
+     * El token de acceso del backend NO está aquí a propósito: vive solo
+     * dentro de la cookie cifrada de la sesión y lo lee el servidor (el
+     * proxy de la API). Si el navegador lo recibiera, cualquier XSS podría
+     * llevárselo.
      */
-    accessToken?: string
-    /** Momento (ms epoch) en que el token de acceso deja de servir. */
-    accessTokenExpiresAt?: number
   }
 
   interface User {
@@ -23,6 +21,10 @@ declare module "next-auth" {
     email: string
     name: string
     role: string
+    /**
+     * Token de acceso del backend. Solo existe en el servidor (durante el
+     * login y dentro de la cookie cifrada).
+     */
     accessToken: string
     /** Token de refresco: sirve para pedir un access token nuevo. */
     refreshToken: string
@@ -34,8 +36,11 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     role: string
+    id?: string
     accessToken?: string
     refreshToken?: string
     accessTokenExpiresAt?: number
+    /** Momento (ms epoch) de la última lectura del rol contra el backend. */
+    roleCheckedAt?: number
   }
 }

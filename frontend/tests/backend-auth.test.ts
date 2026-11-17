@@ -5,6 +5,7 @@ import {
   refreshBackendToken,
   shouldRefreshAccessToken,
 } from '@/lib/backend-auth';
+import { mockResponse } from './mocks/response';
 
 const NOW = 1_700_000_000_000;
 
@@ -47,7 +48,7 @@ describe('refreshBackendToken', () => {
       expires_in: 3600,
     };
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(body), { status: 200 }),
+      mockResponse(body, { status: 200 }) as unknown as Response,
     );
 
     const result = await refreshBackendToken('refresh');
@@ -61,7 +62,7 @@ describe('refreshBackendToken', () => {
 
   it('devuelve null cuando el refresh token ya no vale', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response('{"detail":"Invalid refresh token"}', { status: 401 }),
+      mockResponse({ detail: 'Invalid refresh token' }, { status: 401 }) as unknown as Response,
     );
 
     expect(await refreshBackendToken('refresh')).toBeNull();

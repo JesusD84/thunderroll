@@ -1,7 +1,7 @@
 
 'use client';
 
-import { sessionAwareFetch } from '@/lib/api';
+import { apiFetch, ApiError } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Location {
   id: number;
@@ -47,13 +45,9 @@ export default function NewUnitPage() {
 
   useEffect(() => {
     const fetchLocations = async () => {
-      const token = (session as any)?.accessToken;
-      if (!token) return;
+      if (!session) return;
       try {
-        const res = await sessionAwareFetch(`${API_URL}/api/v1/locations/`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (res.ok) setLocations(await res.json());
+        setLocations(await apiFetch<Location[]>('/api/v1/locations/'));
       } catch (err) {
         console.error('Error fetching locations:', err);
       }
@@ -66,17 +60,12 @@ export default function NewUnitPage() {
     setLoading(true);
     setError(null);
 
-    const token = (session as any)?.accessToken;
-    if (!token) return;
+    if (!session) return;
 
     try {
-      const res = await sessionAwareFetch(`${API_URL}/api/v1/units/`, {
+      await apiFetch('/api/v1/units/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        json: {
           engine_number: formData.engine_number || null,
           chassis_number: formData.chassis_number || null,
           model: formData.model,
@@ -85,18 +74,17 @@ export default function NewUnitPage() {
           current_location_id: formData.current_location_id ? parseInt(formData.current_location_id) : null,
           notes: formData.notes || null,
           status: (formData.engine_number && formData.chassis_number) ? 'AVAILABLE' : 'WAREHOUSE_UNIDENTIFIED',
-        }),
+        },
       });
 
-      if (res.ok) {
-        router.push('/units');
-      } else {
-        const err = await res.json();
-        setError(err.detail || 'Error creando unidad');
-      }
+      router.push('/units');
     } catch (err) {
       console.error('Error creando unidad:', err);
-      setError('Error de conexión');
+      if (err instanceof ApiError) {
+        setError(typeof err.detail === 'string' ? err.detail : 'Error creando unidad');
+      } else {
+        setError('Error de conexión');
+      }
     } finally {
       setLoading(false);
     }

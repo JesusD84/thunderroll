@@ -172,7 +172,7 @@ async def get_current_user(
     1. que el token sea de tipo ``access`` (un token de reset no abre sesión);
     2. que el ``sub`` sea el id de un usuario que existe;
     3. que la versión del token coincida con la del usuario (si no, el token
-       fue revocado por un cambio de contraseña, de rol o por una baja).
+       fue revocado por un cambio de contraseña o por una baja).
     """
     credentials_exception = _credentials_exception()
     try:

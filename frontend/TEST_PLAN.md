@@ -153,7 +153,7 @@ npx playwright install
 |---|---|
 | Loading | Muestra "Cargando dashboard..." |
 | Error | Muestra mensaje de error |
-| Sin token | No hace fetch si no hay accessToken |
+| Sin sesión | No hace fetch si no hay sesión (el token ya no está en el navegador) |
 
 ### 3b. Datos
 

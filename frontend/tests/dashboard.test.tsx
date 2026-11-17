@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardPage from '@/app/page';
+import { API_BASE } from '@/lib/api';
+import { mockResponse } from './mocks/response';
 
 const mockFetch = vi.fn();
-let mockSession: any = { user: { name: 'Admin' }, accessToken: 'token123' };
+// The session no longer carries an access token: the credential lives in the
+// encrypted cookie and the server-side proxy adds the Authorization header.
+let mockSession: any = { user: { name: 'Admin' } };
 
 vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: mockSession }),
+  getSession: () => Promise.resolve(null),
+  signOut: vi.fn(),
 }));
 
 const mockReplace = vi.fn();
@@ -24,7 +30,7 @@ vi.mock('next/link', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin' }, accessToken: 'token123' };
+  mockSession = { user: { name: 'Admin' } };
   mockFetch.mockReset();
 });
 
@@ -60,8 +66,8 @@ const mockDashboardData = {
 
 describe('DashboardPage', () => {
   it('redirects operator to /units without fetching the dashboard', () => {
-    mockSession = { user: { name: 'Op', role: 'operator' }, accessToken: 'token123' };
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockSession = { user: { name: 'Op', role: 'operator' } };
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     expect(mockReplace).toHaveBeenCalledWith('/units');
     expect(mockFetch).not.toHaveBeenCalled();
@@ -80,14 +86,28 @@ describe('DashboardPage', () => {
     expect(await screen.findByText(/Error cargando dashboard/)).toBeInTheDocument();
   });
 
-  it('does not fetch without accessToken', () => {
-    mockSession = { user: { name: 'Admin' } };
+  it('does not fetch when there is no session', () => {
+    mockSession = null;
     render(<DashboardPage />);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('fetches the dashboard with a session that has no accessToken', async () => {
+    mockSession = { user: { name: 'Admin' } };
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Total de Unidades')).toBeInTheDocument();
+    });
+    // The call goes to the server-side proxy and carries no credential.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][0]).toBe(`${API_BASE}/api/v1/reports/dashboard`);
+    expect(new Headers(mockFetch.mock.calls[0][1]?.headers).get('Authorization')).toBeNull();
+  });
+
   it('renders KPI stats cards', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('50')).toBeInTheDocument();
@@ -102,7 +122,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders inventory by location', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Distribución por Ubicación')).toBeInTheDocument();
@@ -113,7 +133,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders inventory by brand', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Inventario por Marca')).toBeInTheDocument();
@@ -123,7 +143,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders alerts section', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Alertas')).toBeInTheDocument();
@@ -133,7 +153,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders recent activity', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Actividad Reciente')).toBeInTheDocument();
@@ -142,7 +162,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders quick action buttons', async () => {
-    mockFetch.mockResolvedValue({ ok: true, json: () => mockDashboardData });
+    mockFetch.mockResolvedValue(mockResponse(mockDashboardData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Acciones Rápidas')).toBeInTheDocument();
@@ -159,7 +179,7 @@ describe('DashboardPage', () => {
       units: { total: 10, available: 10, sold: 0, in_transit: 0 },
       transfers: { active: 0 },
     };
-    mockFetch.mockResolvedValue({ ok: true, json: () => noAlertsData });
+    mockFetch.mockResolvedValue(mockResponse(noAlertsData));
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Todo en orden — sin alertas pendientes')).toBeInTheDocument();

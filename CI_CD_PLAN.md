@@ -110,13 +110,18 @@ SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM   # placeholders
 
 ### Frontend (Vercel)
 ```
-NEXT_PUBLIC_API_URL=https://thunderroll-backend.onrender.com   # llamadas del navegador
+# El navegador ya no llama al backend: todo pasa por el proxy de este mismo
+# origen, así que el frontend solo necesita BACKEND_URL.
 BACKEND_URL=https://thunderroll-backend.onrender.com           # login server-side de NextAuth
 NEXTAUTH_URL=https://thunderroll.vercel.app
 NEXTAUTH_SECRET=...                                            # openssl rand -base64 32
 ```
 
-> **Importante:** `BACKEND_URL` y `NEXT_PUBLIC_API_URL` son distintas y ambas necesarias. El login de NextAuth corre server-side y usa `BACKEND_URL`; si falta, el login falla con "Credenciales inválidas" aunque el resto funcione.
+> **Importante:** `BACKEND_URL` es necesaria: el login de NextAuth y el proxy de la API corren server-side y la usan; si falta, el login falla con "Credenciales inválidas" aunque el resto funcione.
+>
+> `NEXTAUTH_SECRET` también es obligatoria: el middleware y el proxy leen la cookie de sesión con ella. Sin ella, el middleware no puede abrir ninguna sesión y todo redirige al login.
+>
+> `NEXT_PUBLIC_API_URL` ya **no** se usa (las llamadas del navegador pasan por el proxy de este mismo origen, así que tampoco hay CORS que configurar).
 
 ---
 

@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from './mocks/server';
 
-let mockSession: any = { user: { name: 'Admin User', role: 'admin' }, accessToken: 'mock-jwt' };
+let mockSession: any = { user: { name: 'Admin User', role: 'admin' } };
 let mockStatus = 'authenticated';
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -19,6 +19,7 @@ vi.mock('next-auth/react', () => ({
   useSession: () => ({ data: mockSession, status: mockStatus }),
   signIn: vi.fn(),
   signOut: vi.fn(),
+  getSession: () => Promise.resolve(null),
 }));
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -27,7 +28,7 @@ afterAll(() => server.close());
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSession = { user: { name: 'Admin User', role: 'admin' }, accessToken: 'mock-jwt' };
+  mockSession = { user: { name: 'Admin User', role: 'admin' } };
   mockStatus = 'authenticated';
 });
 
@@ -88,7 +89,7 @@ describe('UC-2: Inventory Management', () => {
     const { server } = await import('./mocks/server');
     const { http, HttpResponse } = await import('msw');
     server.use(
-      http.get('http://localhost:8000/api/v1/units/', () =>
+      http.get('/api/proxy/api/v1/units/', () =>
         HttpResponse.json([])
       )
     );

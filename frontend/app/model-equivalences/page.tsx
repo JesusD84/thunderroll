@@ -68,7 +68,7 @@ const EMPTY_DIALOG: DialogState = {
 };
 
 export default function ModelEquivalencesPage() {
-  const { token, deleteEquivalence: canDelete, manageEquivalences: canManage, viewEquivalences } = useAuth();
+  const { deleteEquivalence: canDelete, manageEquivalences: canManage, viewEquivalences } = useAuth();
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -91,8 +91,8 @@ export default function ModelEquivalencesPage() {
     setError(null);
     try {
       const [eqs, unm] = await Promise.all([
-        listModelEquivalences(token),
-        listUnmappedModels(token),
+        listModelEquivalences(),
+        listUnmappedModels(),
       ]);
       setEquivalences(eqs);
       setUnmapped(unm);
@@ -102,7 +102,7 @@ export default function ModelEquivalencesPage() {
       setError(message);
       setEquivalences([]);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -144,10 +144,10 @@ export default function ModelEquivalencesPage() {
         notes: dialog.notes.trim() || null,
       };
       if (dialog.mode === 'create') {
-        await createModelEquivalence(payload, token);
+        await createModelEquivalence(payload);
         toast.success('Equivalencia creada');
       } else if (dialog.id != null) {
-        await updateModelEquivalence(dialog.id, payload, token);
+        await updateModelEquivalence(dialog.id, payload);
         toast.success('Equivalencia actualizada');
       }
       closeDialog();
@@ -164,7 +164,7 @@ export default function ModelEquivalencesPage() {
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
-      await deleteModelEquivalence(id, token);
+      await deleteModelEquivalence(id);
       toast.success('Equivalencia eliminada');
       await load();
     } catch (err) {

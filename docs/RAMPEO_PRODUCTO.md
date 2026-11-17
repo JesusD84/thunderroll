@@ -50,9 +50,10 @@ El sistema tiene tres roles. No es decoración: cada rol refleja quién tiene el
   ADMIN y MANAGER
 - No ve el dashboard, ni importaciones, ni equivalencias, ni reportes, ni configuración
 
-> **Para el dev:** el gating de la UI vive en `frontend/lib/auth.ts` (`getPermissions`) y **es el espejo**
-> de `require_role()` del backend. Si agregas un permiso, cámbialo en los dos lados o la UI va a prometer
-> algo que la API rechaza.
+> **Para el dev:** el gating de la UI vive en `frontend/lib/permissions.ts` (`getPermissions`, reexportado por
+> `lib/auth.ts`) y **es el espejo** de `require_role()` del backend. Si agregas un permiso, cámbialo en los dos
+> lados o la UI va a prometer algo que la API rechaza. El **middleware** usa esas mismas reglas para cerrar
+> por rol las secciones que no le tocan.
 
 ## 4. El corazón del sistema: el ciclo de vida de una unidad
 

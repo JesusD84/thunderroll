@@ -49,9 +49,11 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     # Session revocation counter. It travels inside every access token, and a
     # token whose version no longer matches the one stored here is rejected.
-    # Bumping it is how a password change, a role change or a deactivation
-    # closes the sessions that were opened before it: there is no session
-    # store to delete from.
+    # Bumping it is how a password change or a deactivation closes the
+    # sessions that were opened before it: there is no session store to
+    # delete from. A role change does NOT bump it: the role is evaluated
+    # from this row on every request, so a new role applies right away and
+    # the open session does not have to be thrown away.
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
