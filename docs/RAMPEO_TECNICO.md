@@ -49,7 +49,18 @@ docker compose up --build
 
 - Frontend → http://localhost:3000
 - API + Swagger → http://localhost:8000/docs ← **esta es tu mejor amiga las primeras semanas**
-- Login → `admin@thunderoll.com` / `admin123`
+- Login → usuario `admin`, con la contraseña que tú definas en `BOOTSTRAP_ADMIN_PASSWORD`
+
+> **La cuenta admin no se crea sola.** El backend crea el usuario `admin`
+> (`admin@thunderoll.com`) **únicamente** si `BOOTSTRAP_ADMIN_PASSWORD` está definida en el
+> entorno y la base está vacía. Si la variable falta, **no se crea ninguna cuenta** y el backend
+> lo avisa en el log. No se genera ninguna contraseña: una que nadie conoce no serviría para
+> entrar y no se puede cambiar desde adentro (cambiar tu propia contraseña pide la actual). En
+> producción los logs se guardan, así que ninguna contraseña se imprime nunca.
+>
+> Para crear la cuenta: define la variable en el `.env` de la raíz
+> (`BOOTSTRAP_ADMIN_PASSWORD=...`, se sugiere `openssl rand -base64 18`) y reinicia la app
+> con la base todavía vacía. Después cámbiala desde **Configuración → Usuarios**.
 
 Docker Compose levanta **tres** servicios: `postgres` (con healthcheck), `backend` y `frontend`. El
 backend espera a que Postgres esté sano antes de arrancar. Los volúmenes `postgres_data` y
@@ -754,6 +765,7 @@ viste en el preview, y las filas sin identificador no aparecen en el historial d
 | `CORS error` | `FRONTEND_URL` no apunta al origen real | Incluir el dominio de preview de Vercel en `ALLOWED_ORIGINS` |
 | `no such column: units.<campo>` | La DB de producción (Neon) no tiene la columna | El deploy **no corre Alembic**: hay que resolver la migración a mano |
 | `ModuleNotFoundError: xlrd` | Falta dependencia para `.xls` | `xlrd` está en requirements; reinstala el venv |
+| No existe la cuenta `admin` y no puedo entrar | `BOOTSTRAP_ADMIN_PASSWORD` no está definida: el seed no creó ninguna cuenta (a propósito) | Define la variable en el entorno y reinicia la app con la base vacía — el log del backend lo avisa |
 
 ---
 
