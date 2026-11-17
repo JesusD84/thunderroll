@@ -179,12 +179,17 @@ class UserService:
         if new_password is not None:
             db_user.hashed_password = get_password_hash(new_password)
 
-        # Cualquier cambio de credenciales revoca las sesiones abiertas de
-        # esa cuenta: la contraseña, el rol (un token de operador no puede
-        # seguir valiendo como token de admin) y la baja.
-        role_changed = "role" in changes and changes["role"] != db_user.role
+        # Un cambio de ROL no revoca las sesiones abiertas: el backend
+        # evalúa el rol desde la base en cada petición (``require_role``
+        # mira ``current_user.role``), así que el cambio aplica de inmediato
+        # y el frontend puede actualizar su copia del rol al renovar la
+        # sesión, sin obligar a la persona a volver a iniciar sesión.
+        #
+        # La contraseña y la baja sí revocan: ahí cambió la credencial o la
+        # cuenta dejó de estar activa, y las sesiones abiertas no deben
+        # seguir valiendo.
         deactivated = changes.get("is_active") is False
-        if new_password is not None or role_changed or deactivated:
+        if new_password is not None or deactivated:
             bump_token_version(db_user)
 
         try:

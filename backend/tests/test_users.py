@@ -244,6 +244,38 @@ async def test_admin_can_update_other_user(
 
 
 @pytest.mark.asyncio
+async def test_role_change_keeps_the_session_and_applies_at_once(
+    client: AsyncClient, auth_headers, test_users, test_locations
+):
+    """A role change does not close the session, and it applies right away.
+
+    The role is read from the database on every request (``require_role``
+    looks at ``current_user.role``), so there is no need to revoke the open
+    sessions: the frontend refreshes its copy of the role when the session is
+    renewed. The token that was already issued keeps working.
+    """
+    user_id = _create_db_user("rol-cambiado", UserRole.OPERATOR)
+    operator_headers = await _login_as(client, "rol-cambiado")
+
+    # Before the change the operator cannot list the users (403).
+    before = await client.get("/api/v1/user/", headers=operator_headers)
+    assert before.status_code == 403
+
+    changed = await client.put(
+        f"/api/v1/user/{user_id}", json={"role": "manager"}, headers=auth_headers
+    )
+    assert changed.status_code == 200
+
+    # The same token keeps working, and with the new role.
+    after = await client.get("/api/v1/user/", headers=operator_headers)
+    assert after.status_code == 200
+
+    me = await client.get("/api/v1/user/me", headers=operator_headers)
+    assert me.status_code == 200
+    assert me.json()["role"] == "manager"
+
+
+@pytest.mark.asyncio
 async def test_update_user_requires_admin(
     client: AsyncClient, test_users, test_locations
 ):

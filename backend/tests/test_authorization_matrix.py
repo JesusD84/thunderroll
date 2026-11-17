@@ -16,7 +16,7 @@ The same matrix runs against a real PostgreSQL in
 ``tests/authorization_matrix.py`` so the two cannot drift apart.
 
 The module also compares the backend matrix against the permission flags the
-frontend uses (``frontend/lib/auth.ts``), so the UI and the API cannot drift
+frontend uses (``frontend/lib/permissions.ts``), so the UI and the API cannot drift
 apart without the suite noticing.
 """
 
@@ -42,7 +42,9 @@ from tests.authorization_matrix import (
 from tests.conftest import TestingSessionLocal
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-FRONTEND_AUTH_FILE = REPO_ROOT / "frontend" / "lib" / "auth.ts"
+# The permission flags moved to their own module so the edge middleware can
+# use the very same rules (frontend/lib/auth.ts re-exports them).
+FRONTEND_AUTH_FILE = REPO_ROOT / "frontend" / "lib" / "permissions.ts"
 
 
 # ---------------------------------------------------------------------------
@@ -139,10 +141,10 @@ def test_every_case_targets_a_protected_endpoint(case: EndpointCase):
 
 
 def _frontend_permission_flags() -> dict[str, str]:
-    """The ``flag -> expression`` map declared in frontend/lib/auth.ts."""
+    """The ``flag -> expression`` map declared in frontend/lib/permissions.ts."""
     source = FRONTEND_AUTH_FILE.read_text(encoding="utf-8")
     block = re.search(r"return\s*\{(.*?)\n\s*\};", source, re.DOTALL)
-    assert block, "Could not find the permission map in frontend/lib/auth.ts"
+    assert block, "Could not find the permission map in frontend/lib/permissions.ts"
 
     flags: dict[str, str] = {}
     for line in block.group(1).splitlines():
@@ -204,7 +206,7 @@ def test_frontend_permissions_match_backend(flag: str, role: str):
     assert required is not None, f"{method} {path} should require a role"
 
     flags = _frontend_permission_flags()
-    assert flag in flags, f"frontend/lib/auth.ts no longer declares {flag}"
+    assert flag in flags, f"frontend/lib/permissions.ts no longer declares {flag}"
 
     backend_allows = role in required
     frontend_allows = _frontend_allows(flag, role, flags)
