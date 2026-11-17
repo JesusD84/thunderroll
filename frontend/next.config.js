@@ -14,6 +14,10 @@ const isDev = process.env.NODE_ENV !== 'production';
  * - `connect-src` es solo 'self': desde que las llamadas al backend pasan
  *   por el proxy de este mismo origen, el navegador no habla con ningún
  *   otro origen (y por eso ya no necesita CORS).
+ *
+ * No se usa `upgrade-insecure-requests`: obliga al navegador a subir a
+ * https todos los recursos, y en un entorno que sirve por http (localhost,
+ * una red interna) eso deja la página en blanco.
  */
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -26,7 +30,6 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  ...(isDev ? [] : ['upgrade-insecure-requests']),
 ].join('; ');
 
 /** @type {import('next').NextConfig} */
